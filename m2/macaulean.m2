@@ -100,9 +100,14 @@ registerMethod(server, "testMethod", (expr) -> (
         toExternalString value expr
         ))
 
+registerMethod(server, "factorInt", (x) -> (
+        toList \ toList factor x
+    )
+)
+
 
 macauleanMainLoop(server, stdio);
 -- inputJSON = fromJSONStream stdio;
 -- stdio << toExternalString sum inputJSON << endl;
 
-stderr << "Macaualy2 Finished" << endl
+stderr << "Macaulay2 Finished" << endl

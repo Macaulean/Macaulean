@@ -28,15 +28,22 @@ def startM2Server : IO (IO.Process.Child {stdin := .null, stdout := .piped, stde
         IO.FS.Stream.ofHandle m2Process.stdout
      (m2Process,.) <$> .mk m2stdinStream m2stdoutStream <$> IO.mkRef 1
 
-def Macaulay2.sendRequest [Lean.ToJson a] [Lean.FromJson b] (m2 : Macaulay2) (requestName : String) (requestBody : a) : IO b :=
-  do let reqId <-
-        Lean.JsonRpc.RequestID.num <$> m2.nextRequestId.modifyGet (fun x => (x,x+1))
-     m2.requestStream.writeLspRequest
-        { id := reqId ,
-          method := requestName,
-          param :=  requestBody}
-     let response <- m2.responseStream.readLspResponseAs reqId (α := b)
-     pure response.result
+def Macaulay2.sendRequest [Lean.ToJson a] [Lean.FromJson b] (m2 : Macaulay2) (requestName : String) (requestBody : a) : IO b := do
+  let reqId ←
+    Lean.JsonRpc.RequestID.num <$> m2.nextRequestId.modifyGet (fun x => (x,x+1))
+  m2.requestStream.writeLspRequest
+    { id := reqId
+      method := requestName
+      param :=  requestBody }
+  let response <- m2.responseStream.readLspResponseAs reqId (α := b)
+  pure response.result
 
 def Macaulay2.eval (m2 : Macaulay2) (cmd : String) : IO String :=
   m2.sendRequest "testMethod" [cmd]
+
+def Macaulay2.factorNat (m2 : Macaulay2) (x : Nat) : IO (List (Nat × Nat)) := do
+  let response : List (List Nat) ← m2.sendRequest "factorInt" [x]
+  pure ((fun p =>
+    match p with
+      | [a,b] => (a,b)
+      | _ => ⟨1,1⟩) <$> response)
