@@ -27,6 +27,7 @@ def runJSONRPCTest := do
   match tryProveFactorization n result3 with
     | .some _ => IO.println s!"Proof Successful!"
     | .none => IO.println s!"Incorrect Factorization!"
+  let result4 <- m2Server.factorUnivariatePoly [(1,1)]
   pure m2Process
 
 def main : IO Unit :=

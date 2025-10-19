@@ -47,3 +47,8 @@ def Macaulay2.factorNat (m2 : Macaulay2) (x : Nat) : IO (List (Nat × Nat)) := d
     match p with
       | [a,b] => (a,b)
       | _ => ⟨1,1⟩) <$> response)
+
+abbrev Poly := List (Int × Nat)
+def Macaulay2.factorUnivariatePoly (m2 : Macaulay2) (p : Poly) : IO (List (Poly × Nat)) := do
+  let response : List (Poly × Nat) ← m2.sendRequest "factorUnivariatePoly" [p]
+  return response
