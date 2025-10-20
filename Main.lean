@@ -1,5 +1,6 @@
 import Macaulean
 
+import Lean
 
 def productOfFactors (factors : List (Nat × Nat)) : Nat :=
   factors.foldl (fun c ((a,b) : Nat × Nat) => c*a^b) 1
@@ -29,6 +30,27 @@ def runJSONRPCTest := do
     | .none => IO.println s!"Incorrect Factorization!"
   let result4 <- m2Server.factorUnivariatePoly [(1,1)]
   pure m2Process
+
+open Lean Elab Tactic
+
+elab "macaulay" : tactic => do
+  IO.println "TEST"
+  let goal ← getMainGoal
+  let target ← getMainTarget
+  let pf := Expr.const `True.intro []
+  let s ← get
+  try
+    closeMainGoal `macaulay pf
+  catch e =>
+    set s
+    throwError "macaulay can only prove True"
+  -- IO.println
+  return
+
+example : True := by macaulay
+
+-- example : (1=1) := by macaulay
+
 
 def main : IO Unit :=
   do let m2Process <- runJSONRPCTest
