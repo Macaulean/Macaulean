@@ -2,6 +2,8 @@ import Macaulean
 
 import Lean
 
+open Lean Elab Tactic
+
 def productOfFactors (factors : List (Nat × Nat)) : Nat :=
   factors.foldl (fun c ((a,b) : Nat × Nat) => c*a^b) 1
 
@@ -31,8 +33,6 @@ def runJSONRPCTest := do
   let result4 <- m2Server.factorUnivariatePoly [(1,1)]
   pure m2Process
 
-open Lean Elab Tactic
-
 elab "macaulay" : tactic => do
   IO.println "TEST"
   let goal ← getMainGoal
@@ -56,4 +56,5 @@ def main : IO Unit :=
   do let m2Process <- runJSONRPCTest
      let returnCode <- m2Process.wait
      IO.println s!"Macaulay2 Return Code: {returnCode}"
-     IO.println s!"Hello, {hello}!"
+
+-- #eval main
