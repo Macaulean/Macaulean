@@ -31,8 +31,6 @@ theorem natOnlyUnit {x : Nat} : IsUnit x ↔ x = 1 := by
 --this syntax command is based on the one for intro, correct if wrong
 syntax (name := m2factor) "m2factor" notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
-#eval Meta.evalExpr
-
 @[tactic m2factor]
 def macaualy2ProvideFactorization : Tactic := fun stx => do
   match stx with
