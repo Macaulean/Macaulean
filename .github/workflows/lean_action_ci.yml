@@ -10,5 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - run: |
+          sudo apt-get install macaulay2
       - uses: actions/checkout@v4
       - uses: leanprover/lean-action@v1
