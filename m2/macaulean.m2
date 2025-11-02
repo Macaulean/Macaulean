@@ -1,3 +1,4 @@
+stderr << version << endl
 stderr << "Macaulean M2 Startup" << endl
 
 needsPackage "JSONRPC"
