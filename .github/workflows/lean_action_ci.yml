@@ -11,6 +11,8 @@ jobs:
 
     steps:
       - run: |
+          sudo add-apt-repository ppa:macaulay2/macaulay2
+          sudo apt update
           sudo apt-get install macaulay2
       - uses: actions/checkout@v4
       - uses: leanprover/lean-action@v1
