@@ -1,7 +1,7 @@
 import Lean
 import Macaulean.Macaulay2
 
-open Lean Grind Elab Tactic
+open Lean Grind Elab Tactic Meta
 
 --based on mathlib
 
@@ -28,6 +28,14 @@ theorem natOnlyUnit {x : Nat} : IsUnit x ↔ x = 1 := by
   simp
   trivial
 
+def factorizationExpr (factorization : List (Nat × Nat)) : Expr :=
+  match factorization with
+      | [] => mkNatLit 1
+      | (a,e) :: remainder => remainder.foldl (fun x (a,e) =>  mkProductExpr x $ mkPowerExpr (mkNatLit a) (mkNatLit e)) $ mkPowerExpr (mkNatLit a) (mkNatLit e)
+  where
+    mkProductExpr a b := mkApp2 (Expr.const ``Nat.mul []) a b
+    mkPowerExpr a b := mkApp2 (Expr.const ``Nat.pow []) a b
+
 --this syntax command is based on the one for intro, correct if wrong
 syntax (name := m2factor) "m2factor" notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
@@ -42,26 +50,34 @@ def macaualy2ProvideFactorization : Tactic := fun stx => do
               | _ => throwError ("Expect a Nat " ++ repr x_expr)
       let (m2Process,m2Server) <- startM2Server
       let factorization <- m2Server.factorNat x
-      let mkProductExpr a b := mkApp2 (Expr.const ``Nat.mul []) a b
-      let mkPowerExpr a b := mkApp2 (Expr.const ``Nat.pow []) a b
-      let factorizationExpr := factorization.foldl (fun x (a,e) =>  mkProductExpr x $ mkPowerExpr (mkNatLit a) (mkNatLit e)) $ mkNatLit 1
+      let factorizationExpr := factorizationExpr factorization
       closeMainGoal `m2factor factorizationExpr
   | _ => throwUnsupportedSyntax
 
   -- the returned Expr should be an expression of type ¬ Irreducible x
-def macaulay2ProveReducible (x : Nat) : TacticM (Option Expr) := do
+def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
   let (m2Process,m2Server) <- startM2Server
+  let factorizationMVarExpr <- mkFreshExprMVar (.some $ Expr.const `Prop [])
+  let factorizationMVarId := factorizationMVarExpr.mvarId!
   let factorization <- m2Server.factorNat x
-  match factorization with
-    | [] | [(a,1)] => pure .none
-    | (a,e)::otherFactors =>
-      let b := otherFactors.foldl (fun x (a',e') => x*(a'^e')) a^(e-1)
-      let aExpr := mkNatLit a
-      let bExpr := mkNatLit b
-      let prodExpr := mkApp2 (Expr.const ``Nat.mul []) aExpr bExpr
-      let factorExpr := mkApp2 (Expr.const ``Eq [.succ .zero]) prodExpr $ mkNatLit x
-      --TODO: add goals to prove that a and b are not units, and use trivial to try to prove them then reduce Irreducible x to proving
-      sorry
+  factorizationMVarId.assign $ factorizationExpr factorization
+  --sorry the goal for now
+  let goal <- getMainGoal
+  admitGoal goal
+  --closeMainGoal `macaulay $ by sorry
+
+elab "m2reducible" : tactic => do
+  IO.println "TEST"
+  let target <- getMainTarget
+  match target with
+  | .app (.const ``Not _) (.app (.const ``Irreducible _) x_expr) =>
+      let x_expr' <- whnf x_expr
+      let x <- match x_expr' with
+              | .lit (Literal.natVal x) => pure x
+              | _ => throwError "Expected a goal of the form ¬ Irreducible x 1"
+      macaulay2ProveReducible x
+  | _ => throwError "Expected a goal of the form ¬ Irreducible x 2"
+
 
 def twelve : Nat := 12
 def factor12 : Nat := by m2factor twelve
@@ -69,3 +85,6 @@ def factor12 : Nat := by m2factor twelve
 
 def factor10 : Nat := by m2factor 10
 #print factor10
+
+theorem twelve_reducible : ¬ Irreducible 12 :=
+  by m2reducible
