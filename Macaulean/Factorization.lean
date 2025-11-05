@@ -28,6 +28,14 @@ theorem natOnlyUnit {x : Nat} : IsUnit x ↔ x = 1 := by
   simp
   trivial
 
+theorem factorizationImpliesReducible {a b : Nat} : ¬ (IsUnit a ∨ IsUnit b) → ¬ Irreducible (a * b) := by
+  intro p
+  apply Not.intro
+  intro irr
+  let ⟨_ , unitImp ⟩ := irr
+  have abUnit : _ := unitImp (by trivial : a*b = a*b)
+  contradiction
+
 def factorizationExpr (factorization : List (Nat × Nat)) : Expr :=
   match factorization with
       | [] => mkNatLit 1
@@ -60,23 +68,26 @@ def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
   let factorizationMVarExpr <- mkFreshExprMVar (.some $ Expr.const `Prop [])
   let factorizationMVarId := factorizationMVarExpr.mvarId!
   let factorization <- m2Server.factorNat x
-  factorizationMVarId.assign $ factorizationExpr factorization
-  --sorry the goal for now
-  let goal <- getMainGoal
-  admitGoal goal
+  match factorization with
+    | [] | [(a,0)] | [(a,1)] => throwError "Cannot prove reducibility"
+    | _ =>
+        --sorry the goal for now
+        let goal <- getMainGoal
+        admitGoal goal
+
   --closeMainGoal `macaulay $ by sorry
 
 elab "m2reducible" : tactic => do
   IO.println "TEST"
   let target <- getMainTarget
   match target with
-  | .app (.const ``Not _) (.app (.const ``Irreducible _) x_expr) =>
+  | .app (.const ``Not _) (.app (.app (.app (.const ``Irreducible _) _) _) x_expr) =>
       let x_expr' <- whnf x_expr
       let x <- match x_expr' with
               | .lit (Literal.natVal x) => pure x
-              | _ => throwError "Expected a goal of the form ¬ Irreducible x 1"
+              | _ => throwError "Expected a goal of the form ¬ Irreducible x"
       macaulay2ProveReducible x
-  | _ => throwError "Expected a goal of the form ¬ Irreducible x 2"
+  | _ => throwError ("Expected a goal of the form ¬ Irreducible x" ++ repr target)
 
 
 def twelve : Nat := 12
