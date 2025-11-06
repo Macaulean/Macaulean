@@ -28,7 +28,7 @@ theorem natOnlyUnit {x : Nat} : IsUnit x ↔ x = 1 := by
   simp
   trivial
 
-theorem factorizationImpliesReducible {a b : Nat} : ¬ (IsUnit a ∨ IsUnit b) → ¬ Irreducible (a * b) := by
+theorem factorizationImpliesReducible {a b : R} [CommSemiring R] : ¬ (IsUnit a ∨ IsUnit b) → ¬ Irreducible (a * b) := by
   intro p
   apply Not.intro
   intro irr
@@ -53,10 +53,8 @@ def macaualy2ProvideFactorization : Tactic := fun stx => do
   | `(tactic| m2factor $x_stx:term) =>
       let x_expr <- elabTermEnsuringType x_stx (.some $ Expr.const ``Nat [])
       let x_expr' <- Meta.whnf x_expr
-      let x <- match x_expr' with
-              | .lit (Literal.natVal x) => pure x
-              | _ => throwError ("Expect a Nat " ++ repr x_expr)
-      let (m2Process,m2Server) <- startM2Server
+      let .lit (Literal.natVal x) := x_expr' | throwError ("Expect a Nat " ++ repr x_expr)
+      let m2Server <- globalM2Server
       let factorization <- m2Server.factorNat x
       let factorizationExpr := factorizationExpr factorization
       closeMainGoal `m2factor factorizationExpr
@@ -64,12 +62,12 @@ def macaualy2ProvideFactorization : Tactic := fun stx => do
 
   -- the returned Expr should be an expression of type ¬ Irreducible x
 def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
-  let (m2Process,m2Server) <- startM2Server
+  let m2Server <- globalM2Server
   let factorizationMVarExpr <- mkFreshExprMVar (.some $ Expr.const `Prop [])
   let factorizationMVarId := factorizationMVarExpr.mvarId!
   let factorization <- m2Server.factorNat x
   match factorization with
-    | [] | [(a,0)] | [(a,1)] => throwError "Cannot prove reducibility"
+    | [] | [(_,0)] | [(_,1)] => throwError "Cannot prove reducibility"
     | _ =>
         --sorry the goal for now
         let goal <- getMainGoal
@@ -87,15 +85,22 @@ elab "m2reducible" : tactic => do
               | .lit (Literal.natVal x) => pure x
               | _ => throwError "Expected a goal of the form ¬ Irreducible x"
       macaulay2ProveReducible x
-  | _ => throwError ("Expected a goal of the form ¬ Irreducible x" ++ repr target)
+  | _ => throwError "Expected a goal of the form ¬ Irreducible x"
 
 
 def twelve : Nat := 12
-def factor12 : Nat := by m2factor twelve
+def factor12 : Nat := by
+  m2factor twelve
+
 #print factor12
 
 def factor10 : Nat := by m2factor 10
 #print factor10
 
-theorem twelve_reducible : ¬ Irreducible 12 :=
+example : ¬ Irreducible 12 :=
   by m2reducible
+
+-- theorem seven_reducible : ¬ Irreducible 7 :=
+--   by m2reducible
+
+example : ∀ b : Nat, b ≤ 3 → b*3 ≠ 1 := by decide

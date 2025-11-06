@@ -28,6 +28,18 @@ def startM2Server : IO (IO.Process.Child {stdin := .null, stdout := .piped, stde
         IO.FS.Stream.ofHandle m2Process.stdout
      (m2Process,.) <$> .mk m2stdinStream m2stdoutStream <$> IO.mkRef 1
 
+initialize macaulay2ServerRef : IO.Ref (Option Macaulay2)
+  ← IO.mkRef .none
+
+def globalM2Server : IO Macaulay2 :=
+  do match (← macaulay2ServerRef.get) with
+    | .some m2server => pure m2server
+    | .none => do let (_,server) <- startM2Server
+                  let server' <- macaulay2ServerRef.modifyGet (fun
+                    | .none => (server, .some server)
+                    | .some otherServer => (otherServer, .some otherServer))
+                  pure server'
+
 def Macaulay2.sendRequest [Lean.ToJson a] [Lean.FromJson b] (m2 : Macaulay2) (requestName : String) (requestBody : a) : IO b := do
   let reqId ←
     Lean.JsonRpc.RequestID.num <$> m2.nextRequestId.modifyGet (fun x => (x,x+1))
