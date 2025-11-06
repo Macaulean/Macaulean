@@ -36,13 +36,13 @@ theorem factorizationImpliesReducible {a b : R} [CommSemiring R] : ¬ (IsUnit a 
   have abUnit : _ := unitImp (by trivial : a*b = a*b)
   contradiction
 
-def factorizationExpr (factorization : List (Nat × Nat)) : Expr :=
+def factorizationExpr (factorization : List (Nat × Nat)) : MetaM Expr := do
   match factorization with
-      | [] => mkNatLit 1
-      | (a,e) :: remainder => remainder.foldl (fun x (a,e) =>  mkProductExpr x $ mkPowerExpr (mkNatLit a) (mkNatLit e)) $ mkPowerExpr (mkNatLit a) (mkNatLit e)
+      | [] => pure $ mkNatLit 1
+      | (a,e) :: remainder => remainder.foldlM (fun x (a,e) =>  mkPowerExpr (mkNatLit a) (mkNatLit e) >>= mkProductExpr x) $ (← mkPowerExpr (mkNatLit a) (mkNatLit e))
   where
-    mkProductExpr a b := mkApp2 (Expr.const ``Nat.mul []) a b
-    mkPowerExpr a b := mkApp2 (Expr.const ``Nat.pow []) a b
+    mkProductExpr a b := mkAppM ``HMul.hMul #[a,b]
+    mkPowerExpr a b := mkAppM ``HPow.hPow #[a,b]
 
 --this syntax command is based on the one for intro, correct if wrong
 syntax (name := m2factor) "m2factor" notFollowedBy("|") (ppSpace colGt term:max)* : tactic
@@ -51,42 +51,50 @@ syntax (name := m2factor) "m2factor" notFollowedBy("|") (ppSpace colGt term:max)
 def macaualy2ProvideFactorization : Tactic := fun stx => do
   match stx with
   | `(tactic| m2factor $x_stx:term) =>
-      let x_expr <- elabTermEnsuringType x_stx (.some $ Expr.const ``Nat [])
-      let x_expr' <- Meta.whnf x_expr
-      let .lit (Literal.natVal x) := x_expr' | throwError ("Expect a Nat " ++ repr x_expr)
-      let m2Server <- globalM2Server
-      let factorization <- m2Server.factorNat x
-      let factorizationExpr := factorizationExpr factorization
+      let x_expr ← elabTermEnsuringType x_stx (.some $ Expr.const ``Nat [])
+      let .lit (Literal.natVal x) ← Meta.whnf x_expr | throwError ("Expect a Nat " ++ repr x_expr)
+      let m2Server ← globalM2Server
+      let factorization ← m2Server.factorNat x
+      let factorizationExpr ← factorizationExpr factorization
       closeMainGoal `m2factor factorizationExpr
   | _ => throwUnsupportedSyntax
 
+#check pushGoal
   -- the returned Expr should be an expression of type ¬ Irreducible x
 def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
   let m2Server <- globalM2Server
-  let factorizationMVarExpr <- mkFreshExprMVar (.some $ Expr.const `Prop [])
-  let factorizationMVarId := factorizationMVarExpr.mvarId!
   let factorization <- m2Server.factorNat x
   match factorization with
     | [] | [(_,0)] | [(_,1)] => throwError "Cannot prove reducibility"
     | _ =>
-        --sorry the goal for now
-        let goal <- getMainGoal
-        admitGoal goal
+        let factoredExpr ← factorizationExpr factorization
+        let factorEqExpr ← mkAppM ``Eq #[mkNatLit x, factoredExpr]
+        let factorizationMVarExpr <- mkFreshExprMVar $ .some factorEqExpr
+        let factorizationMVarId := factorizationMVarExpr.mvarId!
+        pushGoal factorizationMVarId
+        --use decide to prove that the factorization is a factorization
+        _ ← runTactic factorizationMVarId (← `(tactic|decide))
+        --rewrite the goal with the expression
+        let goal ← getMainGoal
+        let rewriteResult ← goal.rewrite (← getMainTarget) factorizationMVarExpr -- (symm := true)
+        let newGoal ← goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
+        setGoals [newGoal]
+        --use the factorization implies reducible theorem
+        setGoals (← newGoal.apply $ mkConst ``factorizationImpliesReducible [.zero])
+        --get grind to prove that things are not units
+        _ ← runTactic (← getMainGoal) (← `(tactic|grind))
+        pure ()
 
-  --closeMainGoal `macaulay $ by sorry
+#check TSyntax.raw
+
+#check Expr.getAppFnArgs
 
 elab "m2reducible" : tactic => do
-  IO.println "TEST"
   let target <- getMainTarget
-  match target with
-  | .app (.const ``Not _) (.app (.app (.app (.const ``Irreducible _) _) _) x_expr) =>
-      let x_expr' <- whnf x_expr
-      let x <- match x_expr' with
-              | .lit (Literal.natVal x) => pure x
-              | _ => throwError "Expected a goal of the form ¬ Irreducible x"
-      macaulay2ProveReducible x
-  | _ => throwError "Expected a goal of the form ¬ Irreducible x"
-
+  let (``Not,#[irrExpr]) := target.getAppFnArgs | throwError "Expected a goal of the form ¬ Irreducible x"
+  let (``Irreducible,#[_,_,irrTarget]) := irrExpr.getAppFnArgs | throwError "Expected a goal of the form ¬ Irreducible x"
+  let .lit (Literal.natVal x) <- whnf irrTarget | throwError "Expected a goal of the form ¬ Irreducible x"
+  macaulay2ProveReducible x
 
 def twelve : Nat := 12
 def factor12 : Nat := by
@@ -97,8 +105,8 @@ def factor12 : Nat := by
 def factor10 : Nat := by m2factor 10
 #print factor10
 
-example : ¬ Irreducible 12 :=
-  by m2reducible
+example : ¬ Irreducible 60 := by
+  m2reducible
 
 -- theorem seven_reducible : ¬ Irreducible 7 :=
 --   by m2reducible
