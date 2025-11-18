@@ -49,3 +49,24 @@ info: {"add":
 -/
 #guard_msgs in
 #eval toJson (z^5 + w*y^2 - x + 1 |>.toPoly)
+
+abbrev f := z^5 + w*y^2 - x + 1 |>.toPoly
+abbrev g := 1 - x + z^5 + w*y^2 |>.toPoly
+
+/--
+info: Poly.add (Int.ofNat 1) (Mon.mult { x := 3, k := 5 } Mon.unit)
+  (Poly.add (Int.ofNat 1) (Mon.mult { x := 0, k := 1 } (Mon.mult { x := 2, k := 2 } Mon.unit))
+    (Poly.add (Int.negSucc 0) (Mon.mult { x := 1, k := 1 } Mon.unit) (Poly.num (Int.ofNat 1))))
+-/
+#guard_msgs in
+#reduce f
+#reduce g
+
+#check Poly
+
+namespace Lean.Grind.CommRing
+
+def Mon.toTuple : Mon → Nat × Nat × Nat
+  | .unit       => (1, 0, 0)
+  | .mult p m   => m.toTuple + (1, p.x, p.k)
+
