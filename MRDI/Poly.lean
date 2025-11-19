@@ -9,7 +9,7 @@ namespace MRDI
 instance : ToJson Grind.CommRing.Power where
   toJson p := .arr #[p.x, p.k]
 
-/-- A list of powers representing a monomial. -/
+/-- An array of powers representing a monomial. -/
 def Monomial := Array Grind.CommRing.Power
 deriving instance ToJson for Monomial
 
