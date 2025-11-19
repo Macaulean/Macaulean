@@ -343,27 +343,3 @@ assert Equation(f, R_3^5 + R_0*R_2^2 - R_1 + 1)
 ///
 
 end
-
-loadPackage("MRDI", FileName => "~/src/macaulay2/Macaulean/m2/MRDI.m2", Reload => true)
-check oo
-x = ///
-{
-  "_ns": {
-    "Lean": ["https://github.com/leanprover/lean4", "4.25.0"]
-  },
-  "_type": "Lean.Grind.CommRing.Poly",
-  "data": {
-    "num_vars": 4,
-    "char": 5,
-    "ordering": "grevlex",
-    "data": [
-      [[[3, 5]], 1],
-      [[[0, 1], [2, 2]], 1],
-      [[[1, 1]], -1],
-      [[],1]
-    ]
-}
-}
-///
-
-loadMRDI x
