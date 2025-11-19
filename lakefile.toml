@@ -6,6 +6,9 @@ defaultTargets = ["macaulean"]
 name = "Macaulean"
 
 [[lean_lib]]
+name = "MRDI"
+
+[[lean_lib]]
 name = "MacauleanTest"
 
 [[lean_exe]]
