@@ -228,6 +228,17 @@ addLoadMethod("Oscar", "FiniteField", (params, data, f) -> (
 	if params =!= null then error "not implemented yet"
 	else ZZ/(value data)))
 
+leanMonomialOrders = hashTable {
+    "grevlex" => GLex
+    -- TODO: add all of grind's various monomial orderings
+    }
+addLoadMethod("Lean", "Lean.Grind.CommRing.Poly", (params, data, f) -> (
+	kk := ZZ/data#"char";
+	R := kk[vars(0..<data#"num_vars"),
+	    MonomialOrder => leanMonomialOrders#(data#"ordering")];
+	sum(data#"data", mon -> (
+		mon#1 * product(mon#0, vp -> R_(vp#0)^(vp#1))))))
+
 addListLoadMethod = method()
 addListLoadMethod(String, String, Type) := (ns, type, T) -> (
     addLoadMethod(ns, type, (params, data, f) -> (
@@ -306,4 +317,53 @@ assert BinaryOperation(symbol ===, ZZ, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://
 assert BinaryOperation(symbol ===, QQ, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://github.com/oscar-system/Oscar.jl\",\"1.5.0\"]},\"_type\":\"QQField\"}")
 ///
 
+TEST ///
+-- Lean polynomial test
+f = loadMRDI ////
+{
+  "_ns": {
+    "Lean": ["https://github.com/leanprover/lean4", "4.25.0"]
+  },
+  "_type": "Lean.Grind.CommRing.Poly",
+  "data": {
+    "num_vars": 4,
+    "char": 5,
+    "ordering": "grevlex",
+    "data": [
+      [[[3, 5]], 1],
+      [[[0, 1], [2, 2]], 1],
+      [[[1, 1]], -1],
+      [[],1]
+    ]
+  }
+}
+////
+R = ring f
+assert Equation(f, R_3^5 + R_0*R_2^2 - R_1 + 1)
+///
+
 end
+
+loadPackage("MRDI", FileName => "~/src/macaulay2/Macaulean/m2/MRDI.m2", Reload => true)
+check oo
+x = ///
+{
+  "_ns": {
+    "Lean": ["https://github.com/leanprover/lean4", "4.25.0"]
+  },
+  "_type": "Lean.Grind.CommRing.Poly",
+  "data": {
+    "num_vars": 4,
+    "char": 5,
+    "ordering": "grevlex",
+    "data": [
+      [[[3, 5]], 1],
+      [[[0, 1], [2, 2]], 1],
+      [[[1, 1]], -1],
+      [[],1]
+    ]
+}
+}
+///
+
+loadMRDI x
