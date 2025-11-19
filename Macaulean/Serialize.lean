@@ -1,6 +1,6 @@
 import MRDI.Poly
 
-open Lean.Grind.CommRing MRDI
+open MRDI
 
 namespace Lean.Grind.CommRing
 
