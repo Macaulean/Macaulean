@@ -1,0 +1,57 @@
+# Lean
+/.lake/
+/lake-packages/
+/build/
+*.olean
+*.trace
+*.hash
+.lake-cache/
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.pdf
+*.dvi
+*.ps
+*.nav
+*.snm
+*.vrb
+*.bcf
+*.run.xml
+*.idx
+*.ilg
+*.ind
+*.lof
+*.lot
+
+# Macaulay2
+*.m2out
+*.M2out
+*.m2cache
+
+# Editor and IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.bak
+
+# OS-specific
+Thumbs.db
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
