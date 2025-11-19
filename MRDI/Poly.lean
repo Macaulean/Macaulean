@@ -22,12 +22,12 @@ instance : ToJson Term where
   toJson t := .arr #[t.coeff, toJson t.mon]
 
 /-- A polynomial represented as a list of terms. -/
-def PolymonialData := Array Term
-deriving instance ToJson for PolymonialData
+def PolynomialData := Array Term
+deriving instance ToJson for PolynomialData
 
 structure Poly where
   version : String := Lean.versionString
-  data : PolymonialData
+  data : PolynomialData
 
 instance : ToJson Poly where
   toJson p := .mkObj [("_ns", .mkObj [("Lean", .arr #[.str Lean.githubURL, .str
