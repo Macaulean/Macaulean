@@ -21,7 +21,7 @@ structure Term where
 instance : ToJson Term where
   toJson t := .arr #[t.coeff, toJson t.mon]
 
-/-- A polynomial represented as a list of terms. -/
+/-- A polynomial represented as an array of terms. -/
 def PolynomialData := Array Term
 deriving instance ToJson for PolynomialData
 
