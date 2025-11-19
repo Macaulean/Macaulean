@@ -5,6 +5,9 @@ defaultTargets = ["macaulean"]
 [[lean_lib]]
 name = "Macaulean"
 
+[[lean_lib]]
+name = "MacauleanTest"
+
 [[lean_exe]]
 name = "macaulean"
 root = "Main"
