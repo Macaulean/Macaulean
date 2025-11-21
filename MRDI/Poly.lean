@@ -26,7 +26,6 @@ def PolynomialData := Array Term
 deriving instance ToJson for PolynomialData
 
 structure Poly where
-  version : String := Lean.versionString
   data : PolynomialData
 
 instance : ToJson Poly where
