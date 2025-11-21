@@ -30,8 +30,10 @@ structure Poly where
   data : PolynomialData
 
 instance : ToJson Poly where
-  toJson p := .mkObj [("_ns", .mkObj [("Lean", .arr #[.str Lean.githubURL, .str
-  p.version])]), ("_type", .str "Lean.Grind.CommRing.Poly"), ("data", toJson p.data)]
+  toJson p := .mkObj [("_ns", .mkObj [("Lean", .arr #[.str Lean.githubURL,
+                                               .str p.version])]),
+                      ("_type", .str "Lean.Grind.CommRing.Poly"),
+                      ("data", toJson p.data)]
 
 -- def test : Poly := {
 --   data := #[
