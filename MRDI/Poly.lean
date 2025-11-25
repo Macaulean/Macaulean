@@ -30,7 +30,7 @@ structure Poly where
 
 instance : ToJson Poly where
   toJson p := .mkObj [("_ns", .mkObj [("Lean", .arr #[.str Lean.githubURL,
-                                               .str p.version])]),
+                                               .str Lean.versionString])]),
                       ("_type", .str "Lean.Grind.CommRing.Poly"),
                       ("data", toJson p.data)]
 
