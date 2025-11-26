@@ -1,3 +1,4 @@
+stderr << version << endl
 stderr << "Macaulean M2 Startup" << endl
 
 needsPackage "JSONRPC"
@@ -100,9 +101,31 @@ registerMethod(server, "testMethod", (expr) -> (
         toExternalString value expr
         ))
 
+registerMethod(server, "factorInt", (x) -> (
+        toList \ toList factor x
+    )
+)
+
+--expects a list of pairs where the pairs represent a term as a coefficent and exponent
+registerMethod(server, "factorUnivariatePoly", (polyTerms) -> (
+        R := ZZ[x];
+        p := sum(polyTerms, t -> (
+                c:= t#0;
+                i:= t#1;
+                c*x^i
+                ));
+        apply(toList factor p, fac -> (
+                q := fac#0;
+                e := fac#1;
+                (v,c) := coefficients q;
+                ex := apply(exponents q, x -> x#0);
+                {transpose {apply(flatten entries c, x -> lift(x,ZZ)),ex},e}))
+        )
+    )
+
 
 macauleanMainLoop(server, stdio);
 -- inputJSON = fromJSONStream stdio;
 -- stdio << toExternalString sum inputJSON << endl;
 
-stderr << "Macaualy2 Finished" << endl
+stderr << "Macaulay2 Finished" << endl
