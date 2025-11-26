@@ -32,7 +32,13 @@ class MrdiType (α : Type u) : Type u extends ToJson α, FromJson α where
 structure MrdiData where
   type : MrdiTypeDesc
   data : Json
-  deriving ToJson
+
+instance : ToJson MrdiData where
+  toJson data :=
+    .mkObj [
+      ("_type", toJson data.type),
+      ("_data", data.data)
+    ]
 
 --TODO From/ToJson instances
 structure Mrdi extends MrdiData where
