@@ -37,7 +37,7 @@ instance : ToJson MrdiData where
   toJson data :=
     .mkObj [
       ("_type", toJson data.type),
-      ("_data", data.data)
+      ("data", data.data)
     ]
 
 --TODO From/ToJson instances
@@ -52,13 +52,13 @@ instance : ToJson Mrdi where
     then .mkObj [
       ("_ns", mrdi.ns),
       ("_type", toJson mrdi.type),
-      ("_data", mrdi.data)
+      ("data", mrdi.data)
     ]
     else .mkObj [
       ("_ns", mrdi.ns),
       ("_type", toJson mrdi.type),
       ("_refs", toJson mrdi.refs),
-      ("_data", mrdi.data)
+      ("data", mrdi.data)
     ]
 
 def toMrdiData [MrdiType α] (x: α) : MrdiData :=
