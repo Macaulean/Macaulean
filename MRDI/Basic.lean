@@ -3,10 +3,6 @@ open Lean Json
 
 def Lean.githubURL := "https://github.com/leanprover/lean4"
 
---This is enough of a skeleton to transfer Mrdi data, but isn't a correct implementation, because the class
---MrdiType isn't sufficiently general. In particular, it can't deal with anything that needs
---references to other objects
-
 --works for now
 abbrev Uuid := String
 
@@ -22,7 +18,9 @@ instance : ToJson MrdiTypeDesc where
 instance : FromJson MrdiTypeDesc where
   fromJson? := fun
     | .str s => .ok <| .string s
-    | .obj terms => sorry
+    | .obj terms =>  .parameterized
+      <$> (terms.get? "name").elim (.error "Missing name field from MRDI Type") fromJson?
+      <*> (terms.get? "params").elim (.error "Missing params field from MRDI Type") fromJson?
     | _ => .error "Invalid MRDI Type Descriptor"
 
 class MrdiType (α : Type u) : Type u extends ToJson α, FromJson α where
@@ -40,11 +38,10 @@ instance : ToJson MrdiData where
       ("data", data.data)
     ]
 
---TODO From/ToJson instances
+--TODO FromJson instance
 structure Mrdi extends MrdiData where
   ns : Json
   refs : Std.TreeMap Uuid MrdiData
-  deriving ToJson
 
 instance : ToJson Mrdi where
   toJson mrdi :=
