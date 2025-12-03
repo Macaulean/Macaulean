@@ -21,6 +21,7 @@ export {
 
     -- symbols
     "UseID",
+    "ToString",
     }
 
 ------------
@@ -137,10 +138,10 @@ addSaveMethod(Matrix,
 
 saveMRDI = method(
     Dispatch => Thing,
-    Options => {FileName => null})
+    Options => {FileName => null, ToString => true})
 saveMRDI Thing := o -> x -> (
     (mrdi, refs) := toMRDI x;
-    r := toJSON merge(
+    r := (if o.ToString then toJSON else identity) merge(
 	hashTable {
 	    "_ns" => hashTable {
 		"Macaulay2" => ("https://macaulay2.com", version#"VERSION")},
@@ -161,8 +162,9 @@ loadMethods = new MutableHashTable
 uuidsToCreate = new MutableHashTable
 
 loadMRDI = method()
-loadMRDI String := s -> (
-    r := fromJSON s; -- TODO: schema validation
+-- TODO: schema validation
+loadMRDI String := loadMRDI @@ fromJSON
+loadMRDI HashTable := r -> (
     ns := first keys r#"_ns";
     if not loadMethods#?ns then error("unknown namespace: ", ns);
     -- save info about refs we haven't created yet
