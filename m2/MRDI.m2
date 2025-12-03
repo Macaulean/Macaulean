@@ -235,11 +235,10 @@ leanMonomialOrders = hashTable {
     -- TODO: add all of grind's various monomial orderings
     }
 addLoadMethod("Lean", "Lean.Grind.CommRing.Poly", (params, data, f) -> (
-	kk := ZZ/data#"char";
-	R := kk[vars(0..<data#"num_vars"),
-	    MonomialOrder => leanMonomialOrders#(data#"ordering")];
-	sum(data#"data", mon -> (
-		mon#1 * product(mon#0, vp -> R_(vp#0)^(vp#1))))))
+	-- for now, just guess number of vars based on the highest index
+	n := max flatten apply(last \ data, m -> first \ m) + 1;
+	R := ZZ[vars(0..<n)];
+	sum(data, mon -> mon#0 * product(mon#1, vp -> R_(vp#0)^(vp#1)))))
 
 addListLoadMethod = method()
 addListLoadMethod(String, String, Type) := (ns, type, T) -> (
@@ -352,26 +351,12 @@ assert BinaryOperation(symbol ===, QQ, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://
 TEST ///
 -- Lean polynomial test
 f = loadMRDI ////
-{
-  "_ns": {
-    "Lean": ["https://github.com/leanprover/lean4", "4.25.0"]
-  },
-  "_type": "Lean.Grind.CommRing.Poly",
-  "data": {
-    "num_vars": 4,
-    "char": 5,
-    "ordering": "grevlex",
-    "data": [
-      [[[3, 5]], 1],
-      [[[0, 1], [2, 2]], 1],
-      [[[1, 1]], -1],
-      [[],1]
-    ]
-  }
-}
+{"data": [[3, []], [5, [[2, 3]]]],
+ "_type": "Lean.Grind.CommRing.Poly",
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.26.0-rc1"]}}
 ////
 R = ring f
-assert Equation(f, R_3^5 + R_0*R_2^2 - R_1 + 1)
+assert Equation(f, 3 + 5*R_2^3)
 ///
 
 end
