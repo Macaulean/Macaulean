@@ -57,7 +57,7 @@ addNamespace(String, String, String) := (ns, url, v) -> (
     loadMethods#ns = new MutableHashTable;)
 
 addNamespace("Macaulay2", "https://macaulay2.com", version#"VERSION")
-addNamespace("Oscar", "https://github.com/oscar-system/Oscar.jl", "1.5.0")
+addNamespace("Oscar", "https://github.com/oscar-system/Oscar.jl", "1.6.0")
 
 -- low-level unexported method
 -- input: string ns (namespace), some object x
