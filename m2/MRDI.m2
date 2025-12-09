@@ -215,52 +215,59 @@ fromMRDI(String, String) := (ns, i) -> (
 	    else error("unknown uuid: ", i))))
 
 -- input function takes two args: params (de-serialized) & data
-addLoadMethod = method()
-addLoadMethod(String, String, Function) := (ns, type, f) -> (
-    if not loadMethods#?ns then error("unknown namespace: ", ns);
-    loadMethods#ns#type = f)
+addLoadMethod = method(Options => {Namespace => "Macaulay2"})
+addLoadMethod(String, Function) := o -> (type, f) -> (
+    if not loadMethods#?(o.Namespace)
+    then error("unknown namespace: ", o.Namespace);
+    loadMethods#(o.Namespace)#type = f)
 
-addLoadMethod("Macaulay2", "ZZ", (params, data, f) -> value data)
-addLoadMethod("Macaulay2", "Ring", (params, data, f) -> (
+addLoadMethod("ZZ", (params, data, f) -> value data)
+addLoadMethod("Ring", (params, data, f) -> (
 	if data == "ZZ" then ZZ
 	else if data == "QQ" then QQ
 	else error "unknown ring"))
-addLoadMethod("Macaulay2", "QuotientRing", (params, data, f) -> ZZ/(value data))
-addLoadMethod("Macaulay2", "GaloisField", (params, data, f) -> (
+addLoadMethod("QuotientRing", (params, data, f) -> ZZ/(value data))
+addLoadMethod("GaloisField", (params, data, f) -> (
 	GF(value data#"char", value data#"degree")))
-addLoadMethod("Macaulay2", "PolynomialRing", (params, data, f) -> (
+addLoadMethod("PolynomialRing", (params, data, f) -> (
 	R := f params;
 	R[Variables => data#"variables"]))
 
 mrdiToPolynomial = (R, f) -> sum(f, term -> (
 	(value term#1)*R_(value \ toList term#0)))
-addLoadMethod("Macaulay2", "RingElement", (params, data, f) -> (
+addLoadMethod("RingElement", (params, data, f) -> (
 	mrdiToPolynomial(f params, data)))
-addLoadMethod("Macaulay2", "Ideal", (params, data, f) -> (
+addLoadMethod("Ideal", (params, data, f) -> (
 	R := f params;
 	ideal apply(data, f -> mrdiToPolynomial(R, f))))
-addLoadMethod("Macaulay2", "Matrix", (params, data, f) -> (
+addLoadMethod("Matrix", (params, data, f) -> (
 	R := f params;
 	matrix apply(data, row -> apply(row, f -> mrdiToPolynomial(R, f)))))
 
-addLoadMethod("Oscar", "Base.Int", (params, data, f) -> value data)
-addLoadMethod("Oscar", "ZZRingElem", (params, data, f) -> value data)
-addLoadMethod("Oscar", "String", (params, data, f) -> data)
-addLoadMethod("Oscar", "Float64", (params, data, f) -> value data)
-addLoadMethod("Oscar", "ZZRing", (params, data, f) -> ZZ)
-addLoadMethod("Oscar", "QQField", (params, data, f) -> QQ)
-addLoadMethod("Oscar", "FiniteField", (params, data, f) -> (
+addLoadMethod("Base.Int", (params, data, f) -> value data, Namespace => "Oscar")
+addLoadMethod("ZZRingElem",
+    (params, data, f) -> value data,
+    Namespace => "Oscar")
+addLoadMethod("String", (params, data, f) -> data, Namespace => "Oscar")
+addLoadMethod("Float64", (params, data, f) -> value data, Namespace => "Oscar")
+addLoadMethod("ZZRing", (params, data, f) -> ZZ, Namespace => "Oscar")
+addLoadMethod("QQField", (params, data, f) -> QQ, Namespace => "Oscar")
+addLoadMethod("FiniteField",
+    (params, data, f) -> (
 	if params =!= null then error "not implemented yet"
-	else ZZ/(value data)))
+	else ZZ/(value data)),
+    Namespace => "Oscar")
 
 addListLoadMethod = method()
 addListLoadMethod(String, String, Type) := (ns, type, T) -> (
-    addLoadMethod(ns, type, (params, data, f) -> (
+    addLoadMethod(type,
+	(params, data, f) -> (
 	    new T from apply(#params, i -> (
 		    if instance(data#i, String) and isUuid data#i then f data#i
 		    else f hashTable {
 			"_type" => params#i,
-			"data" => data#i})))))
+			"data" => data#i}))),
+	Namespace => ns))
 
 addListLoadMethod("Macaulay2", "List", List)
 addListLoadMethod("Macaulay2", "Sequence", Sequence)
@@ -371,11 +378,13 @@ assert BinaryOperation(symbol ===, QQ, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://
 
 addNamespace("Lean", "https://github.com/leanprover/lean4", "4.26.0-rc1")
 
-addLoadMethod("Lean", "Lean.Grind.CommRing.Poly", (params, data, f) -> (
+addLoadMethod("Lean.Grind.CommRing.Poly",
+    (params, data, f) -> (
 	-- for now, just guess number of vars based on the highest index
 	n := max flatten apply(last \ data, m -> first \ m) + 1;
 	R := ZZ[vars(0..<n)];
-	sum(data, mon -> mon#0 * product(mon#1, vp -> R_(vp#0)^(vp#1)))))
+	sum(data, mon -> mon#0 * product(mon#1, vp -> R_(vp#0)^(vp#1)))),
+    Namespace => "Lean")
 
 TEST ///
 -- Lean polynomial test
