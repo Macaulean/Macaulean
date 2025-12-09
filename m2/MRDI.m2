@@ -73,6 +73,12 @@ addSaveMethod = method(Options => {
 	Name => toString @@ class,
 	Namespace => "Macaulay2"})
 
+addSaveMethod Type := o -> T -> (
+    installMethod((toMRDI, o.Namespace), T, x -> (
+	    if o.UseID then thingToUuid x;
+	    hashTable {"_type" => o.Name x},
+	    {}));
+    T#(UseID, o.Namespace) = o.UseID)
 addSaveMethod(Type, Function) := o -> (T, dataf) -> (
     installMethod((toMRDI, o.Namespace), T, x -> (
 	    if o.UseID then thingToUuid x;
@@ -244,9 +250,39 @@ addLoadMethod("Matrix", (params, data, f) -> (
 	R := f params;
 	matrix apply(data, row -> apply(row, f -> mrdiToPolynomial(R, f)))))
 
+-----------
+-- Oscar --
+-----------
+
+oscarRings = hashTable {
+    ZZ => "ZZRing",
+    QQ => "QQField",
+    }
+addSaveMethod(Ring,
+    Name => R -> oscarRings#R ?? error "unknown ring",
+    Namespace => "Oscar")
+
+addSaveMethod(ZZ,
+    x -> ZZ,
+    toString,
+    Name => x -> "ZZRingElem",
+    Namespace => "Oscar")
+
+addSaveMethod(QQ,
+    x -> QQ,
+    x -> concatenate(toString numerator x, "//", toString denominator x),
+    Name => x -> "QQFieldElem",
+    Namespace => "Oscar")
+
 addLoadMethod("Base.Int", (params, data, f) -> value data, Namespace => "Oscar")
 addLoadMethod("ZZRingElem",
     (params, data, f) -> value data,
+    Namespace => "Oscar")
+addLoadMethod("QQFieldElem",
+    (params, data, f) -> (
+	x := separate("//", data);
+	if #x == 2 then value x#0 / value x#1
+	else value x#0 / 1),
     Namespace => "Oscar")
 addLoadMethod("String", (params, data, f) -> data, Namespace => "Oscar")
 addLoadMethod("Float64", (params, data, f) -> value data, Namespace => "Oscar")
@@ -361,13 +397,14 @@ checkMRDI "{\"_type\": {\"params\": \"ef9ecd1d-0a22-49d1-aeae-c02def9fc876\", \"
 ///
 
 TEST ///
--- load Oscar objects
-assert Equation(5, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://github.com/oscar-system/Oscar.jl\",\"1.5.0\"]},\"_type\":\"Base.Int\",\"data\":\"5\"}")
-assert Equation(5, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://github.com/oscar-system/Oscar.jl\",\"1.5.0\"]},\"_type\":\"ZZRingElem\",\"data\":\"5\"}")
-assert BinaryOperation(symbol ===, ZZ, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://github.com/oscar-system/Oscar.jl\",\"1.5.0\"]},\"_type\":\"ZZRing\"}")
-assert BinaryOperation(symbol ===, QQ, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://github.com/oscar-system/Oscar.jl\",\"1.5.0\"]},\"_type\":\"QQField\"}")
+-- save/load Oscar objects
+checkMRDI = x -> assert BinaryOperation(symbol ===,
+    loadMRDI saveMRDI(x, Namespace => "Oscar"), x)
+checkMRDI ZZ
+checkMRDI QQ
+checkMRDI 5
+checkMRDI(1/2)
 ///
-
 
 ----------
 -- Lean --
