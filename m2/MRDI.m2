@@ -15,13 +15,15 @@ newPackage(
 export {
     -- methods
     "addLoadMethod",
+    "addNamespace",
     "addSaveMethod",
     "loadMRDI",
     "saveMRDI",
 
     -- symbols
-    "UseID",
+    "Namespace",
     "ToString",
+    "UseID",
     }
 
 ------------
@@ -46,55 +48,70 @@ uuidToThing = (i, f) -> thingsByUuid#i ??= (
     x)
 isUuid = i -> match("^[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$", i)
 
+namespaces =  new MutableHashTable
+loadMethods = new MutableHashTable
+
+addNamespace = method()
+addNamespace(String, String, String) := (ns, url, v) -> (
+    namespaces#ns = (url, v);
+    loadMethods#ns = new MutableHashTable;)
+
+addNamespace("Macaulay2", "https://macaulay2.com", version#"VERSION")
+addNamespace("Oscar", "https://github.com/oscar-system/Oscar.jl", "1.5.0")
+
 -- low-level unexported method
--- input: some object x
+-- input: string ns (namespace), some object x
 -- returns a pair (mrdi, refs)
 -- mdri = hash table representing x (type & data only)
 -- refs = list of hash tables representing x's refs (type & data only)
 -- use addSaveMethod to define for a given class
 toMRDI = method()
+toMRDI(String, Thing) := (ns, x) -> (lookup((toMRDI, ns), class x)) x
 
--- can't use addSaveMethod since "toMRDI params" would cause recursion error
-toMRDI VisibleList := L -> (
-    mrdis := toMRDI \ L;
-    (
-	hashTable {
-	    "_type" => hashTable {
-		"name" => toString class L,
-		"params" => apply(mrdis, (mrdi, ref) -> mrdi#"_type")},
-	    "data" => apply(#L, i ->
-		?? (uuidsByThing#(L#i) ?? mrdis#i#0#"data"))},
-	join(
-	    flatten apply(mrdis, (mrdi, ref) -> ref),
-	    for x in L list uuidsByThing#x ?? continue)))
+addSaveMethod = method(Options => {
+	UseID => false,
+	Name => toString @@ class,
+	Namespace => "Macaulay2"})
 
-addSaveMethod = method(Options => {UseID => false, Name => toString @@ class})
 addSaveMethod(Type, Function) := o -> (T, dataf) -> (
-    toMRDI T := x -> (
-	if o.UseID then thingToUuid x;
-	hashTable {
-	    "_type" => o.Name x,
-	    "data" => dataf x},
-	{});
-    T.UseID = o.UseID)
+    installMethod((toMRDI, o.Namespace), T, x -> (
+	    if o.UseID then thingToUuid x;
+	    hashTable {
+		"_type" => o.Name x,
+		"data" => dataf x},
+	    {}));
+    T#(UseID, o.Namespace) = o.UseID)
 addSaveMethod(Type, Function, Function) := o -> (T, paramsf, dataf) -> (
-    toMRDI T := x -> (
-	if o.UseID then thingToUuid x;
-	params := paramsf x;
-	(mrdi, refs) := toMRDI params;
-	if lookup(UseID, class params) then (
-	    mrdi = thingToUuid params;
-	    refs = append(refs, mrdi));
+    installMethod((toMRDI, o.Namespace), T, x -> (
+	    if o.UseID then thingToUuid x;
+	    params := paramsf x;
+	    (mrdi, refs) := toMRDI(o.Namespace, params);
+	    if lookup((UseID, o.Namespace), class params) then (
+		mrdi = thingToUuid params;
+		refs = append(refs, mrdi));
+	    (
+		hashTable {
+		    "_type" => hashTable {
+			"name" => o.Name x,
+			"params" => mrdi},
+		    "data" => dataf x},
+		refs)));
+    T#(UseID, o.Namespace) = o.UseID)
+
+addSaveMethod(Thing, toString)
+
+addSaveMethod(VisibleList, L ->  (
+	mrdis := toMRDI_"Macaulay2" \ L;
 	(
 	    hashTable {
 		"_type" => hashTable {
-		    "name" => o.Name x,
-		    "params" => mrdi},
-		"data" => dataf x},
-	    refs));
-    T.UseID = o.UseID)
-
-addSaveMethod(Thing, toString)
+		    "name" => toString class L,
+		    "params" => apply(mrdis, (mrdi, ref) -> mrdi#"_type")},
+		"data" => apply(#L, i ->
+		    ?? (uuidsByThing#(L#i) ?? mrdis#i#0#"data"))},
+	    join(
+		flatten apply(mrdis, (mrdi, ref) -> ref),
+		for x in L list uuidsByThing#x ?? continue))))
 
 addSaveMethod(QuotientRing,
     R -> (
@@ -138,16 +155,23 @@ addSaveMethod(Matrix,
 
 saveMRDI = method(
     Dispatch => Thing,
-    Options => {FileName => null, ToString => true})
+    Options => {
+	FileName => null,
+	ToString => true,
+	Namespace => "Macaulay2"})
 saveMRDI Thing := o -> x -> (
-    (mrdi, refs) := toMRDI x;
+    if not namespaces#?(o.Namespace)
+    then error("unknown namespace: ", o.Namespace);
+    (mrdi, refs) := toMRDI(o.Namespace, x);
     r := (if o.ToString then toJSON else identity) merge(
 	hashTable {
 	    "_ns" => hashTable {
-		"Macaulay2" => ("https://macaulay2.com", version#"VERSION")},
-	    if lookup(UseID, class x) then "id" => thingToUuid x,
+		o.Namespace => namespaces#(o.Namespace)},
+	    if lookup((UseID, o.Namespace), class x)
+	    then "id" => thingToUuid x,
 	    if #refs > 0 then "_refs" => hashTable apply(refs,
 		ref -> ref => first toMRDI(
+		    o.Namespace,
 		    uuidToThing(ref, () -> error("unknown uuid: ", ref))))},
 	mrdi,
 	(x, y) -> error "unexpected key collision");
@@ -158,7 +182,6 @@ saveMRDI Thing := o -> x -> (
 -- loading --
 -------------
 
-loadMethods = new MutableHashTable
 uuidsToCreate = new MutableHashTable
 
 loadMRDI = method()
@@ -194,7 +217,7 @@ fromMRDI(String, String) := (ns, i) -> (
 -- input function takes two args: params (de-serialized) & data
 addLoadMethod = method()
 addLoadMethod(String, String, Function) := (ns, type, f) -> (
-    if not loadMethods#?ns then loadMethods#ns = new MutableHashTable;
+    if not loadMethods#?ns then error("unknown namespace: ", ns);
     loadMethods#ns#type = f)
 
 addLoadMethod("Macaulay2", "ZZ", (params, data, f) -> value data)
@@ -229,16 +252,6 @@ addLoadMethod("Oscar", "QQField", (params, data, f) -> QQ)
 addLoadMethod("Oscar", "FiniteField", (params, data, f) -> (
 	if params =!= null then error "not implemented yet"
 	else ZZ/(value data)))
-
-leanMonomialOrders = hashTable {
-    "grevlex" => GLex
-    -- TODO: add all of grind's various monomial orderings
-    }
-addLoadMethod("Lean", "Lean.Grind.CommRing.Poly", (params, data, f) -> (
-	-- for now, just guess number of vars based on the highest index
-	n := max flatten apply(last \ data, m -> first \ m) + 1;
-	R := ZZ[vars(0..<n)];
-	sum(data, mon -> mon#0 * product(mon#1, vp -> R_(vp#0)^(vp#1)))))
 
 addListLoadMethod = method()
 addListLoadMethod(String, String, Type) := (ns, type, T) -> (
@@ -347,6 +360,22 @@ assert Equation(5, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://github.com/oscar-sys
 assert BinaryOperation(symbol ===, ZZ, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://github.com/oscar-system/Oscar.jl\",\"1.5.0\"]},\"_type\":\"ZZRing\"}")
 assert BinaryOperation(symbol ===, QQ, loadMRDI "{\"_ns\":{\"Oscar\":[\"https://github.com/oscar-system/Oscar.jl\",\"1.5.0\"]},\"_type\":\"QQField\"}")
 ///
+
+
+----------
+-- Lean --
+----------
+
+-- TODO: Move this to some Macaulean package
+-- keep MRDI just the Macaulay2 namespace (+ maybe Oscar?)
+
+addNamespace("Lean", "https://github.com/leanprover/lean4", "4.26.0-rc1")
+
+addLoadMethod("Lean", "Lean.Grind.CommRing.Poly", (params, data, f) -> (
+	-- for now, just guess number of vars based on the highest index
+	n := max flatten apply(last \ data, m -> first \ m) + 1;
+	R := ZZ[vars(0..<n)];
+	sum(data, mon -> mon#0 * product(mon#1, vp -> R_(vp#0)^(vp#1)))))
 
 TEST ///
 -- Lean polynomial test
