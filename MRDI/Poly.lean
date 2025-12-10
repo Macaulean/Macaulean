@@ -20,11 +20,13 @@ instance : FromJson Grind.CommRing.Power where
 def Monomial := Array Grind.CommRing.Power
 deriving instance ToJson for Monomial
 deriving instance FromJson for Monomial
+deriving instance Repr for Monomial
 
 /-- A term in a polynomial, consisting of a coefficient and a monomial. -/
 structure Term where
   coeff : Int
   mon : Monomial
+  deriving Repr
 
 instance : ToJson Term where
   toJson t := .arr #[t.coeff, toJson t.mon]
@@ -41,9 +43,11 @@ instance : FromJson Term where
 def PolynomialData := Array Term
 deriving instance ToJson for PolynomialData
 deriving instance FromJson for PolynomialData
+deriving instance Repr for PolynomialData
 
 structure Poly where
   data : PolynomialData
+  deriving Repr
 
 -- instance : ToJson Poly where
 --   toJson p := .mkObj [("_ns", .mkObj [("Lean", .arr #[.str Lean.githubURL,
@@ -61,6 +65,7 @@ instance : FromJson Poly where
 
 instance : MrdiType Poly where
   mrdiType := .string "Lean.Grind.CommRing.Poly"
+  decode? := trivialDecode?
 
 def test : Poly := {
   data := #[
@@ -69,3 +74,5 @@ def test : Poly := {
   ]
 }
 #eval toJson <| toMrdi test
+
+#eval ((fromJson? <| toJson <| toMrdi test) >>= fromMrdi? (α := Poly))
