@@ -35,8 +35,10 @@ def runJSONRPCTest := do
   let result4 <- m2Server.factorUnivariatePoly [(1,1)]
   let mrdiData := toMrdi MRDI.test
   --The toString is to deal with the fact that loadMRDI in MRDI.m2 only takes strings
-  let result5 : Json <- m2Server.sendRequest "mrdiEcho" [toString <| toJson mrdiData]
-  IO.println result5
+  let result5 : String <- m2Server.sendRequest "mrdiEcho" [toString <| toJson mrdiData]
+  match Json.parse result5 >>= fromJson? with
+    | .ok mrdiData => IO.println <| repr <| (fromMrdi? (α := MRDI.Poly) mrdiData)
+    | .error str => IO.println ("Invalid reply from mrdiEcho: " ++ str)
   pure m2Process
 
 elab "macaulay" : tactic => do
