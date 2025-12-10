@@ -22,10 +22,10 @@ See the [wiki](https://github.com/Macaulay2/M2/wiki).
 * [Lean-Oscar](https://github.com/todbeibrot/Lean-Oscar)
 * [mrdi file format](https://arxiv.org/abs/2309.00465)
 
-## Loading the JSONRPC/MRDI packages
+## Loading the JSONRPC/MRDI packages (Macaulay2)
 
 Suppose you have cloned the Macaulean repository to `/path/to/Macaulean`.
-Then run:
+### Load packages
 
 ```m2
 path = append(path, "/path/to/Macaulean/m2")
@@ -33,3 +33,16 @@ needsPackage "JSONRPC"
 needsPackage "MRDI"
 ```
 
+### Test packages
+
+```m2
+check "JSONRPC"
+check "MRDI" 
+```
+
+##  Tests (Lean)
+
+From command line:
+```
+lake build MacauleanTest
+```
