@@ -108,7 +108,8 @@ registerMethod(server, "factorInt", (x) -> (
 
 registerMethod(server, "mrdiEcho", (mrdi) -> (
         f := loadMRDI mrdi;
-        toExternalString f
+        stderr << f << endl;
+        saveMRDI(f, Namespace => "Lean")
     )
 )
 
