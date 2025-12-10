@@ -9,7 +9,7 @@ abbrev Uuid := String
 inductive MrdiTypeDesc where
   | string : String → MrdiTypeDesc
   | parameterized : String → List Uuid → MrdiTypeDesc
-  deriving Repr
+  deriving Repr,BEq,Ord
 
 instance : ToJson MrdiTypeDesc where
   toJson := fun
@@ -23,10 +23,19 @@ instance : FromJson MrdiTypeDesc where
       <*> (terms.get? "params").elim (.error "Missing params field from MRDI Type") fromJson?
     | _ => .error "Invalid MRDI Type Descriptor"
 
-class MrdiType (α : Type u) : Type u extends ToJson α, FromJson α where
-  mrdiType : MrdiTypeDesc
+structure MrdiState where
+  types : Std.TreeMap Uuid Type
+  values : Std.DTreeMap Uuid (types.getD · Empty)
 
---TODO From/ToJson instances
+def MrdiState.empty : MrdiState := ⟨.empty,.empty⟩
+
+class MrdiType (α : Type u) : Type _ extends ToJson α where
+  mrdiType : MrdiTypeDesc
+  --not using StateM because of universe issues
+  decode? : Json → MrdiState → Except String α
+
+def trivialDecode? [FromJson α] (json : Json) (_ : MrdiState) : Except String α := fromJson? json
+
 structure MrdiData where
   type : MrdiTypeDesc
   data : Json
@@ -37,6 +46,17 @@ instance : ToJson MrdiData where
       ("_type", toJson data.type),
       ("data", data.data)
     ]
+
+instance : FromJson MrdiData where
+  fromJson? := fun
+    | .obj entries => do
+      let .some type := entries.get? "_type" | .error "MRDI objects must contain a _type field"
+      let mrdiType <- fromJson? type
+      pure {
+        type := mrdiType
+        data := entries.getD "data" .null
+        }
+    | _ => .error "Expected an object"
 
 --TODO FromJson instance
 structure Mrdi extends MrdiData where
@@ -58,6 +78,22 @@ instance : ToJson Mrdi where
       ("data", mrdi.data)
     ]
 
+instance : FromJson Mrdi where
+  fromJson? := fun
+    | json@(.obj entries) => do
+      -- The json schema seems to allow a file not to have a _ns parameter
+      -- I don't know what we should do with that
+      let .some ns := entries.get? "_ns" | .error "MRDI objects without namespaces are unspported"
+      let dataPart ← fromJson? json
+      let refs : Std.TreeMap Uuid MrdiData <-
+        fromJson? <| entries.getD "refs" (.obj .empty)
+      pure {
+        toMrdiData := dataPart
+        refs := refs
+        ns := ns
+      }
+    | _ => .error "Expected an object"
+
 def toMrdiData [MrdiType α] (x: α) : MrdiData :=
   {
     type := MrdiType.mrdiType α,
@@ -75,4 +111,8 @@ def toMrdi [MrdiType α] (x: α) : Mrdi :=
   --   ("_type", .str $ mrdiName x),
   --   ("data", toJson x)]
 
-def fromMrdi [MrdiType α] (mrdi : Mrdi) : α := sorry
+-- doesn't implement references yet
+def fromMrdi? [MrdiType α] (mrdi : Mrdi) : Except String α :=
+  if MrdiType.mrdiType α != mrdi.type
+  then .error "MRDI type does not match"
+  else MrdiType.decode? mrdi.data MrdiState.empty
