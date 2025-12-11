@@ -280,6 +280,21 @@ addSaveMethod(QQ,
     Name => "QQFieldElem",
     Namespace => "Oscar")
 
+-- Oscar differentiates between univariate and multivariate polynomial rings,
+-- but multivariate rings can have just 1 variable, so we just always use that
+addSaveMethod(PolynomialRing,
+    baseRing,
+    R -> hashTable {"symbols" => toString \ gens R},
+    Name => "MPolyRing",
+    UseID => true,
+    Namespace => "Oscar")
+
+addSaveMethod(RingElement,
+    ring,
+    f -> apply(listForm f, mon -> {toString \ mon#0, toString mon#1}),
+    Name => "MPolyRingElem",
+    Namespace => "Oscar")
+
 addLoadMethod("Base.Int", (params, data, f) -> value data, Namespace => "Oscar")
 addLoadMethod("ZZRingElem",
     (params, data, f) -> value data,
@@ -298,6 +313,15 @@ addLoadMethod("FiniteField",
     (params, data, f) -> (
 	if params =!= null then error "not implemented yet"
 	else ZZ/(value data)),
+    Namespace => "Oscar")
+addLoadMethod({"PolyRing", "MPolyRing"},
+    (params, data, f) -> (
+	R := f params;
+	-- TODO: handled indexed variables, e.g., x[1], x[2], x[3]
+	R[Variables => data#"symbols"]),
+    Namespace => "Oscar")
+addLoadMethod({"PolyRingElem", "MPolyRingElem"},
+    (params, data, f) -> mrdiToPolynomial(f params, data),
     Namespace => "Oscar")
 
 addListLoadMethod = method()
@@ -410,6 +434,9 @@ checkMRDI ZZ
 checkMRDI QQ
 checkMRDI 5
 checkMRDI(1/2)
+R = ZZ[x,y,z,w]
+checkMRDI R
+checkMRDI random(3, R)
 ///
 
 end
