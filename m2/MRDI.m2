@@ -230,6 +230,8 @@ addLoadMethod(String, Function) := o -> (type, f) -> (
     if not loadMethods#?(o.Namespace)
     then error("unknown namespace: ", o.Namespace);
     loadMethods#(o.Namespace)#type = f)
+addLoadMethod(List, Function) := o -> (types, f) -> (
+    scan(types, type -> addLoadMethod(type, f, o)))
 
 addLoadMethod("ZZ", (params, data, f) -> value data)
 addLoadMethod("Ring", (params, data, f) -> (
