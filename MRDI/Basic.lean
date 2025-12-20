@@ -1,10 +1,8 @@
 import Lean.Data.Json.FromToJson
+import MRDI.Uuid
 open Lean Json
 
 def Lean.githubURL := "https://github.com/leanprover/lean4"
-
---works for now
-abbrev Uuid := String
 
 inductive MrdiTypeDesc where
   | string : String → MrdiTypeDesc
@@ -23,18 +21,60 @@ instance : FromJson MrdiTypeDesc where
       <*> (terms.get? "params").elim (.error "Missing params field from MRDI Type") fromJson?
     | _ => .error "Invalid MRDI Type Descriptor"
 
+abbrev AnyValue.{u} := (α : Type u) × α
+
+def AnyValue.type (v : AnyValue) : Type _ := v.1
+def AnyValue.value (v : AnyValue) : v.1 := v.2
+
 structure MrdiState where
-  types : Std.TreeMap Uuid Type
-  values : Std.DTreeMap Uuid (types.getD · Empty)
+  values : Std.TreeMap Uuid AnyValue
+  uuids : Std.TreeMap USize Uuid
+  --^ I don't know that this is quite right, in particular, I think two objects with different types can have the same address when you use subtypes
 
-def MrdiState.empty : MrdiState := ⟨.empty,.empty⟩
+def MrdiState.empty : MrdiState := ⟨.empty, .empty⟩
 
-class MrdiType (α : Type u) : Type _ extends ToJson α where
+unsafe def MrdiState.addEntry (state : MrdiState) (u : Uuid) (x : α) : MrdiState :=
+  ⟨state.values.insert u ⟨α, x⟩, state.uuids.insert (ptrAddrUnsafe x) u⟩
+
+def MrdiState.getEntry (state : MrdiState) (u : Uuid) (h : u ∈ state.values) : (state.values.get u h).1 :=
+  (state.values.get u h).2
+
+--exploits the fact that it's impossible to have inserted a value of Type Empty
+def MrdiState.getType (state : MrdiState) (u : Uuid) : Type :=
+  match (state.values.get? u) with
+    | .some ⟨t, _⟩ => t
+    | .none => Empty
+
+def MrdiState.getEntry? (state : MrdiState) (u : Uuid) : Option (state.getType u) :=
+  let optV := state.values.get? u
+  match h : optV with
+    | .some ⟨t, v⟩ =>
+        let h : t = state.getType u := by
+          let p : AnyValue := ⟨t, v⟩
+          unfold MrdiState.getType
+          subst optV
+          simp [h]
+        Option.some (cast h <| v)
+    | .none => .none
+
+unsafe def MrdiState.getUuid (state : MrdiState) (x : α) : IO Uuid := do
+  match state.uuids.get? (ptrAddrUnsafe x) with
+    | .some u => pure u
+    | .none => sorry
+
+def MrdiT (m : Type _ → Type v) α := MrdiState → m (α × MrdiState)
+abbrev MrdiM := MrdiT Id
+
+-- Explicitly specified universes to avoid
+-- being too universe polymorphic
+class MrdiType.{u} (α : Type u) : Type _ where
   mrdiType : MrdiTypeDesc
   --not using StateM because of universe issues
-  decode? : Json → MrdiState → Except String α
+  decode? : Json → MrdiState.{u} → Except String α
+  encode : α → MrdiState.{u} → Json × MrdiState.{u}
 
 def trivialDecode? [FromJson α] (json : Json) (_ : MrdiState) : Except String α := fromJson? json
+def trivialEncode [ToJson α] (x : α) (_ : MrdiState) : Json × MrdiState := ⟨toJson x, .empty⟩
 
 structure MrdiData where
   type : MrdiTypeDesc
@@ -58,7 +98,6 @@ instance : FromJson MrdiData where
         }
     | _ => .error "Expected an object"
 
---TODO FromJson instance
 structure Mrdi extends MrdiData where
   ns : Json
   refs : Std.TreeMap Uuid MrdiData
@@ -74,7 +113,7 @@ instance : ToJson Mrdi where
     else .mkObj [
       ("_ns", mrdi.ns),
       ("_type", toJson mrdi.type),
-      ("_refs", toJson mrdi.refs),
+      ("_refs", toJson <| Std.TreeMap.ofArray <| (fun (k,v) => (toString k, v)) <$> mrdi.refs.toArray ),
       ("data", mrdi.data)
     ]
 
@@ -85,11 +124,17 @@ instance : FromJson Mrdi where
       -- I don't know what we should do with that
       let .some ns := entries.get? "_ns" | .error "MRDI objects without namespaces are unspported"
       let dataPart ← fromJson? json
-      let refs : Std.TreeMap Uuid MrdiData <-
+      let refs : Std.TreeMap String MrdiData ←
         fromJson? <| entries.getD "refs" (.obj .empty)
+      let parsedRefs : Std.TreeMap Uuid MrdiData  ←
+        .ofArray (cmp := Ord.compare) <$>
+        refs.toArray.mapM (fun (k,v) =>
+          match toUuid? k with
+            | .some u => .ok (u,v)
+            | .none => .error "Invalid UUID")
       pure {
         toMrdiData := dataPart
-        refs := refs
+        refs := parsedRefs
         ns := ns
       }
     | _ => .error "Expected an object"
@@ -97,7 +142,7 @@ instance : FromJson Mrdi where
 def toMrdiData [MrdiType α] (x: α) : MrdiData :=
   {
     type := MrdiType.mrdiType α,
-    data := toJson x
+    data := (MrdiType.encode x .empty).1
   }
 
 def toMrdi [MrdiType α] (x: α) : Mrdi :=
@@ -106,10 +151,6 @@ def toMrdi [MrdiType α] (x: α) : Mrdi :=
     ns := .mkObj [("Lean", .arr #[.str Lean.githubURL, .str Lean.versionString])],
     refs := .empty
   }
-  -- .mkObj [("_ns", .mkObj [
-  --   ("Lean", .arr #[.str Lean.githubURL, .str Lean.versionString])]),
-  --   ("_type", .str $ mrdiName x),
-  --   ("data", toJson x)]
 
 -- doesn't implement references yet
 def fromMrdi? [MrdiType α] (mrdi : Mrdi) : Except String α :=
