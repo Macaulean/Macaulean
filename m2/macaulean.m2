@@ -113,6 +113,13 @@ registerMethod(server, "mrdiEcho", (mrdi) -> (
     )
 )
 
+registerMethod(server, "mrdiFactor", (mrdi) -> (
+        f := loadMRDI mrdi;
+        stderr << f << endl;
+        apply(toList factor f, p -> saveMRDI(value p, Namespace => "Lean"))
+    )
+)
+
 --expects a list of pairs where the pairs represent a term as a coefficent and exponent
 registerMethod(server, "factorUnivariatePoly", (polyTerms) -> (
         R := ZZ[x];
