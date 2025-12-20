@@ -66,6 +66,7 @@ instance : FromJson Poly where
 instance : MrdiType Poly where
   mrdiType := .string "Lean.Grind.CommRing.Poly"
   decode? := trivialDecode?
+  encode := trivialEncode
 
 def test : Poly := {
   data := #[
