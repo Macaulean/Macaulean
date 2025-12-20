@@ -113,6 +113,13 @@ registerMethod(server, "mrdiEcho", (mrdi) -> (
     )
 )
 
+registerMethod(server, "mrdiFactor", (mrdi) -> (
+        f := loadMRDI mrdi;
+        stderr << f << endl;
+        apply(toList factor f, p -> saveMRDI(value p, Namespace => "Lean"))
+    )
+)
+
 macauleanMainLoop(server, stdio);
 -- inputJSON = fromJSONStream stdio;
 -- stdio << toExternalString sum inputJSON << endl;

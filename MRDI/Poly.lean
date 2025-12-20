@@ -49,12 +49,6 @@ structure Poly where
   data : PolynomialData
   deriving Repr
 
--- instance : ToJson Poly where
---   toJson p := .mkObj [("_ns", .mkObj [("Lean", .arr #[.str Lean.githubURL,
---                                                .str Lean.versionString])]),
---                       ("_type", .str "Lean.Grind.CommRing.Poly"),
---                       ("data", toJson p.data)]
-
 instance : ToJson Poly where
   toJson p := toJson p.data
 
@@ -63,17 +57,38 @@ instance : FromJson Poly where
     let pdata ← fromJson? x
     pure <| Poly.mk pdata
 
-instance : MrdiType Poly where
-  mrdiType := .string "Lean.Grind.CommRing.Poly"
-  decode? := trivialDecode?
-  encode := trivialEncode
 
-def test : Poly := {
-  data := #[
-    { coeff := 3, mon := #[] },
-    { coeff := 5, mon := #[ ⟨2, 3⟩ ] }
-  ]
-}
+def polyToTermList : Grind.CommRing.Poly → List Term := fun
+  | .num k => [{coeff := k, mon := #[]}]
+  | .add k v p => {coeff := k, mon := (monToPowerList v).toArray} :: polyToTermList p
+  where
+    monToPowerList : Grind.CommRing.Mon → List Grind.CommRing.Power := fun
+      | .unit => []
+      | .mult p m => p :: monToPowerList m
+
+def polyFromTermArray (terms : Array Term) : Grind.CommRing.Poly :=
+  if h : terms.size <= 0 -- this instead of isEmpty to make dealing with a proof easier
+  then .num 0
+  else
+    let lastTerm :=
+      let t := terms.back (Nat.lt_of_not_le h)
+      if t.mon.isEmpty
+      then .num t.coeff
+      else .add t.coeff (powerArrayToMon t.mon) <| .num 0
+    terms.foldr (start := terms.size - 1)
+      (fun t p => .add t.coeff (powerArrayToMon t.mon) p) <| lastTerm
+  where
+    powerArrayToMon (powers : Array Grind.CommRing.Power) : Grind.CommRing.Mon :=
+      powers.foldr (.mult) .unit
+
+instance : MrdiType Grind.CommRing.Poly where
+  mrdiType := .string "Lean.Grind.CommRing.Poly"
+  decode? json state := polyFromTermArray <$> trivialDecode? json state
+  encode p := trivialEncode ({data := (polyToTermList p).toArray} : Poly)
+
+def test : Grind.CommRing.Poly :=
+  .add 3 .unit <| .add 5 (.mult ⟨2, 3⟩ <| .unit) <| .num 0
+
 #eval toJson <| toMrdi test
 
-#eval ((fromJson? <| toJson <| toMrdi test) >>= fromMrdi? (α := Poly))
+#eval ((fromJson? <| toJson <| toMrdi test) >>= fromMrdi? (α := Grind.CommRing.Poly))
