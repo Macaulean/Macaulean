@@ -30,7 +30,6 @@ def runJSONRPCTest := do
   match tryProveFactorization n result3 with
     | .some _ => IO.println s!"Proof Successful!"
     | .none => IO.println s!"Incorrect Factorization!"
-  let result4 <- m2Server.factorUnivariatePoly [(1,1)]
   pure m2Process
 
 elab "macaulay" : tactic => do
@@ -44,13 +43,9 @@ elab "macaulay" : tactic => do
   catch e =>
     set s
     throwError "macaulay can only prove True"
-  -- IO.println
   return
 
 example : True := by macaulay
-
--- example : (1=1) := by macaulay
-
 
 def main : IO Unit :=
   do let m2Process <- runJSONRPCTest

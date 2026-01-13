@@ -17,17 +17,6 @@ structure Irreducible [CommSemiring R] (p : R) : Prop where
   /-- If an irreducible element factors, then one factor is a unit. -/
   isUnit_or_isUnit ⦃a b : R⦄ : p = a * b → IsUnit a ∨ IsUnit b
 
-theorem natOnlyUnit {x : Nat} : IsUnit x ↔ x = 1 := by
-  apply Iff.intro
-  intro a
-  cases a
-  expose_names
-  exact Nat.eq_one_of_mul_eq_one_left h
-  intro
-  exists 1
-  simp
-  trivial
-
 theorem factorizationImpliesReducible {a b : R} [CommSemiring R] : ¬ (IsUnit a ∨ IsUnit b) → ¬ Irreducible (a * b) := by
   intro p
   apply Not.intro
@@ -59,9 +48,7 @@ def macaualy2ProvideFactorization : Tactic := fun stx => do
       closeMainGoal `m2factor factorizationExpr
   | _ => throwUnsupportedSyntax
 
-#check pushGoal
-#check throwTacticEx
-  -- the returned Expr should be an expression of type ¬ Irreducible x
+-- This will try to close a goal of the form ¬ Irreducible x
 def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
   let m2Server <- globalM2Server
   let factorization <- m2Server.factorNat x
@@ -86,10 +73,6 @@ def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
         _ ← runTactic (← getMainGoal) (← `(tactic|grind))
         pure ()
 
-#check TSyntax.raw
-
-#check Expr.getAppFnArgs
-
 elab "m2reducible" : tactic => do
   let goal ← getMainGoal
   let target ← getMainTarget
@@ -97,23 +80,3 @@ elab "m2reducible" : tactic => do
   let (``Irreducible,#[_,_,irrTarget]) := irrExpr.getAppFnArgs | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
   let .lit (Literal.natVal x) ← whnf irrTarget | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
   macaulay2ProveReducible x
-
-def twelve : Nat := 12
-def factor12 : Nat := by
-  m2factor twelve
-
-#print factor12
-
-def factor10 : Nat := by m2factor 10
-#print factor10
-
-example : ¬ Irreducible 60 := by
-  m2reducible
-
--- example : ¬ Irreducible 7 :=
---    by m2reducible
-
--- example : Irreducible 7 :=
---   by m2reducible
-
-example : ∀ b : Nat, b ≤ 3 → b*3 ≠ 1 := by decide
