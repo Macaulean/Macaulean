@@ -1,4 +1,4 @@
-import Macaulean
+--import Macaulean
 
 open Lean.Grind.CommRing
 
