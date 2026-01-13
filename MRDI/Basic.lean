@@ -57,13 +57,20 @@ def MrdiState.getEntry? (state : MrdiState) (u : Uuid) : Option (state.getType u
         Option.some (cast h <| v)
     | .none => .none
 
-unsafe def MrdiState.getUuid (state : MrdiState) (x : α) : IO Uuid := do
-  match state.uuids.get? (ptrAddrUnsafe x) with
-    | .some u => pure u
-    | .none => sorry
+unsafe def MrdiState.getUuid (state : MrdiState) (x : α) : Option Uuid :=
+  state.uuids.get? (ptrAddrUnsafe x)
 
-def MrdiT (m : Type _ → Type v) α := MrdiState → m (α × MrdiState)
+structure MrdiT (m : Type _ → Type v) α where
+  runMrdi : MrdiState → m (α × MrdiState)
+
 abbrev MrdiM := MrdiT Id
+
+instance [Monad m] : Monad (MrdiT m) where
+  pure x := {runMrdi := fun s => pure (x,s)}
+  bind p f := {runMrdi := fun s => do
+    let (x,s') ← p.runMrdi s
+    (f x).runMrdi s'
+    }
 
 -- Explicitly specified universes to avoid
 -- being too universe polymorphic
