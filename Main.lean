@@ -32,7 +32,6 @@ def runJSONRPCTest := do
   match tryProveFactorization n result3 with
     | .some _ => IO.println s!"Proof Successful!"
     | .none => IO.println s!"Incorrect Factorization!"
-  let result4 <- m2Server.factorUnivariatePoly [(1,1)]
   let poly : Grind.CommRing.Poly := .add 3 (.mult ⟨2, 2⟩ <| .unit) <| .add 5 (.mult ⟨2, 3⟩ <| .unit) <| .num 0
   let mrdiData := toMrdi poly
   --The toString is to deal with the fact that loadMRDI in MRDI.m2 only takes strings
@@ -55,13 +54,9 @@ elab "macaulay" : tactic => do
   catch e =>
     set s
     throwError "macaulay can only prove True"
-  -- IO.println
   return
 
 example : True := by macaulay
-
--- example : (1=1) := by macaulay
-
 
 def main : IO Unit :=
   do let m2Process <- runJSONRPCTest

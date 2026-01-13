@@ -69,11 +69,6 @@ def Macaulay2.factorNat (m2 : Macaulay2) (x : Nat) : IO (List (Nat × Nat)) := d
       | [a,b] => (a,b)
       | _ => ⟨1,1⟩) <$> response)
 
-abbrev Poly := List (Int × Nat)
-def Macaulay2.factorUnivariatePoly (m2 : Macaulay2) (p : Poly) : IO (List (Poly × Nat)) := do
-  let response : List (Poly × Nat) ← m2.sendRequest "factorUnivariatePoly" [p]
-  return response
-
 -- attempts to find a factorization viewing
 -- p as a polynomial over the integers
 def Macaulay2.factor (m2 : Macaulay2) (p : CommRing.Poly) : IO (List (CommRing.Poly × Nat)) := do

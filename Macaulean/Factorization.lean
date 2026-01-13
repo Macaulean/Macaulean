@@ -17,17 +17,6 @@ structure Irreducible [CommSemiring R] (p : R) : Prop where
   /-- If an irreducible element factors, then one factor is a unit. -/
   isUnit_or_isUnit ⦃a b : R⦄ : p = a * b → IsUnit a ∨ IsUnit b
 
-theorem natOnlyUnit {x : Nat} : IsUnit x ↔ x = 1 := by
-  apply Iff.intro
-  intro a
-  cases a
-  expose_names
-  exact Nat.eq_one_of_mul_eq_one_left h
-  intro
-  exists 1
-  simp
-  trivial
-
 theorem factorizationImpliesReducible {a b : R} [CommSemiring R] : ¬ (IsUnit a ∨ IsUnit b) → ¬ Irreducible (a * b) := by
   intro p
   apply Not.intro
@@ -65,9 +54,7 @@ def factorWithContext [CommRing R] (ctx : CommRing.Context R) (p : CommRing.Poly
   let factorization <- m2Server.factor p
   pure <| factorization.map (fun (q,n) => (q.denote ctx, n))
 
-#check pushGoal
-#check throwTacticEx
-  -- the returned Expr should be an expression of type ¬ Irreducible x
+-- This will try to close a goal of the form ¬ Irreducible x
 def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
   let m2Server <- globalM2Server
   let factorization <- m2Server.factorNat x
@@ -91,10 +78,6 @@ def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
         --get grind to prove that things are not units
         _ ← runTactic (← getMainGoal) (← `(tactic|grind))
         pure ()
-
-#check TSyntax.raw
-
-#check Expr.getAppFnArgs
 
 elab "m2reducible" : tactic => do
   let goal ← getMainGoal
