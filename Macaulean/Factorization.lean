@@ -59,6 +59,12 @@ def macaualy2ProvideFactorization : Tactic := fun stx => do
       closeMainGoal `m2factor factorizationExpr
   | _ => throwUnsupportedSyntax
 
+-- usually not a complete factorization if the ring is at all interesting
+def factorWithContext [CommRing R] (ctx : CommRing.Context R) (p : CommRing.Poly) : IO (List (R × Nat)) := do
+  let m2Server ← globalM2Server
+  let factorization <- m2Server.factor p
+  pure <| factorization.map (fun (q,n) => (q.denote ctx, n))
+
 #check pushGoal
 #check throwTacticEx
   -- the returned Expr should be an expression of type ¬ Irreducible x
@@ -93,10 +99,15 @@ def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
 elab "m2reducible" : tactic => do
   let goal ← getMainGoal
   let target ← getMainTarget
-  let (``Not,#[irrExpr]) := target.getAppFnArgs | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
-  let (``Irreducible,#[_,_,irrTarget]) := irrExpr.getAppFnArgs | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
-  let .lit (Literal.natVal x) ← whnf irrTarget | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
-  macaulay2ProveReducible x
+  let mvar ← mkFreshExprMVar (.some <| Expr.const ``Nat [])
+  let irrExpr ← mkAppM ``Not #[← mkAppM ``Irreducible #[mvar]]
+  if ← isDefEq target irrExpr
+  then
+    let x' ← instantiateMVars mvar
+    let .lit (.natVal x) ← whnf x'
+      | throwTacticEx `m2reducible goal s!"Expected a goal of the form ¬ Irreducible x"
+    macaulay2ProveReducible x
+  else throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
 
 def twelve : Nat := 12
 def factor12 : Nat := by
