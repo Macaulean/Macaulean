@@ -5,6 +5,15 @@ import Lean.Data.Json
 --send the messages
 import Lean.Data.Lsp.Communication
 
+import Lean
+
+import MRDI.Basic
+import MRDI.Poly
+
+open Lean Grind
+
+
+
 --TODO: consider framing this as a monad instead
 structure Macaulay2 where
   requestStream : IO.FS.Stream

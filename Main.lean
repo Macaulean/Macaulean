@@ -35,11 +35,12 @@ def runJSONRPCTest := do
   let poly : Grind.CommRing.Poly := .add 3 (.mult ⟨2, 2⟩ <| .unit) <| .add 5 (.mult ⟨2, 3⟩ <| .unit) <| .num 0
   let mrdiData := toMrdi poly
   --The toString is to deal with the fact that loadMRDI in MRDI.m2 only takes strings
-  let result5 : List String <- m2Server.sendRequest "mrdiFactor" [toString <| toJson mrdiData]
-  result5.forM <| fun x =>
+  let result5 : List (String × Nat) <- m2Server.sendRequest "mrdiFactor" [toString <| toJson mrdiData]
+  result5.forM <| fun (x,n) =>
     match Json.parse x >>= fromJson? with
-      | .ok mrdiData => IO.println <| repr <| fromMrdi? (α := Grind.CommRing.Poly) mrdiData
-      | .error str => IO.println ("Invalid reply from mrdiEcho: " ++ str)
+      | .ok mrdiData => IO.println <| (·,n) <| repr <| fromMrdi? (α := Grind.CommRing.Poly) mrdiData
+      | .error str => IO.println ("Invalid reply from mrdiFactor: " ++ str)
+
   pure m2Process
 
 elab "macaulay" : tactic => do
