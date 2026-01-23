@@ -73,17 +73,21 @@ addSaveMethod = method(Options => {
 	Name => toString @@ class,
 	Namespace => "Macaulay2"})
 
+getType = method()
+getType(Function, Thing) := (f, x) -> f x
+getType(String,   Thing) := (s, x) -> s
+
 addSaveMethod Type := o -> T -> (
     installMethod((toMRDI, o.Namespace), T, x -> (
 	    if o.UseID then thingToUuid x;
-	    hashTable {"_type" => o.Name x},
+	    hashTable {"_type" => getType(o.Name, x)},
 	    {}));
     T#(UseID, o.Namespace) = o.UseID)
 addSaveMethod(Type, Function) := o -> (T, dataf) -> (
     installMethod((toMRDI, o.Namespace), T, x -> (
 	    if o.UseID then thingToUuid x;
 	    hashTable {
-		"_type" => o.Name x,
+		"_type" => getType(o.Name, x),
 		"data" => dataf x},
 	    {}));
     T#(UseID, o.Namespace) = o.UseID)
@@ -98,7 +102,7 @@ addSaveMethod(Type, Function, Function) := o -> (T, paramsf, dataf) -> (
 	    (
 		hashTable {
 		    "_type" => hashTable {
-			"name" => o.Name x,
+			"name" => getType(o.Name, x),
 			"params" => mrdi},
 		    "data" => dataf x},
 		refs)));
@@ -144,7 +148,7 @@ addSaveMethod(RingElement,
     ring,
     f -> apply(listForm f,
 	(exps, coeff) -> (toString \ exps, toString coeff)),
-    Name => f -> "RingElement")
+    Name => "RingElement")
 
 addSaveMethod(Ideal,
     ring,
@@ -265,13 +269,13 @@ addSaveMethod(Ring,
 addSaveMethod(ZZ,
     x -> ZZ,
     toString,
-    Name => x -> "ZZRingElem",
+    Name => "ZZRingElem",
     Namespace => "Oscar")
 
 addSaveMethod(QQ,
     x -> QQ,
     x -> concatenate(toString numerator x, "//", toString denominator x),
-    Name => x -> "QQFieldElem",
+    Name => "QQFieldElem",
     Namespace => "Oscar")
 
 addLoadMethod("Base.Int", (params, data, f) -> value data, Namespace => "Oscar")
