@@ -85,12 +85,5 @@ deriving instance TypeName for Grind.CommRing.Poly
 
 instance : MrdiType Grind.CommRing.Poly where
   mrdiType := .string "Lean.Grind.CommRing.Poly"
-  decode? json state := polyFromTermArray <$> trivialDecode? json state
+  decode? json := (polyFromTermArray <$> ·) <$> trivialDecode? json
   encode p := trivialEncode ({data := (polyToTermList p).toArray} : Poly)
-
-def test : Grind.CommRing.Poly :=
-  .add 3 .unit <| .add 5 (.mult ⟨2, 3⟩ <| .unit) <| .num 0
-
-#eval toJson <| toMrdi test
-
-#eval ((fromJson? <| toJson <| toMrdi test) >>= fromMrdi? (α := Grind.CommRing.Poly))

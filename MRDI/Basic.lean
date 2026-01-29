@@ -35,12 +35,6 @@ unsafe def MrdiState.addEntry [TypeName α] (state : MrdiState) (u : Uuid) (x : 
 def MrdiState.getEntry [TypeName α] (state : MrdiState) (u : Uuid) (h : u ∈ state.values) : Option α :=
   (state.values.get u h).get? α
 
---exploits the fact that it's impossible to have inserted a value of Type Empty
---def MrdiState.getType (state : MrdiState) (u : Uuid) : Type :=
---  match (state.values.get? u) with
---    | .some ⟨t, _⟩ => t
---    | .none => Empty
-
 def MrdiState.getEntry? [TypeName α] (state : MrdiState) (u : Uuid) : Option α := do
   let v ← state.values.get? u
   v.get? α
@@ -48,26 +42,16 @@ def MrdiState.getEntry? [TypeName α] (state : MrdiState) (u : Uuid) : Option α
 unsafe def MrdiState.getUuid (state : MrdiState) (x : α) : Option Uuid :=
   state.uuids.get? (ptrAddrUnsafe x)
 
-structure MrdiT (m : Type _ → Type v) α where
-  runMrdi : MrdiState → m (α × MrdiState)
+abbrev MrdiT := StateT MrdiState
+abbrev MrdiM := StateM MrdiState
 
-abbrev MrdiM := MrdiT Id
-
-instance [Monad m] : Monad (MrdiT m) where
-  pure x := {runMrdi := fun s => pure (x,s)}
-  bind p f := {runMrdi := fun s => do
-    let (x,s') ← p.runMrdi s
-    (f x).runMrdi s'
-    }
-
-class MrdiType (α : Type u) : Type _ where
+class MrdiType α : Type where
   mrdiType : MrdiTypeDesc
-  --not using StateM because of universe issues
-  decode? : Json → MrdiState → Except String α
-  encode : α → MrdiState → Json × MrdiState
+  decode? : Json → MrdiM (Except String α)
+  encode : α → MrdiM Json
 
-def trivialDecode? [FromJson α] (json : Json) (_ : MrdiState) : Except String α := fromJson? json
-def trivialEncode [ToJson α] (x : α) (_ : MrdiState) : Json × MrdiState := ⟨toJson x, .empty⟩
+def trivialDecode? [FromJson α] (json : Json) : MrdiM (Except String α) := pure <| fromJson? json
+def trivialEncode [ToJson α] (x : α) : MrdiM Json := pure <| toJson x
 
 structure MrdiData where
   type : MrdiTypeDesc
@@ -149,4 +133,4 @@ def toMrdi [MrdiType α] (x: α) : Mrdi :=
 def fromMrdi? [MrdiType α] (mrdi : Mrdi) : Except String α :=
   if MrdiType.mrdiType α != mrdi.type
   then .error "MRDI type does not match"
-  else MrdiType.decode? mrdi.data MrdiState.empty
+  else ((MrdiType.decode? mrdi.data).run MrdiState.empty).1
