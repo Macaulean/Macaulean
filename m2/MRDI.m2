@@ -406,40 +406,4 @@ checkMRDI 5
 checkMRDI(1/2)
 ///
 
-----------
--- Lean --
-----------
-
--- TODO: Move this to some Macaulean package
--- keep MRDI just the Macaulay2 namespace (+ maybe Oscar?)
-
-addNamespace("Lean", "https://github.com/leanprover/lean4", "4.26.0-rc1")
-
-addSaveMethod(RingElement,
-    f -> (
-	if baseRing ring f =!= ZZ then error "expected a ring over ZZ";
-	apply(listForm f, mon -> {
-		mon#1,
-		apply(select(#mon#0, i -> mon#0#i != 0), j -> {j, mon#0#j})})),
-    Name => f -> "Lean.Grind.CommRing.Poly",
-    Namespace => "Lean")
-
-addLoadMethod("Lean.Grind.CommRing.Poly",
-    (params, data, f) -> (
-	-- for now, just guess number of vars based on the highest index
-	n := max flatten apply(last \ data, m -> first \ m) + 1;
-	R := ZZ[vars(0..<n)];
-	sum(data, mon -> mon#0 * product(mon#1, vp -> R_(vp#0)^(vp#1)))),
-    Namespace => "Lean")
-
-TEST ///
--- save/load Lean objects
-R = ZZ[x,y,z]
-f = 3 + 5*z^3
-g = loadMRDI saveMRDI(f, Namespace => "Lean")
-S = ring g
-phi = map(R, S, {x, y, z})
-assert Equation(f, phi g)
-///
-
 end
