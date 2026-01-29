@@ -81,6 +81,8 @@ def polyFromTermArray (terms : Array Term) : Grind.CommRing.Poly :=
     powerArrayToMon (powers : Array Grind.CommRing.Power) : Grind.CommRing.Mon :=
       powers.foldr (.mult) .unit
 
+deriving instance TypeName for Grind.CommRing.Poly
+
 instance : MrdiType Grind.CommRing.Poly where
   mrdiType := .string "Lean.Grind.CommRing.Poly"
   decode? json state := polyFromTermArray <$> trivialDecode? json state

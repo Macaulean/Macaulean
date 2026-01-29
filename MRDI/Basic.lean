@@ -21,41 +21,29 @@ instance : FromJson MrdiTypeDesc where
       <*> (terms.get? "params").elim (.error "Missing params field from MRDI Type") fromJson?
     | _ => .error "Invalid MRDI Type Descriptor"
 
-abbrev AnyValue.{u} := (α : Type u) × α
-
-def AnyValue.type (v : AnyValue) : Type _ := v.1
-def AnyValue.value (v : AnyValue) : v.1 := v.2
 
 structure MrdiState where
-  values : Std.TreeMap Uuid AnyValue
+  values : Std.TreeMap Uuid Dynamic
   uuids : Std.TreeMap USize Uuid
   --^ I don't know that this is quite right, in particular, I think two objects with different types can have the same address when you use subtypes
 
 def MrdiState.empty : MrdiState := ⟨.empty, .empty⟩
 
-unsafe def MrdiState.addEntry (state : MrdiState) (u : Uuid) (x : α) : MrdiState :=
-  ⟨state.values.insert u ⟨α, x⟩, state.uuids.insert (ptrAddrUnsafe x) u⟩
+unsafe def MrdiState.addEntry [TypeName α] (state : MrdiState) (u : Uuid) (x : α) : MrdiState :=
+  ⟨state.values.insert u (Dynamic.mk x), state.uuids.insert (ptrAddrUnsafe x) u⟩
 
-def MrdiState.getEntry (state : MrdiState) (u : Uuid) (h : u ∈ state.values) : (state.values.get u h).1 :=
-  (state.values.get u h).2
+def MrdiState.getEntry [TypeName α] (state : MrdiState) (u : Uuid) (h : u ∈ state.values) : Option α :=
+  (state.values.get u h).get? α
 
 --exploits the fact that it's impossible to have inserted a value of Type Empty
-def MrdiState.getType (state : MrdiState) (u : Uuid) : Type :=
-  match (state.values.get? u) with
-    | .some ⟨t, _⟩ => t
-    | .none => Empty
+--def MrdiState.getType (state : MrdiState) (u : Uuid) : Type :=
+--  match (state.values.get? u) with
+--    | .some ⟨t, _⟩ => t
+--    | .none => Empty
 
-def MrdiState.getEntry? (state : MrdiState) (u : Uuid) : Option (state.getType u) :=
-  let optV := state.values.get? u
-  match h : optV with
-    | .some ⟨t, v⟩ =>
-        let h : t = state.getType u := by
-          let p : AnyValue := ⟨t, v⟩
-          unfold MrdiState.getType
-          subst optV
-          simp [h]
-        Option.some (cast h <| v)
-    | .none => .none
+def MrdiState.getEntry? [TypeName α] (state : MrdiState) (u : Uuid) : Option α := do
+  let v ← state.values.get? u
+  v.get? α
 
 unsafe def MrdiState.getUuid (state : MrdiState) (x : α) : Option Uuid :=
   state.uuids.get? (ptrAddrUnsafe x)
@@ -72,13 +60,11 @@ instance [Monad m] : Monad (MrdiT m) where
     (f x).runMrdi s'
     }
 
--- Explicitly specified universes to avoid
--- being too universe polymorphic
-class MrdiType.{u} (α : Type u) : Type _ where
+class MrdiType (α : Type u) : Type _ where
   mrdiType : MrdiTypeDesc
   --not using StateM because of universe issues
-  decode? : Json → MrdiState.{u} → Except String α
-  encode : α → MrdiState.{u} → Json × MrdiState.{u}
+  decode? : Json → MrdiState → Except String α
+  encode : α → MrdiState → Json × MrdiState
 
 def trivialDecode? [FromJson α] (json : Json) (_ : MrdiState) : Except String α := fromJson? json
 def trivialEncode [ToJson α] (x : α) (_ : MrdiState) : Json × MrdiState := ⟨toJson x, .empty⟩
