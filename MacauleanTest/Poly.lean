@@ -1,7 +1,9 @@
 --import Macaulean
 import MRDI
+import Lean
 
 open Lean.Grind.CommRing
+open Lean.Grind
 
 def w : Expr := .var 0
 def x : Expr := .var 1
@@ -48,9 +50,11 @@ info: Poly.add (Int.ofNat 1)
 #reduce g
 
 --TODO make this into a proper test
-def test : Grind.CommRing.Poly :=
+def test : Poly :=
   .add 3 .unit <| .add 5 (.mult ⟨2, 3⟩ <| .unit) <| .num 0
 
-#eval toJson <| toMrdi test
+#eval (Lean.toJson <$> toMrdi (m := Id) test).run' .empty
 
-#eval ((fromJson? <| toJson <| toMrdi test) >>= fromMrdi? (α := Grind.CommRing.Poly))
+#eval (do
+  let .ok mrdiJson ← Lean.fromJson? <$> Lean.toJson <$> toMrdi test | return .error "Incorrect MRDI"
+  fromMrdi? (m := Id) (α := Poly) mrdiJson).run' .empty
