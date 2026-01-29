@@ -1,4 +1,5 @@
 --import Macaulean
+import MRDI
 
 open Lean.Grind.CommRing
 
@@ -45,3 +46,11 @@ info: Poly.add (Int.ofNat 1)
 -/
 #guard_msgs in
 #reduce g
+
+--TODO make this into a proper test
+def test : Grind.CommRing.Poly :=
+  .add 3 .unit <| .add 5 (.mult ⟨2, 3⟩ <| .unit) <| .num 0
+
+#eval toJson <| toMrdi test
+
+#eval ((fromJson? <| toJson <| toMrdi test) >>= fromMrdi? (α := Grind.CommRing.Poly))

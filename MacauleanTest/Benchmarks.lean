@@ -1,3 +1,7 @@
+import Lean
+
+open Lean Grind Elab Tactic Meta
+
 /- From https://github.com/leanprover/lean4/issues/11861 -/
 theorem foo
   (u r k x y z a b c : Rat)
@@ -34,6 +38,7 @@ theorem foo
                     z) ^
                 2 *
               (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 2) +
+        u ^ 2 *
             ((k * x + ((u + r) ^ 2 - 1) * y) * c ^ 2 +
               (2 * u * k * a ^ 2 + u * ((u + r) ^ 2 - 2) * a * b +
                       (r * (u + r) - 2) * k * a * c +
@@ -41,4 +46,4 @@ theorem foo
                   u * k * c ^ 2) *
                 z) *
           (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 3) = 0 := by
-  sorry
+  grobner
