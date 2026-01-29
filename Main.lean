@@ -33,12 +33,12 @@ def runJSONRPCTest := do
     | .some _ => IO.println s!"Proof Successful!"
     | .none => IO.println s!"Incorrect Factorization!"
   let poly : Grind.CommRing.Poly := .add 3 (.mult ⟨2, 2⟩ <| .unit) <| .add 5 (.mult ⟨2, 3⟩ <| .unit) <| .num 0
-  let mrdiData := toMrdi poly
+  let mrdiData ← (toMrdi poly).run' .empty
   --The toString is to deal with the fact that loadMRDI in MRDI.m2 only takes strings
   let result5 : List (String × Nat) <- m2Server.sendRequest "mrdiFactor" [toString <| toJson mrdiData]
   result5.forM <| fun (x,n) =>
     match Json.parse x >>= fromJson? with
-      | .ok mrdiData => IO.println <| (·,n) <| repr <| fromMrdi? (α := Grind.CommRing.Poly) mrdiData
+      | .ok mrdiData => IO.println <| (·,n) <| repr <| (fromMrdi? (m := Id) (α := Grind.CommRing.Poly) mrdiData).run' .empty
       | .error str => IO.println ("Invalid reply from mrdiFactor: " ++ str)
 
   pure m2Process
