@@ -45,10 +45,16 @@ unsafe def MrdiState.getUuid (state : MrdiState) (x : α) : Option Uuid :=
 abbrev MrdiT := StateT MrdiState
 abbrev MrdiM := StateM MrdiState
 
-class MrdiType α : Type where
+instance [Monad m] [MonadState MrdiState m] : MonadLift MrdiM m where
+  monadLift act := modifyGet act.run
+
+/-
+  TODO consider whether to rewrite decode? and encode back to being simple functions
+-/
+class MrdiType α where
   mrdiType : MrdiTypeDesc
   decode? : Json → MrdiM (Except String α)
-  encode : α → MrdiM Json
+  encode: α → MrdiM Json
 
 def trivialDecode? [FromJson α] (json : Json) : MrdiM (Except String α) := pure <| fromJson? json
 def trivialEncode [ToJson α] (x : α) : MrdiM Json := pure <| toJson x
@@ -116,21 +122,22 @@ instance : FromJson Mrdi where
       }
     | _ => .error "Expected an object"
 
-def toMrdiData [MrdiType α] (x: α) : MrdiData :=
-  {
-    type := MrdiType.mrdiType α,
-    data := (MrdiType.encode x .empty).1
+def toMrdiData [Monad m] [MrdiType α] (x: α) : MrdiT m MrdiData := do
+  let jsonData ← MrdiType.encode x
+  pure {
+    type := MrdiType.mrdiType α
+    data := jsonData
   }
 
-def toMrdi [MrdiType α] (x: α) : Mrdi :=
-  {
-    toMrdiData x with
+def toMrdi [Monad m] [MrdiType α] (x: α) : MrdiT m Mrdi := do
+  pure {
+    ← toMrdiData x with
     ns := .mkObj [("Lean", .arr #[.str Lean.githubURL, .str Lean.versionString])],
     refs := .empty
   }
 
 -- doesn't implement references yet
-def fromMrdi? [MrdiType α] (mrdi : Mrdi) : Except String α :=
+def fromMrdi? [Monad m] [MrdiType α] (mrdi : Mrdi) : MrdiT m (Except String α) :=
   if MrdiType.mrdiType α != mrdi.type
-  then .error "MRDI type does not match"
-  else ((MrdiType.decode? mrdi.data).run MrdiState.empty).1
+  then pure <| .error "MRDI type does not match"
+  else MrdiType.decode? mrdi.data
