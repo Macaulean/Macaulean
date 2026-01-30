@@ -53,7 +53,7 @@ loadMethods = new MutableHashTable
 
 addNamespace = method()
 addNamespace(String, String, String) := (ns, url, v) -> (
-    namespaces#ns = (url, v);
+    namespaces#ns = {url, v};
     loadMethods#ns = new MutableHashTable;)
 
 addNamespace("Macaulay2", "https://macaulay2.com", version#"VERSION")
@@ -147,21 +147,21 @@ listForm Number := x -> {({}, x)}
 addSaveMethod(RingElement,
     ring,
     f -> apply(listForm f,
-	(exps, coeff) -> (toString \ exps, toString coeff)),
+	(exps, coeff) -> {toString \ exps, toString coeff}),
     Name => "RingElement")
 
 addSaveMethod(Ideal,
     ring,
     I -> apply(I_*, f -> (
 	    apply(listForm f,
-		(exps, coeff) -> (toString \ exps, toString coeff)))))
+		(exps, coeff) -> {toString \ exps, toString coeff}))))
 
 addSaveMethod(Matrix,
     ring,
     A -> apply(entries A, row -> (
 	    apply(row, f -> (
 		    apply(listForm f,
-			(exps, coeff) -> (toString \ exps, toString coeff)))))))
+			(exps, coeff) -> {toString \ exps, toString coeff}))))))
 
 saveMRDI = method(
     Dispatch => Thing,
