@@ -5,6 +5,15 @@ import Lean.Data.Json
 --send the messages
 import Lean.Data.Lsp.Communication
 
+import Lean
+
+import MRDI.Basic
+import MRDI.Poly
+
+open Lean Grind
+
+
+
 --TODO: consider framing this as a monad instead
 structure Macaulay2 where
   requestStream : IO.FS.Stream
@@ -60,7 +69,20 @@ def Macaulay2.factorNat (m2 : Macaulay2) (x : Nat) : IO (List (Nat × Nat)) := d
       | [a,b] => (a,b)
       | _ => ⟨1,1⟩) <$> response)
 
-abbrev Poly := List (Int × Nat)
-def Macaulay2.factorUnivariatePoly (m2 : Macaulay2) (p : Poly) : IO (List (Poly × Nat)) := do
-  let response : List (Poly × Nat) ← m2.sendRequest "factorUnivariatePoly" [p]
-  return response
+-- attempts to find a factorization viewing
+-- p as a polynomial over the integers
+def Macaulay2.factor (m2 : Macaulay2) (p : CommRing.Poly) : IO (List (CommRing.Poly × Nat)) :=
+  runMrdi.run' .empty
+  where
+    runMrdi : MrdiT IO (List (CommRing.Poly × Nat)) := do
+      let respose : List (Mrdi × Nat) ← m2.sendRequest "factorMrdi" [toString <| toJson <| ← toMrdi p]
+      let parsedRespose ← respose.mapM (fun (m,n) => do
+        let p <- fromMrdi? m
+        match p with
+          | .ok p' => pure <| Except.ok (p',n)
+          | .error e => pure <| .error e)
+      --This is silly, there's certainly an easier way than .mapM id
+      --also this method parses all of them even if the first one has an error
+      match parsedRespose.mapM id with
+        | Except.ok r => pure r
+        | .error e => throw <| IO.userError e

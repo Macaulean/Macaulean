@@ -1,6 +1,9 @@
-import Macaulean
+--import Macaulean
+import MRDI
+import Lean
 
 open Lean.Grind.CommRing
+open Lean.Grind
 
 def w : Expr := .var 0
 def x : Expr := .var 1
@@ -23,3 +26,35 @@ instance : OfNat Expr n where
 def f := x^5 + y^5 + z^5 + w^5 - 5*x*y*z*w |>.toPoly
 
 def g := x*y*z*w*(x + y + z + w) |>.toPoly
+
+/-- info: f : Poly -/
+#guard_msgs in
+#check f
+
+/--
+info: Poly.add (Int.ofNat 1)
+  (Mon.mult { x := 0, k := 2 }
+    (Mon.mult { x := 1, k := 1 } (Mon.mult { x := 2, k := 1 } (Mon.mult { x := 3, k := 1 } Mon.unit))))
+  (Poly.add (Int.ofNat 1)
+    (Mon.mult { x := 0, k := 1 }
+      (Mon.mult { x := 1, k := 2 } (Mon.mult { x := 2, k := 1 } (Mon.mult { x := 3, k := 1 } Mon.unit))))
+    (Poly.add (Int.ofNat 1)
+      (Mon.mult { x := 0, k := 1 }
+        (Mon.mult { x := 1, k := 1 } (Mon.mult { x := 2, k := 2 } (Mon.mult { x := 3, k := 1 } Mon.unit))))
+      (Poly.add (Int.ofNat 1)
+        (Mon.mult { x := 0, k := 1 }
+          (Mon.mult { x := 1, k := 1 } (Mon.mult { x := 2, k := 1 } (Mon.mult { x := 3, k := 2 } Mon.unit))))
+        (Poly.num (Int.ofNat 0)))))
+-/
+#guard_msgs in
+#reduce g
+
+--TODO make this into a proper test
+def test : Poly :=
+  .add 3 .unit <| .add 5 (.mult ⟨2, 3⟩ <| .unit) <| .num 0
+
+#eval (Lean.toJson <$> toMrdi (m := Id) test).run' .empty
+
+#eval (do
+  let .ok mrdiJson ← Lean.fromJson? <$> Lean.toJson <$> toMrdi test | return .error "Incorrect MRDI"
+  fromMrdi? (m := Id) (α := Poly) mrdiJson).run' .empty
