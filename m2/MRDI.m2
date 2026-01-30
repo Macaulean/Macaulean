@@ -57,7 +57,7 @@ loadMethods = new MutableHashTable
 
 addNamespace = method()
 addNamespace(String, String, String) := (ns, url, v) -> (
-    namespaces#ns = (url, v);
+    namespaces#ns = {url, v};
     loadMethods#ns = new MutableHashTable;
     Thing#{ns, UseID} = false;)
 
