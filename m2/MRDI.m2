@@ -19,6 +19,7 @@ export {
     "addSaveMethod",
     "loadMRDI",
     "saveMRDI",
+    "validateMRDI",
 
     -- symbols
     "Namespace",
@@ -346,6 +347,52 @@ addLoadMethod({"PolyRingElem", "MPolyRingElem"},
     (params, data) -> mrdiToPolynomial(params, data),
     Namespace => "Oscar")
 
+----------------
+-- validating --
+----------------
+
+-- https://www.oscar-system.org/schemas/mrdi.json
+
+-- all JSON objects must have keys as strings
+validateObject = x -> scanKeys(x, k -> (
+	if not instance(k, String)
+	then error("expected all keys to be strings, but got ", k)))
+
+validateData = method()
+validateData Thing := x -> error("invalid data: ", x)
+validateData String := x -> null
+validateData HashTable := x -> (
+    validateObject x;
+    scanKeys(x, k -> if not match("^[a-zA-Z0-9_]*", k)
+	then error("expected an alphanumeric key, but got ", k)))
+validateData List := x -> validateData \ x
+-- TODO: validate polymake schema
+
+validateMRDI = method()
+validateMRDI Thing := x -> error("expected an object, but got ", x)
+validateMRDI String := validateMRDI @@ fromJSON
+validateMRDI HashTable := x -> (
+    validateObject x;
+    if not x#?"_type" then error "expected a '_type' key";
+    if instance(x#"_type", String) then null
+    else if instance(x#"_type", HashTable) then (
+	validateObject x#"_type";
+	if x#"_type"#?"name" then (
+	    if not instance(x#"_type"#"name", String)
+	    then error("expected value of 'name' to be a string"));
+	if x#"_type"#?"params" then validateData x#"_type"#"params")
+    else error("expected value of '_type' to be a string or object");
+    scan({"_ns", "_refs"}, k -> (
+	    if x#?k then (
+		if not instance(x#k, HashTable)
+		then error("expected value of '", k, "' to be an object");
+		validateObject x#k)));
+    if x#?"_refs" then scanPairs(x#"_refs", (k, v) -> (
+	    if not isUuid k
+	    then error("expected all keys of '_refs' to be UUID's, but got ", k);
+	    validateMRDI v));
+    )
+
 -------------------
 -- documentation --
 -------------------
@@ -443,6 +490,29 @@ checkMRDI(1/2)
 R = ZZ[x,y,z,w]
 checkMRDI R
 checkMRDI random(3, R)
+///
+
+TEST ///
+-- validation
+validateMRDI saveMRDI 5
+validateMRDI saveMRDI ZZ
+validateMRDI saveMRDI QQ
+validateMRDI saveMRDI (ZZ/101)
+validateMRDI saveMRDI GF(2, 3)
+validateMRDI saveMRDI (QQ[x])
+validateMRDI saveMRDI (QQ[x][y][z])
+R = QQ[x,y,z,w]
+I = monomialCurveIdeal(R, {1, 2, 3})
+validateMRDI saveMRDI I_0
+validateMRDI saveMRDI I
+validateMRDI saveMRDI gens I
+validateMRDI saveMRDI(ZZ, Namespace => "Oscar")
+validateMRDI saveMRDI(QQ, Namespace => "Oscar")
+validateMRDI saveMRDI(5, Namespace => "Oscar")
+validateMRDI saveMRDI(1/2, Namespace => "Oscar")
+R = ZZ[x,y,z,w]
+validateMRDI saveMRDI(R, Namespace => "Oscar")
+validateMRDI saveMRDI(random(3, R), Namespace => "Oscar")
 ///
 
 end
