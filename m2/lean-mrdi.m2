@@ -61,6 +61,8 @@ mrdi = saveMRDI(f, Namespace => "Lean")
 
 -- {"_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.27.0"]}, "_type": "ConcretePoly", "data": {"polynomial": [[[0, 1], [2, 1]], [[1, 1], [2, 1]]], "coefficient map": [[2, [1, 2]]], "coefficient ring": "Rat"}}
 
+validateMRDI mrdi
+
 g = loadMRDI mrdi
 phi = map(R, ring g, vars R)
 assert Equation(phi g, f)
