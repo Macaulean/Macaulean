@@ -1,4 +1,6 @@
 import Macaulean
+import MRDI.Basic
+import MRDI.Poly
 
 import Lean
 
@@ -31,6 +33,14 @@ def runJSONRPCTest := do
     | .some _ => IO.println s!"Proof Successful!"
     | .none => IO.println s!"Incorrect Factorization!"
   let result4 <- m2Server.factorUnivariatePoly [(1,1)]
+  let poly : Grind.CommRing.Poly := .add 3 (.mult ⟨2, 2⟩ <| .unit) <| .add 5 (.mult ⟨2, 3⟩ <| .unit) <| .num 0
+  let mrdiData := toMrdi poly
+  --The toString is to deal with the fact that loadMRDI in MRDI.m2 only takes strings
+  let result5 : List String <- m2Server.sendRequest "mrdiFactor" [toString <| toJson mrdiData]
+  result5.forM <| fun x =>
+    match Json.parse x >>= fromJson? with
+      | .ok mrdiData => IO.println <| repr <| fromMrdi? (α := Grind.CommRing.Poly) mrdiData
+      | .error str => IO.println ("Invalid reply from mrdiEcho: " ++ str)
   pure m2Process
 
 elab "macaulay" : tactic => do
