@@ -22,3 +22,6 @@ jobs:
 
       - name: Check MRDI package
         run: M2 -e 'check "MRDI"; exit 0'
+
+      - name: Validate MRDI
+        run: cd m2 && M2 --script "validate-mrdi.m2"
