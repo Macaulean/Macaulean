@@ -1,5 +1,4 @@
-import Lean.Data.Json.FromToJson
-
+import Lean
 
 open Lean Json
 --TODO decide whether to make this a structure
@@ -56,10 +55,18 @@ instance : FromJson Uuid where
       | .some uuid => .ok uuid
       | .none => .error "Invalid UUID"
 
+def randomBitsMask : BitVec 128 := 0xFFFFFFFFFFFF0FFF3FFFFFFFFFFFFFFF
+def versionAndVariant : BitVec 128 := 0x00000000000040008000000000000000
+
+/--
+Uses g to generate a Uuid
+-/
+def randUuid [RandomGen gen] (g : gen) : Uuid × gen :=
+  let (x, g) := randNat g 0 (2^128-1)
+  (((x : BitVec 128) &&& randomBitsMask) ||| versionAndVariant, g)
+
 def generateUuid : IO Uuid := do
   --This consumes slightly more randomness than is optimal
   --but is conceptually simpler
   let x : BitVec 128 ← IO.rand 0 (2^128)
-  let randomBits : BitVec 128 :=        0xFFFFFFFFFFFF0FFF3FFFFFFFFFFFFFFF
-  let versionAndVariant : BitVec 128 := 0x00000000000040008000000000000000
-  pure <| (x &&& randomBits) ||| versionAndVariant
+  pure <| (x &&& randomBitsMask) ||| versionAndVariant
