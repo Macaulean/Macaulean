@@ -26,6 +26,8 @@ export {
     "UseID",
     }
 
+importFrom(Core, "nullf")
+
 ------------
 -- saving --
 ------------
@@ -77,34 +79,30 @@ getType = method()
 getType(Function, Thing) := (f, x) -> f x
 getType(String,   Thing) := (s, x) -> s
 
+
 addSaveMethod Type := o -> T -> (
-    installMethod((toMRDI, o.Namespace), T, x -> (
-	    if o.UseID then thingToUuid x;
-	    hashTable {"_type" => getType(o.Name, x)},
-	    {}));
-    T#(UseID, o.Namespace) = o.UseID;)
+    addSaveMethod(T, nullf, nullf, o))
 addSaveMethod(Type, Function) := o -> (T, dataf) -> (
-    installMethod((toMRDI, o.Namespace), T, x -> (
-	    if o.UseID then thingToUuid x;
-	    hashTable {
-		"_type" => getType(o.Name, x),
-		"data" => dataf x},
-	    {}));
-    T#(UseID, o.Namespace) = o.UseID;)
+    addSaveMethod(T, nullf, dataf, o))
 addSaveMethod(Type, Function, Function) := o -> (T, paramsf, dataf) -> (
     installMethod((toMRDI, o.Namespace), T, x -> (
-	    if o.UseID then thingToUuid x;
+	    if o.UseID then thingToUuid x; -- save uuid
 	    params := paramsf x;
-	    (mrdi, refs) := toMRDI(o.Namespace, params);
-	    if lookup((UseID, o.Namespace), class params) then (
-		mrdi = thingToUuid params;
-		refs = append(refs, mrdi));
+	    data := dataf x;
+	    if params =!= null then (
+		(mrdi, refs) := toMRDI(o.Namespace, params);
+		if lookup((UseID, o.Namespace), class params) then (
+		    mrdi = thingToUuid params;
+		    refs = append(refs, mrdi)))
+	    else refs = {};
 	    (
 		hashTable {
-		    "_type" => hashTable {
-			"name" => getType(o.Name, x),
-			"params" => mrdi},
-		    "data" => dataf x},
+		    "_type" => (
+			if params =!= null then hashTable {
+			    "name" => getType(o.Name, x),
+			    "params" => mrdi}
+			else getType(o.Name, x)),
+		    if data =!= null then "data" => data},
 		refs)));
     T#(UseID, o.Namespace) = o.UseID;)
 
