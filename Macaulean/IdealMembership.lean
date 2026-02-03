@@ -73,21 +73,26 @@ structure ConcretePoly (R : Type) where
   poly : CommRing.Poly
   coefficients : Std.TreeMap CommRing.Var R
 
-instance [MrdiType R] : MrdiType (ConcretePoly R) where
+unsafe instance [MrdiType R] : MrdiType (ConcretePoly R) where
   --TODO this should really be a parameterized mrdiType, but those require better UUID infrastructure
-  mrdiType := .string "ConcretePoly"
-  decode? (x : Json) := sorry
+  mrdiType := .parameterized "ConcretePoly" (.str <| toString <| MrdiType.mrdiType (α := R))
+  decode? (x : Json) := pure <| .ok <| {
+    poly := .num 0
+    coefficients := .empty
+  }
   --TODO use UUID's and references to do this properly
-  encode (p : ConcretePoly R)  := do
-    let basePoly ← MrdiType.encode p.poly
-    let coefficients ← p.coefficients.toList.mapM (fun (i,x) => (i, ·) <$> MrdiType.encode x)
-    pure <| .arr (#[basePoly] ++ coefficients.map toJson) --TODO use objects instead of arrays
+  encode (p : ConcretePoly R) := do
+    let basePolyUuid ← addReference p.poly
+    let coefficients ← p.coefficients.toArray.mapM (fun (i,x) => (i, ·) <$> MrdiType.encode x)
+    pure <| Json.mkObj [
+      ("poly", toJson basePolyUuid),
+      ("coefficients", .arr <| coefficients.map toJson) ]
 
 structure ExprPoly where
   poly : CommRing.Poly
   coefficients : Std.TreeMap Nat Expr
 
-def serializePoly [Macaulay2Ring R] (p : ExprPoly) : MrdiT MetaM (Option Mrdi) := do
+unsafe def serializePoly [Macaulay2Ring R] (p : ExprPoly) : MrdiT MetaM (Option Mrdi) := do
   let convertedCoefficientsOpt : List (Nat × Option R) ←
     p.coefficients.toList.mapM (fun (i,x) => (i, ·) <$> Macaulay2Ring.fromLitExpr? x)
   let some convertedCoefficients := convertedCoefficientsOpt.mapM
@@ -153,10 +158,9 @@ def proveIdealMembership : TacticM Unit := do
 
 syntax (name := m2idealmem) "m2idealmem" notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
-#check Expr.instantiate
-
 unsafe def m2IdealMemTacticImpl (goal : MVarId) (idealExprs : Array Expr) (polyExpr : Expr)
   : TacticM Unit := do
+  --parse a expression into a polynomial, checking that the ring matches using isDefEq
   let getPoly (expectedRing : Expr) (pExpr : Expr) : StateT VariableState MetaM ExprPoly := do
     let some (ring, poly) ← eqExprToPoly (← whnf pExpr) | throwTacticEx `m2idealmem goal "Expected a polynomial equality"
     if ← isDefEq expectedRing ring
@@ -167,11 +171,11 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (idealExprs : Array Expr) (polyE
     let exprPoly ← toExprPoly poly
     let genPolys ← idealExprs.mapM (getPoly ring)
     pure <| some (ring, genPolys, exprPoly)
-  let (some (ring, idealGens, poly), vars) ← getPolys.run  .empty | throwTacticEx `m2idealmem goal "Expected a polynomial expression"
+  let some (ring, idealGens, poly) ← getPolys.run' .empty | throwTacticEx `m2idealmem goal "Expected a polynomial expression"
 
   let serializerExpr ← mkAppOptM ``serializePoly #[ring, none]
   let serializerType ← inferType serializerExpr
-  let serializer ← evalExpr (ExprPoly → MrdiT MetaM (Option Mrdi)) serializerType serializerExpr
+  let serializer ← evalExpr (ExprPoly → MrdiT MetaM (Option Mrdi)) serializerType serializerExpr DefinitionSafety.unsafe
   let serializedPoly : Option Mrdi ← (serializer poly).run' .empty
   let serializedGens : Array (Option Mrdi) ← (idealGens.mapM serializer).run' .empty
   --check that ring is a ring we know how to work with
@@ -185,9 +189,6 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
   | `(tactic| m2idealmem [$args,*]) =>
     let goal ← getMainGoal
     let target ← getMainTarget
-    --TODO find the ring from the target and infer all of the required instances
-    let some (ring,_,_) := target.eq? | throwTacticEx `m2idealmem goal "Expected a polynomial equality"
-    logInfo ring
     let gens ← args.getElems.mapM (fun g => do
       match (← elabTerm g none) with
       | .fvar var =>
