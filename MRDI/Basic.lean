@@ -90,6 +90,9 @@ being encoded, and in partcular, what references have been encoded
 abbrev MrdiEncodeT := StateT MrdiEncodeState
 abbrev MrdiEncodeM := StateM MrdiEncodeState
 
+abbrev MrdiDecodeT m := ReaderT (Std.TreeMap Uuid MrdiData) (MrdiT m)
+abbrev MrdiDecodeM := MrdiDecodeT Id
+
 instance (priority := mid) [Monad m] : MonadStateOf MrdiState (MrdiEncodeT m) where
   get := MrdiEncodeState.toMrdiState <$> get
   set (s : MrdiState) := modify (fun s' => {s' with toMrdiState := s})
@@ -100,18 +103,23 @@ instance (priority := mid) [Monad m] : MonadStateOf MrdiState (MrdiEncodeT m) wh
 instance [Monad m] [MonadState MrdiState m] : MonadLift MrdiM m where
   monadLift act := modifyGet act.run
 
+instance [Monad m] [MonadLift MrdiM m] [MonadReader (Std.TreeMap Uuid MrdiData) m] : MonadLift MrdiDecodeM m where
+  monadLift act := do
+    let x ← read
+    act.run x
+
 /-
   TODO consider whether to rewrite decode? and encode back to being simple functions
 -/
 class MrdiType α where
   mrdiType : MrdiTypeDesc
-  decode? : Json → MrdiM (Except String α)
+  decode? : Json → MrdiDecodeM (Except String α)
   /--
   Return only the JSON that gives the data field.
   -/
   encode: α → MrdiEncodeM Json
 
-def trivialDecode? [FromJson α] (json : Json) : MrdiM (Except String α) := pure <| fromJson? json
+def trivialDecode? [FromJson α] (json : Json) : MrdiDecodeM (Except String α) := pure <| fromJson? json
 def trivialEncode [ToJson α] (x : α) : MrdiEncodeT Id Json := pure <| toJson x
 
 def toMrdiData [Monad m] [MrdiType α] (x: α) : MrdiEncodeT m MrdiData := do
@@ -200,8 +208,26 @@ instance : FromJson Mrdi where
       }
     | _ => .error "Expected an object"
 
+--within the decoder, get the value associated to a uuid
+unsafe def getRef [MrdiType α] [TypeName α] [Monad m] (uuid : Uuid) : MrdiDecodeT m (Except String α) := do
+  match (← get).values.get? uuid with
+  | some x =>
+    match x.get? α with
+    | some x' => pure <| Except.ok x'
+    | none => pure <| Except.error s!"Invalid type for {uuid}"
+  | none =>
+    let refs ← read
+    let some mrdiData := refs.get? uuid | return (.error s!"No value found for {uuid}")
+    match ← MrdiType.decode? mrdiData.data with
+    | .ok val =>
+      modify (fun s => s.addEntry uuid val)
+      pure <| .ok val
+    | .error e => pure <| .error e
+
 -- doesn't implement references yet
 def fromMrdi? [Monad m] [MrdiType α] (mrdi : Mrdi) : MrdiT m (Except String α) :=
   if MrdiType.mrdiType α != mrdi.type
   then pure <| .error "MRDI type does not match"
-  else MrdiType.decode? mrdi.data
+  else
+    let decode := MrdiType.decode? mrdi.data
+    decode.run mrdi.refs

@@ -73,13 +73,33 @@ structure ConcretePoly (R : Type) where
   poly : CommRing.Poly
   coefficients : Std.TreeMap CommRing.Var R
 
+instance [Repr R] : Repr (ConcretePoly R) where
+  reprPrec x n := f!"{repr x.poly} {repr x.coefficients}"
+
+instance [BEq R] : BEq (ConcretePoly R) where
+  beq x y := (x.poly == y.poly) && (x.coefficients.toList == y.coefficients.toList)
+
+
 unsafe instance [MrdiType R] : MrdiType (ConcretePoly R) where
   --TODO this should really be a parameterized mrdiType, but those require better UUID infrastructure
   mrdiType := .parameterized "ConcretePoly" (.str <| toString <| MrdiType.mrdiType (α := R))
-  decode? (x : Json) := pure <| .ok <| {
-    poly := .num 0
-    coefficients := .empty
-  }
+  decode? (x : Json) := ExceptT.run <| do
+    match x with
+    | .obj fields =>
+      let some (.str polyUuid) := fields.get? "poly" | throw "Expected a JSON object with a 'poly' field"
+      let some polyUuid := toUuid? polyUuid | throw "Expect a reference for the 'poly' field"
+      let some (.arr coeffArray) := fields.get? "coefficients" | throw "Expected a JSON object with a 'coefficients' field"
+      let coefficients : Array (Nat × R) ← coeffArray.mapM <| fun c => do
+        match c with
+        | .arr #[i, r] =>
+          pure (← i.getNat?, ← MrdiType.decode? (α := R) r)
+        | _ => throw "Expected a pair of an index and a rational number"
+      let poly ← getRef polyUuid
+      pure {
+        poly := poly
+        coefficients := .ofArray coefficients
+      }
+    | _ => throw "Expected a JSON object"
   --TODO use UUID's and references to do this properly
   encode (p : ConcretePoly R) := do
     let basePolyUuid ← addReference p.poly
@@ -91,6 +111,7 @@ unsafe instance [MrdiType R] : MrdiType (ConcretePoly R) where
 structure ExprPoly where
   poly : CommRing.Poly
   coefficients : Std.TreeMap Nat Expr
+  deriving Inhabited
 
 unsafe def serializePoly [Macaulay2Ring R] (p : ExprPoly) : MrdiT MetaM (Option Mrdi) := do
   let convertedCoefficientsOpt : List (Nat × Option R) ←

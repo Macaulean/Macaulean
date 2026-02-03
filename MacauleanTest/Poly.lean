@@ -1,6 +1,7 @@
 --import Macaulean
 import MRDI
 import Lean
+import Macaulean.IdealMembership
 
 open Lean.Grind.CommRing
 open Lean.Grind
@@ -58,3 +59,22 @@ def test : Poly :=
 #eval (do
   let .ok mrdiJson ← Lean.fromJson? <$> Lean.toJson <$> toMrdi test | return .error "Incorrect MRDI"
   fromMrdi? (m := Id) (α := Poly) mrdiJson).run' .empty
+
+
+--TODO make this into a proper test
+def test2Poly : Poly :=
+  .add 3 (.mult ⟨0,1⟩ <| .mult ⟨2,2⟩ .unit) <| .add 1 (.mult ⟨0, 1⟩ <| .mult ⟨1,2⟩ .unit) <| .num 1
+def test2Coefficients : Std.TreeMap Var Rat :=
+  .ofList [(0,(1:Rat)/2)]
+
+def test2 : ConcretePoly Rat := ⟨test2Poly, test2Coefficients⟩
+
+#eval (do
+  let mrdi ← (toMrdi test2)
+  pure <| Lean.toJson mrdi).run' .empty
+
+#eval (do
+  let mrdi ← (toMrdi test2)
+  let .ok mrdiJson := Lean.fromJson? <| Lean.toJson mrdi | return .error "Invalid JSON"
+  let .ok val ← fromMrdi? (m := Id) (α := ConcretePoly Rat) mrdiJson | return .error "Failed to decode"
+  pure <| Except.ok (val == test2)).run' .empty
