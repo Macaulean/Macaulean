@@ -68,7 +68,7 @@ addNamespace("Oscar", "https://github.com/oscar-system/Oscar.jl", "1.6.0")
 -- refs = list of hash tables representing x's refs (type & data only)
 -- use addSaveMethod to define for a given class
 toMRDI = method()
-toMRDI(String, Thing) := (ns, x) -> (lookup((toMRDI, ns), class x)) x
+toMRDI(String, Thing) := (ns, x) -> (lookup({ns, toMRDI}, class x)) x
 
 addSaveMethod = method(Options => {
 	UseID => false,
@@ -85,13 +85,13 @@ addSaveMethod Type := o -> T -> (
 addSaveMethod(Type, Function) := o -> (T, dataf) -> (
     addSaveMethod(T, nullf, dataf, o))
 addSaveMethod(Type, Function, Function) := o -> (T, paramsf, dataf) -> (
-    installMethod((toMRDI, o.Namespace), T, x -> (
+    installMethod({o.Namespace, toMRDI}, T, x -> (
 	    if o.UseID then thingToUuid x; -- save uuid
 	    params := paramsf x;
 	    data := dataf x;
 	    if params =!= null then (
 		(mrdi, refs) := toMRDI(o.Namespace, params);
-		if lookup((UseID, o.Namespace), class params) then (
+		if lookup({o.Namespace, UseID}, class params) then (
 		    mrdi = thingToUuid params;
 		    refs = append(refs, mrdi)))
 	    else refs = {};
@@ -104,7 +104,7 @@ addSaveMethod(Type, Function, Function) := o -> (T, paramsf, dataf) -> (
 			else getType(o.Name, x)),
 		    if data =!= null then "data" => data},
 		refs)));
-    T#(UseID, o.Namespace) = o.UseID;)
+    T#{o.Namespace, UseID} = o.UseID;)
 
 addSaveMethod(Thing, toString)
 
@@ -175,7 +175,7 @@ saveMRDI Thing := o -> x -> (
 	hashTable {
 	    "_ns" => hashTable {
 		o.Namespace => namespaces#(o.Namespace)},
-	    if lookup((UseID, o.Namespace), class x)
+	    if lookup({o.Namespace, UseID}, class x)
 	    then "id" => thingToUuid x,
 	    if #refs > 0 then "_refs" => hashTable apply(refs,
 		ref -> ref => first toMRDI(
