@@ -82,7 +82,7 @@ addSaveMethod Type := o -> T -> (
 	    if o.UseID then thingToUuid x;
 	    hashTable {"_type" => getType(o.Name, x)},
 	    {}));
-    T#(UseID, o.Namespace) = o.UseID)
+    T#(UseID, o.Namespace) = o.UseID;)
 addSaveMethod(Type, Function) := o -> (T, dataf) -> (
     installMethod((toMRDI, o.Namespace), T, x -> (
 	    if o.UseID then thingToUuid x;
@@ -90,7 +90,7 @@ addSaveMethod(Type, Function) := o -> (T, dataf) -> (
 		"_type" => getType(o.Name, x),
 		"data" => dataf x},
 	    {}));
-    T#(UseID, o.Namespace) = o.UseID)
+    T#(UseID, o.Namespace) = o.UseID;)
 addSaveMethod(Type, Function, Function) := o -> (T, paramsf, dataf) -> (
     installMethod((toMRDI, o.Namespace), T, x -> (
 	    if o.UseID then thingToUuid x;
@@ -106,7 +106,7 @@ addSaveMethod(Type, Function, Function) := o -> (T, paramsf, dataf) -> (
 			"params" => mrdi},
 		    "data" => dataf x},
 		refs)));
-    T#(UseID, o.Namespace) = o.UseID)
+    T#(UseID, o.Namespace) = o.UseID;)
 
 addSaveMethod(Thing, toString)
 
