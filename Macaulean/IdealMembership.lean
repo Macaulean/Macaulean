@@ -8,8 +8,6 @@ structure VariableState where
   coefficientTable : Std.HashMap Lean.Expr CommRing.Var --equality of expressions is probably wrong
   nextVar : CommRing.Var
 
-#check Grind.Arith.CommRing.State
-
 def VariableState.mapVariable (state : VariableState) (var : FVarId) :
   CommRing.Var × VariableState :=
   let (optVar, newTable) := state.varTable.getThenInsertIfNew? var state.nextVar
