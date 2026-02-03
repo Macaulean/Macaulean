@@ -6,8 +6,13 @@ def Lean.githubURL := "https://github.com/leanprover/lean4"
 
 inductive MrdiTypeDesc where
   | string : String → MrdiTypeDesc
-  | parameterized : String → List Uuid → MrdiTypeDesc
-  deriving Repr,BEq,Ord
+  | parameterized : String → Json → MrdiTypeDesc
+  deriving BEq
+
+instance : ToString MrdiTypeDesc where
+  toString := fun
+    | .string s => s
+    | .parameterized s param => s ++ "{" ++ toString param ++ "}"
 
 instance : ToJson MrdiTypeDesc where
   toJson := fun
@@ -21,17 +26,25 @@ instance : FromJson MrdiTypeDesc where
       <*> (terms.get? "params").elim (.error "Missing params field from MRDI Type") fromJson?
     | _ => .error "Invalid MRDI Type Descriptor"
 
-
 structure MrdiState where
+  randomGen : StdGen
   values : Std.TreeMap Uuid Dynamic
   uuids : Std.TreeMap USize Uuid
   --^ I don't know that this is quite right, in particular, I think two objects with different types can have the same address when you use subtypes
 
-def MrdiState.empty : MrdiState := ⟨.empty, .empty⟩
+--TODO do a better job seeding the random number generator
+def MrdiState.empty : MrdiState := ⟨mkStdGen, .empty, .empty⟩
 
 unsafe def MrdiState.addEntry [TypeName α] (state : MrdiState) (u : Uuid) (x : α) : MrdiState :=
-  ⟨state.values.insert u (Dynamic.mk x), state.uuids.insert (ptrAddrUnsafe x) u⟩
+  { state with
+    values := state.values.insert u (Dynamic.mk x)
+    uuids := state.uuids.insert (ptrAddrUnsafe x) u
+  }
 
+/--
+Tries to get the entry corresponding to the given Uuid, given a proof that it is in the table.
+Returns none if the value isn't of type α
+-/
 def MrdiState.getEntry [TypeName α] (state : MrdiState) (u : Uuid) (h : u ∈ state.values) : Option α :=
   (state.values.get u h).get? α
 
@@ -45,6 +58,45 @@ unsafe def MrdiState.getUuid (state : MrdiState) (x : α) : Option Uuid :=
 abbrev MrdiT := StateT MrdiState
 abbrev MrdiM := StateM MrdiState
 
+def genUuid [MonadState MrdiState m] : m Uuid :=
+  modifyGet <| fun s =>
+    let (x, g) := randUuid s.randomGen
+    (x, {s with randomGen := g})
+
+unsafe def insertEntry [Monad m] [MonadStateOf MrdiState m] [TypeName α] (x : α) : m (Uuid) := do
+  let optUuid := (← get).getUuid x
+  let uuid := optUuid.getD (← genUuid)
+  modify (fun s => s.addEntry uuid x)
+  pure uuid
+
+structure MrdiData where
+  type : MrdiTypeDesc
+  data : Json
+
+structure Mrdi extends MrdiData where
+  ns : Json
+  refs : Std.TreeMap Uuid MrdiData
+
+/-
+TODO consider if the extends MrdiState is overcomplicating things
+-/
+structure MrdiEncodeState extends MrdiState where
+  currentReferences : Std.TreeMap Uuid MrdiData
+
+/--
+This monad is used to implement encode, and stores information about the current object
+being encoded, and in partcular, what references have been encoded
+-/
+abbrev MrdiEncodeT := StateT MrdiEncodeState
+abbrev MrdiEncodeM := StateM MrdiEncodeState
+
+instance (priority := mid) [Monad m] : MonadStateOf MrdiState (MrdiEncodeT m) where
+  get := MrdiEncodeState.toMrdiState <$> get
+  set (s : MrdiState) := modify (fun s' => {s' with toMrdiState := s})
+  modifyGet f := modifyGet (fun s =>
+    let (x,s') := f (s.toMrdiState)
+    (x,{s with toMrdiState := s'}))
+
 instance [Monad m] [MonadState MrdiState m] : MonadLift MrdiM m where
   monadLift act := modifyGet act.run
 
@@ -54,14 +106,43 @@ instance [Monad m] [MonadState MrdiState m] : MonadLift MrdiM m where
 class MrdiType α where
   mrdiType : MrdiTypeDesc
   decode? : Json → MrdiM (Except String α)
-  encode: α → MrdiM Json
+  /--
+  Return only the JSON that gives the data field.
+  -/
+  encode: α → MrdiEncodeM Json
 
 def trivialDecode? [FromJson α] (json : Json) : MrdiM (Except String α) := pure <| fromJson? json
-def trivialEncode [ToJson α] (x : α) : MrdiM Json := pure <| toJson x
+def trivialEncode [ToJson α] (x : α) : MrdiEncodeT Id Json := pure <| toJson x
 
-structure MrdiData where
-  type : MrdiTypeDesc
-  data : Json
+def toMrdiData [Monad m] [MrdiType α] (x: α) : MrdiEncodeT m MrdiData := do
+  let jsonData ← modifyGet <| MrdiType.encode x
+  pure {
+    type := MrdiType.mrdiType α
+    data := jsonData
+  }
+
+def runEncode [Monad m] (ns: Json) (act : MrdiEncodeT m MrdiData) : MrdiT m Mrdi := do
+  let (data, s) ← act.run {toMrdiState := (← get), currentReferences := .empty}
+  set s.toMrdiState
+  pure {
+    toMrdiData := data
+    ns := ns
+    refs := s.currentReferences
+  }
+
+def toMrdi [Monad m] [MrdiType α] (x: α) : MrdiT m Mrdi :=
+  runEncode ns (toMrdiData x)
+  where
+    ns := .mkObj [("Lean", .arr #[.str Lean.githubURL, .str Lean.versionString])]
+
+--- Either calls encode and stores it in the reference table or looks it up in the reference table
+unsafe def addReference [Monad m] [TypeName α] [MrdiType α] (x : α) : MrdiEncodeT m Uuid := do
+  let uuid ← insertEntry x
+  if !(← get).currentReferences.contains uuid
+  then
+    let data ← toMrdiData x
+    modify (fun s => {s with currentReferences := s.currentReferences.insert uuid data})
+  pure uuid
 
 instance : ToJson MrdiData where
   toJson data :=
@@ -81,9 +162,6 @@ instance : FromJson MrdiData where
         }
     | _ => .error "Expected an object"
 
-structure Mrdi extends MrdiData where
-  ns : Json
-  refs : Std.TreeMap Uuid MrdiData
 
 instance : ToJson Mrdi where
   toJson mrdi :=
@@ -121,20 +199,6 @@ instance : FromJson Mrdi where
         ns := ns
       }
     | _ => .error "Expected an object"
-
-def toMrdiData [Monad m] [MrdiType α] (x: α) : MrdiT m MrdiData := do
-  let jsonData ← MrdiType.encode x
-  pure {
-    type := MrdiType.mrdiType α
-    data := jsonData
-  }
-
-def toMrdi [Monad m] [MrdiType α] (x: α) : MrdiT m Mrdi := do
-  pure {
-    ← toMrdiData x with
-    ns := .mkObj [("Lean", .arr #[.str Lean.githubURL, .str Lean.versionString])],
-    refs := .empty
-  }
 
 -- doesn't implement references yet
 def fromMrdi? [Monad m] [MrdiType α] (mrdi : Mrdi) : MrdiT m (Except String α) :=
