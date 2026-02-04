@@ -111,43 +111,44 @@ structure ExprPoly where
   coefficients : Std.TreeMap Nat Expr
   deriving Inhabited
 
-unsafe def serializePoly [Macaulay2Ring R] (p : ExprPoly) : MrdiT MetaM (Option Mrdi) := do
-  let convertedCoefficientsOpt : List (Nat × Option R) ←
-    p.coefficients.toList.mapM (fun (i,x) => (i, ·) <$> Macaulay2Ring.fromLitExpr? x)
-  let some convertedCoefficients := convertedCoefficientsOpt.mapM
-    (fun (x,y) => (x, ·) <$> y) | return none
+unsafe def serializePoly [Macaulay2Ring R] (p : ExprPoly)
+  : MrdiT MetaM (Option Mrdi) := OptionT.run do
+  let convertedCoefficients : List (Nat × R) ←
+    p.coefficients.toList.mapM (fun (i,x) => do
+      let x' ← OptionT.mk <| Macaulay2Ring.fromLitExpr? x
+      pure (i, x'))
   let concretePoly : ConcretePoly R := {
     poly := p.poly
     coefficients :=  Std.TreeMap.ofList convertedCoefficients }
-  some <$> toMrdi concretePoly
+  OptionT.lift <| toMrdi concretePoly
 
 --inspired by Grind.Arith.CommRing.reify?
 partial def toCommRingExpr?
   (x : Lean.Expr)
-  : StateT VariableState MetaM (Option CommRing.Expr) := do
+  : StateT VariableState MetaM (Option CommRing.Expr) := OptionT.run do
   match_expr x with
   --TODO: figure out what we need to be careful about with types
   | HAdd.hAdd _ _ _ _ a b =>
-    pure <| .add <$> (← toCommRingExpr? a) <*> (← toCommRingExpr? b)
+    .add <$> (toCommRingExpr? a) <*> (toCommRingExpr? b)
   | HMul.hMul _ _ _ _ a b =>
-    pure <| .mul <$> (← toCommRingExpr? a) <*> (← toCommRingExpr? b)
+    .mul <$> (toCommRingExpr? a) <*> (toCommRingExpr? b)
   | HSub.hSub _ _ _ _ a b =>
-    pure <| .sub <$> (← toCommRingExpr? a) <*> (← toCommRingExpr? b)
+    .sub <$> (toCommRingExpr? a) <*> (toCommRingExpr? b)
   | HPow.hPow _ _ _ _ a b =>
-    pure <| .pow <$> (← toCommRingExpr? a) <*> (← getNatValue? b)
+    .pow <$> (toCommRingExpr? a) <*> (OptionT.mk <| getNatValue? b)
   -- | HDiv.hDiv _ _ _ _ a b => pure <| none
   --^ TODO actually implement, should work if b is an element of R and R is a field
-  --TODO what to do with free meta variables???
   | _ =>
     match x with
     | .fvar varId =>
       let varName ← modifyGet (
         fun varState => varState.mapVariable varId)
-      pure <| some <| .var varName
+      pure <| .var varName
     | _ =>
+      -- TODO in this case we should check that x doesn't contain any variables
       let varName ← modifyGet (
         fun varState => varState.mapCoefficient x)
-      pure <| some <| .var varName
+      pure <| .var varName
 
 def eqExprToPoly
   (expr : Expr)
