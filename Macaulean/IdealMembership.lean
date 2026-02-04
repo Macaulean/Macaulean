@@ -112,7 +112,7 @@ structure ExprPoly where
   deriving Inhabited, Repr
 
 unsafe def serializePoly [Macaulay2Ring R] (p : ExprPoly)
-  : MrdiT MetaM (Option Mrdi) := OptionT.run do
+  : MrdiT TacticM (Option Mrdi) := OptionT.run do
   let convertedCoefficients : List (Nat × R) ←
     p.coefficients.toList.mapM (fun (i,x) => do
       let x' ← OptionT.mk <| Macaulay2Ring.fromLitExpr? x
@@ -123,7 +123,7 @@ unsafe def serializePoly [Macaulay2Ring R] (p : ExprPoly)
   OptionT.lift <| toMrdi concretePoly
 
 unsafe def deserializePoly [ToExpr R] [Macaulay2Ring R] (polyMrdi : Mrdi)
-  : MrdiT MetaM (Except String ExprPoly) := ExceptT.run do
+  : MrdiT TacticM (Except String ExprPoly) := ExceptT.run do
   let poly : ConcretePoly R ← fromMrdi? polyMrdi
   let exprCoefficients  := poly.coefficients.map (fun _ x => toExpr x)
   pure {
@@ -204,21 +204,24 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (idealExprs : Array Expr) (polyE
 
   let serializerExpr ← mkAppOptM ``serializePoly #[ring, none]
   let serializerType ← inferType serializerExpr
-  let serializer ← evalExpr (ExprPoly → MrdiT MetaM (Option Mrdi)) serializerType serializerExpr DefinitionSafety.unsafe
+  let serializer ← evalExpr (ExprPoly → MrdiT TacticM (Option Mrdi)) serializerType serializerExpr DefinitionSafety.unsafe
   let deserializerExpr ← mkAppOptM ``deserializePoly #[ring, none, none]
   let deserializerType ← inferType deserializerExpr
-  let deserializer ← evalExpr (Mrdi → MrdiT MetaM (Except String ExprPoly)) deserializerType deserializerExpr DefinitionSafety.unsafe
-
-  let some serializedPoly ← (serializer poly).run' .empty
-    | throwTacticEx `m2idealmem goal "Unable to serialize polynomial"
-  let serializedGens : Array (Option Mrdi) ← (idealGens.mapM serializer).run' .empty
-  --check that ring is a ring we know how to work with
-  logInfo <| repr polyExpr
-  logInfo <| toString <| toJson serializedPoly
-  logInfo <| toString <| toJson serializedGens
-  let .ok (newExprPoly : ExprPoly) ← (deserializer serializedPoly).run' .empty
-    | throwTacticEx `m2idealmem goal "Unable to deserialize polynomial"
-  logInfo <| repr <| newExprPoly
+  let deserializer ← evalExpr (Mrdi → MrdiT TacticM (Except String ExprPoly)) deserializerType deserializerExpr DefinitionSafety.unsafe
+  let s ← IO.rand 0 (2^64-1)
+  --I should be able to use the runMrdiIO variant
+  -- but I can't get it to infer the right MonadLift instance
+  runMrdiWithSeed s do
+    let some serializedPoly ← serializer poly
+      | throwTacticEx `m2idealmem goal "Unable to serialize polynomial"
+    let serializedGens : Array (Option Mrdi) ← idealGens.mapM serializer
+    --check that ring is a ring we know how to work with
+    logInfo <| repr polyExpr
+    logInfo <| toString <| toJson serializedPoly
+    logInfo <| toString <| toJson serializedGens
+    let .ok (newExprPoly : ExprPoly) ← deserializer serializedPoly
+      | throwTacticEx `m2idealmem goal "Unable to deserialize polynomial"
+    logInfo <| repr <| newExprPoly
 
 @[tactic m2idealmem]
 unsafe def m2IdealMemTactic : Tactic := fun stx => do
