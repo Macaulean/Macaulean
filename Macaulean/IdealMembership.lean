@@ -53,11 +53,13 @@ instance : MrdiType Int where
 instance : MrdiType Rat where
   mrdiType := .string "Rat"
   decode? (x : Json) := do
-    let .ok ((num, den) : Int × Nat) := fromJson? x | return .error "Expected a pair"
+    let .ok ((nstr, dstr) : String × String) := fromJson? x | return .error "Expected a pair"
+    let some num := nstr.toInt? | return .error "Expect an integer numerator"
+    let some den := dstr.toNat? | return .error "Expected a non-negative denominator"
     if den = 0
     then pure <| .error "Expected a non-zero denominator"
     else pure <| .ok <| mkRat num den
-  encode (x : Rat) := pure <| .arr #[x.num, x.den]
+  encode (x : Rat) := pure <| .arr #[toString x.num, toString x.den]
 
 instance : Macaulay2Ring Int where
   mrdiDesc := pure <| .str "Int" --TODO actually think about this representation
@@ -87,21 +89,22 @@ unsafe instance [MrdiType R] : MrdiType (ConcretePoly R) where
       let some (.str polyUuid) := fields.get? "poly" | throw "Expected a JSON object with a 'poly' field"
       let some polyUuid := toUuid? polyUuid | throw "Expect a reference for the 'poly' field"
       let some (.arr coeffArray) := fields.get? "coefficients" | throw "Expected a JSON object with a 'coefficients' field"
-      let coefficients : Array (Nat × R) ← coeffArray.mapM <| fun c => do
+      let coefficients : Array (String × R) ← coeffArray.mapM <| fun c => do
         match c with
         | .arr #[i, r] =>
-          pure (← i.getNat?, ← MrdiType.decode? (α := R) r)
+          pure (← i.getStr?, ← MrdiType.decode? (α := R) r)
         | _ => throw "Expected a pair of an index and a rational number"
       let poly ← getRef polyUuid
       pure {
         poly := poly
-        coefficients := .ofArray coefficients
+        --TODO deal with the failure case of toNat
+        coefficients := .ofArray <| coefficients.map (fun (i,c) => (i.toNat!, c))
       }
     | _ => throw "Expected a JSON object"
   --TODO use UUID's and references to do this properly
   encode (p : ConcretePoly R) := do
     let basePolyUuid ← addReference p.poly
-    let coefficients ← p.coefficients.toArray.mapM (fun (i,x) => (i, ·) <$> MrdiType.encode x)
+    let coefficients ← p.coefficients.toArray.mapM (fun (i,x) => (toString i, ·) <$> MrdiType.encode x)
     pure <| Json.mkObj [
       ("poly", toJson basePolyUuid),
       ("coefficients", .arr <| coefficients.map toJson) ]
@@ -161,12 +164,11 @@ partial def toCommRingExpr?
 
 def eqExprToPoly
   (expr : Expr)
-  : StateT VariableState MetaM (Option (Expr × CommRing.Poly)) := do
-  let some (ring,lhs,rhs) := expr.eq? | return none
-  IO.println rhs
-  let polyExpr : Option (CommRing.Expr) :=
-    .sub <$> (← toCommRingExpr? lhs) <*> (some <| .natCast 0) -- (← toCommRingExpr? rhs)
-  pure <| (ring, · ) <$> CommRing.Expr.toPoly <$> polyExpr
+  : StateT VariableState MetaM (Option (Expr × CommRing.Poly)) := OptionT.run do
+  let (ring,lhs,rhs) ← liftOption expr.eq?
+  let polyExpr : CommRing.Expr ←
+    .sub <$> (toCommRingExpr? lhs) <*> (toCommRingExpr? rhs)
+  pure (ring, polyExpr.toPoly)
 
 def toExprPoly (p : CommRing.Poly) : StateT VariableState MetaM (ExprPoly) := do
   let state ← get
@@ -191,7 +193,7 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (idealExprs : Array Expr) (polyE
   : TacticM Unit := do
   --parse a expression into a polynomial, checking that the ring matches using isDefEq
   let getPoly (expectedRing : Expr) (pExpr : Expr) : StateT VariableState MetaM ExprPoly := do
-    let some (ring, poly) ← eqExprToPoly (← whnf pExpr) | throwTacticEx `m2idealmem goal "Expected a polynomial equality"
+    let some (ring, poly) ← eqExprToPoly pExpr | throwTacticEx `m2idealmem goal "Expected a polynomial equality"
     if ← isDefEq expectedRing ring
     then toExprPoly poly
     else throwTacticEx `m2idealmem goal "Expected polynomials over the same base ring"
@@ -216,12 +218,11 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (idealExprs : Array Expr) (polyE
       | throwTacticEx `m2idealmem goal "Unable to serialize polynomial"
     let serializedGens : Array (Option Mrdi) ← idealGens.mapM serializer
     --check that ring is a ring we know how to work with
-    logInfo <| repr polyExpr
     logInfo <| toString <| toJson serializedPoly
     logInfo <| toString <| toJson serializedGens
     let .ok (newExprPoly : ExprPoly) ← deserializer serializedPoly
       | throwTacticEx `m2idealmem goal "Unable to deserialize polynomial"
-    logInfo <| repr <| newExprPoly
+    -- logInfo <| repr <| newExprPoly
 
 @[tactic m2idealmem]
 unsafe def m2IdealMemTactic : Tactic := fun stx => do

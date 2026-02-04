@@ -6,14 +6,15 @@ open Lean Json
 namespace MRDI
 
 instance : ToJson Grind.CommRing.Power where
-  toJson p := .arr #[p.x, p.k]
+  toJson p := .arr #[toString p.x, toString p.k]
 
 instance : FromJson Grind.CommRing.Power where
   fromJson? := fun
     | .arr #[x, k] => do
-      let xnat ← x.getNat?
-      let knat ← k.getNat?
-      pure ⟨xnat, knat⟩
+      let xstr ← x.getStr?
+      let kstr ← k.getStr?
+      --TODO deal with the failure case of toNat
+      pure ⟨xstr.toNat!, kstr.toNat!⟩
     | _ => .error "Expected a pair of naturals"
 
 /-- An array of powers representing a monomial. -/
@@ -29,14 +30,15 @@ structure Term where
   deriving Repr
 
 instance : ToJson Term where
-  toJson t := .arr #[t.coeff, toJson t.mon]
+  toJson t := .arr #[toString t.coeff, toJson t.mon]
 
 instance : FromJson Term where
   fromJson? := fun
     | .arr #[c, m] => do
-      let cnat ← c.getNat?
+      let cstr ← c.getStr?
       let mon ← fromJson? m
-      pure ⟨cnat, mon⟩
+      --TODO deal with the failure case of toNat
+      pure ⟨cstr.toNat!, mon⟩
     | _ => .error "Expected a pair of a coefficient and a monomial"
 
 /-- A polynomial represented as an array of terms. -/
