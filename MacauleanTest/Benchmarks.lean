@@ -1,5 +1,5 @@
 import Lean
-
+import Macaulean.IdealMembership
 open Lean Grind Elab Tactic Meta
 
 /- From https://github.com/leanprover/lean4/issues/11861 -/
@@ -46,4 +46,5 @@ theorem foo
                   u * k * c ^ 2) *
                 z) *
           (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 3) = 0 := by
-  grobner
+  m2idealmem [ho, hi, hpq, hk]
+  sorry
