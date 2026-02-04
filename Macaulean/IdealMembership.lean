@@ -72,7 +72,7 @@ structure ConcretePoly (R : Type) where
   coefficients : Std.TreeMap CommRing.Var R
 
 instance [Repr R] : Repr (ConcretePoly R) where
-  reprPrec x n := f!"{repr x.poly} {repr x.coefficients}"
+  reprPrec x _ := f!"{repr x.poly} {repr x.coefficients}"
 
 instance [BEq R] : BEq (ConcretePoly R) where
   beq x y := (x.poly == y.poly) && (x.coefficients.toList == y.coefficients.toList)
@@ -109,7 +109,7 @@ unsafe instance [MrdiType R] : MrdiType (ConcretePoly R) where
 structure ExprPoly where
   poly : CommRing.Poly
   coefficients : Std.TreeMap Nat Expr
-  deriving Inhabited
+  deriving Inhabited, Repr
 
 unsafe def serializePoly [Macaulay2Ring R] (p : ExprPoly)
   : MrdiT MetaM (Option Mrdi) := OptionT.run do
@@ -121,6 +121,15 @@ unsafe def serializePoly [Macaulay2Ring R] (p : ExprPoly)
     poly := p.poly
     coefficients :=  Std.TreeMap.ofList convertedCoefficients }
   OptionT.lift <| toMrdi concretePoly
+
+unsafe def deserializePoly [ToExpr R] [Macaulay2Ring R] (polyMrdi : Mrdi)
+  : MrdiT MetaM (Except String ExprPoly) := ExceptT.run do
+  let poly : ConcretePoly R ← fromMrdi? polyMrdi
+  let exprCoefficients  := poly.coefficients.map (fun _ x => toExpr x)
+  pure {
+    poly := poly.poly
+    coefficients := exprCoefficients
+  }
 
 --inspired by Grind.Arith.CommRing.reify?
 partial def toCommRingExpr?
@@ -196,12 +205,20 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (idealExprs : Array Expr) (polyE
   let serializerExpr ← mkAppOptM ``serializePoly #[ring, none]
   let serializerType ← inferType serializerExpr
   let serializer ← evalExpr (ExprPoly → MrdiT MetaM (Option Mrdi)) serializerType serializerExpr DefinitionSafety.unsafe
-  let serializedPoly : Option Mrdi ← (serializer poly).run' .empty
+  let deserializerExpr ← mkAppOptM ``deserializePoly #[ring, none, none]
+  let deserializerType ← inferType deserializerExpr
+  let deserializer ← evalExpr (Mrdi → MrdiT MetaM (Except String ExprPoly)) deserializerType deserializerExpr DefinitionSafety.unsafe
+
+  let some serializedPoly ← (serializer poly).run' .empty
+    | throwTacticEx `m2idealmem goal "Unable to serialize polynomial"
   let serializedGens : Array (Option Mrdi) ← (idealGens.mapM serializer).run' .empty
   --check that ring is a ring we know how to work with
   logInfo <| repr polyExpr
   logInfo <| toString <| toJson serializedPoly
   logInfo <| toString <| toJson serializedGens
+  let .ok (newExprPoly : ExprPoly) ← (deserializer serializedPoly).run' .empty
+    | throwTacticEx `m2idealmem goal "Unable to deserialize polynomial"
+  logInfo <| repr <| newExprPoly
 
 @[tactic m2idealmem]
 unsafe def m2IdealMemTactic : Tactic := fun stx => do
@@ -221,18 +238,3 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
 example {x y : Rat} (f : 1/2*x + 1/2*y = 0) (g : 1/2*x + 1/2*y = 0) : (x + y)^2 = 0 := by
   m2idealmem [f, g]
   sorry
-
-/-
-{
-type = {"ConcretePoly", params := (data about which ring it's over)}
-data = [x_1*x_2+x_5*x_3+x_4, (1,1/2), (5,3)]
-}
-represents
-1/2*x_2+3*x_3+x_4
-
-Eventual format?
-{
-  poly := x_1*x_2+x_5*x_3+x_4
-  coefficients := [(1,1/2), (5,3)]
-}
--/
