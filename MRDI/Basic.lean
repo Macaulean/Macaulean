@@ -170,7 +170,6 @@ instance : FromJson MrdiData where
         }
     | _ => .error "Expected an object"
 
-
 instance : ToJson Mrdi where
   toJson mrdi :=
     if mrdi.refs.isEmpty
@@ -231,3 +230,16 @@ def fromMrdi? [Monad m] [MrdiType α] (mrdi : Mrdi) : MrdiT m (Except String α)
   else
     let decode := MrdiType.decode? mrdi.data
     decode.run mrdi.refs
+
+/--
+  Run the MrdiT monad with a specified seed for UUIDs
+-/
+def runMrdiWithSeed [Monad m] (seed : Nat) (act : MrdiT m α) : m α := do
+  act.run' ⟨mkStdGen seed, .empty, .empty⟩
+
+/--
+  Run the MrdiT monad with a seed for UUIDs derived from IO.rand
+-/
+def runMrdiIO [MonadLift BaseIO m] [Monad m] (act : MrdiT m α) : m α := do
+  let s ← IO.rand 0 (2^64-1)
+  runMrdiWithSeed s act
