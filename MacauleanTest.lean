@@ -1,1 +1,3 @@
 import MacauleanTest.Poly
+import MacauleanTest.Factorization
+import MacauleanTest.Benchmarks
