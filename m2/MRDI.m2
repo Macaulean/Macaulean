@@ -19,6 +19,7 @@ export {
     "addSaveMethod",
     "loadMRDI",
     "saveMRDI",
+    "validateMRDI",
 
     -- symbols
     "Namespace",
@@ -53,7 +54,7 @@ loadMethods = new MutableHashTable
 
 addNamespace = method()
 addNamespace(String, String, String) := (ns, url, v) -> (
-    namespaces#ns = (url, v);
+    namespaces#ns = {url, v};
     loadMethods#ns = new MutableHashTable;)
 
 addNamespace("Macaulay2", "https://macaulay2.com", version#"VERSION")
@@ -73,17 +74,21 @@ addSaveMethod = method(Options => {
 	Name => toString @@ class,
 	Namespace => "Macaulay2"})
 
+getType = method()
+getType(Function, Thing) := (f, x) -> f x
+getType(String,   Thing) := (s, x) -> s
+
 addSaveMethod Type := o -> T -> (
     installMethod((toMRDI, o.Namespace), T, x -> (
 	    if o.UseID then thingToUuid x;
-	    hashTable {"_type" => o.Name x},
+	    hashTable {"_type" => getType(o.Name, x)},
 	    {}));
     T#(UseID, o.Namespace) = o.UseID)
 addSaveMethod(Type, Function) := o -> (T, dataf) -> (
     installMethod((toMRDI, o.Namespace), T, x -> (
 	    if o.UseID then thingToUuid x;
 	    hashTable {
-		"_type" => o.Name x,
+		"_type" => getType(o.Name, x),
 		"data" => dataf x},
 	    {}));
     T#(UseID, o.Namespace) = o.UseID)
@@ -98,7 +103,7 @@ addSaveMethod(Type, Function, Function) := o -> (T, paramsf, dataf) -> (
 	    (
 		hashTable {
 		    "_type" => hashTable {
-			"name" => o.Name x,
+			"name" => getType(o.Name, x),
 			"params" => mrdi},
 		    "data" => dataf x},
 		refs)));
@@ -143,21 +148,21 @@ listForm Number := x -> {({}, x)}
 addSaveMethod(RingElement,
     ring,
     f -> apply(listForm f,
-	(exps, coeff) -> (toString \ exps, toString coeff)),
-    Name => f -> "RingElement")
+	(exps, coeff) -> {toString \ exps, toString coeff}),
+    Name => "RingElement")
 
 addSaveMethod(Ideal,
     ring,
     I -> apply(I_*, f -> (
 	    apply(listForm f,
-		(exps, coeff) -> (toString \ exps, toString coeff)))))
+		(exps, coeff) -> {toString \ exps, toString coeff}))))
 
 addSaveMethod(Matrix,
     ring,
     A -> apply(entries A, row -> (
 	    apply(row, f -> (
 		    apply(listForm f,
-			(exps, coeff) -> (toString \ exps, toString coeff)))))))
+			(exps, coeff) -> {toString \ exps, toString coeff}))))))
 
 saveMRDI = method(
     Dispatch => Thing,
@@ -226,6 +231,8 @@ addLoadMethod(String, Function) := o -> (type, f) -> (
     if not loadMethods#?(o.Namespace)
     then error("unknown namespace: ", o.Namespace);
     loadMethods#(o.Namespace)#type = f)
+addLoadMethod(List, Function) := o -> (types, f) -> (
+    scan(types, type -> addLoadMethod(type, f, o)))
 
 addLoadMethod("ZZ", (params, data, f) -> value data)
 addLoadMethod("Ring", (params, data, f) -> (
@@ -265,13 +272,28 @@ addSaveMethod(Ring,
 addSaveMethod(ZZ,
     x -> ZZ,
     toString,
-    Name => x -> "ZZRingElem",
+    Name => "ZZRingElem",
     Namespace => "Oscar")
 
 addSaveMethod(QQ,
     x -> QQ,
     x -> concatenate(toString numerator x, "//", toString denominator x),
-    Name => x -> "QQFieldElem",
+    Name => "QQFieldElem",
+    Namespace => "Oscar")
+
+-- Oscar differentiates between univariate and multivariate polynomial rings,
+-- but multivariate rings can have just 1 variable, so we just always use that
+addSaveMethod(PolynomialRing,
+    baseRing,
+    R -> hashTable {"symbols" => toString \ gens R},
+    Name => "MPolyRing",
+    UseID => true,
+    Namespace => "Oscar")
+
+addSaveMethod(RingElement,
+    ring,
+    f -> apply(listForm f, mon -> {toString \ mon#0, toString mon#1}),
+    Name => "MPolyRingElem",
     Namespace => "Oscar")
 
 addLoadMethod("Base.Int", (params, data, f) -> value data, Namespace => "Oscar")
@@ -293,6 +315,15 @@ addLoadMethod("FiniteField",
 	if params =!= null then error "not implemented yet"
 	else ZZ/(value data)),
     Namespace => "Oscar")
+addLoadMethod({"PolyRing", "MPolyRing"},
+    (params, data, f) -> (
+	R := f params;
+	-- TODO: handled indexed variables, e.g., x[1], x[2], x[3]
+	R[Variables => data#"symbols"]),
+    Namespace => "Oscar")
+addLoadMethod({"PolyRingElem", "MPolyRingElem"},
+    (params, data, f) -> mrdiToPolynomial(f params, data),
+    Namespace => "Oscar")
 
 addListLoadMethod = method()
 addListLoadMethod(String, String, Type) := (ns, type, T) -> (
@@ -309,6 +340,52 @@ addListLoadMethod("Macaulay2", "List", List)
 addListLoadMethod("Macaulay2", "Sequence", Sequence)
 addListLoadMethod("Macaulay2", "Array", Array)
 addListLoadMethod("Oscar", "Tuple", Sequence)
+
+----------------
+-- validating --
+----------------
+
+-- https://www.oscar-system.org/schemas/mrdi.json
+
+-- all JSON objects must have keys as strings
+validateObject = x -> scanKeys(x, k -> (
+	if not instance(k, String)
+	then error("expected all keys to be strings, but got ", k)))
+
+validateData = method()
+validateData Thing := x -> error("invalid data: ", x)
+validateData String := x -> null
+validateData HashTable := x -> (
+    validateObject x;
+    scanKeys(x, k -> if not match("^[a-zA-Z0-9_]*", k)
+	then error("expected an alphanumeric key, but got ", k)))
+validateData List := x -> validateData \ x
+-- TODO: validate polymake schema
+
+validateMRDI = method()
+validateMRDI Thing := x -> error("expected an object, but got ", x)
+validateMRDI String := validateMRDI @@ fromJSON
+validateMRDI HashTable := x -> (
+    validateObject x;
+    if not x#?"_type" then error "expected a '_type' key";
+    if instance(x#"_type", String) then null
+    else if instance(x#"_type", HashTable) then (
+	validateObject x#"_type";
+	if x#"_type"#?"name" then (
+	    if not instance(x#"_type"#"name", String)
+	    then error("expected value of 'name' to be a string"));
+	if x#"_type"#?"params" then validateData x#"_type"#"params")
+    else error("expected value of '_type' to be a string or object");
+    scan({"_ns", "_refs"}, k -> (
+	    if x#?k then (
+		if not instance(x#k, HashTable)
+		then error("expected value of '", k, "' to be an object");
+		validateObject x#k)));
+    if x#?"_refs" then scanPairs(x#"_refs", (k, v) -> (
+	    if not isUuid k
+	    then error("expected all keys of '_refs' to be UUID's, but got ", k);
+	    validateMRDI v));
+    )
 
 -------------------
 -- documentation --
@@ -404,42 +481,32 @@ checkMRDI ZZ
 checkMRDI QQ
 checkMRDI 5
 checkMRDI(1/2)
+R = ZZ[x,y,z,w]
+checkMRDI R
+checkMRDI random(3, R)
 ///
 
-----------
--- Lean --
-----------
-
--- TODO: Move this to some Macaulean package
--- keep MRDI just the Macaulay2 namespace (+ maybe Oscar?)
-
-addNamespace("Lean", "https://github.com/leanprover/lean4", "4.26.0-rc1")
-
-addSaveMethod(RingElement,
-    f -> (
-	if baseRing ring f =!= ZZ then error "expected a ring over ZZ";
-	apply(listForm f, mon -> {
-		mon#1,
-		apply(select(#mon#0, i -> mon#0#i != 0), j -> {j, mon#0#j})})),
-    Name => f -> "Lean.Grind.CommRing.Poly",
-    Namespace => "Lean")
-
-addLoadMethod("Lean.Grind.CommRing.Poly",
-    (params, data, f) -> (
-	-- for now, just guess number of vars based on the highest index
-	n := max flatten apply(last \ data, m -> first \ m) + 1;
-	R := ZZ[vars(0..<n)];
-	sum(data, mon -> mon#0 * product(mon#1, vp -> R_(vp#0)^(vp#1)))),
-    Namespace => "Lean")
-
 TEST ///
--- save/load Lean objects
-R = ZZ[x,y,z]
-f = 3 + 5*z^3
-g = loadMRDI saveMRDI(f, Namespace => "Lean")
-S = ring g
-phi = map(R, S, {x, y, z})
-assert Equation(f, phi g)
+-- validation
+validateMRDI saveMRDI 5
+validateMRDI saveMRDI ZZ
+validateMRDI saveMRDI QQ
+validateMRDI saveMRDI (ZZ/101)
+validateMRDI saveMRDI GF(2, 3)
+validateMRDI saveMRDI (QQ[x])
+validateMRDI saveMRDI (QQ[x][y][z])
+R = QQ[x,y,z,w]
+I = monomialCurveIdeal(R, {1, 2, 3})
+validateMRDI saveMRDI I_0
+validateMRDI saveMRDI I
+validateMRDI saveMRDI gens I
+validateMRDI saveMRDI(ZZ, Namespace => "Oscar")
+validateMRDI saveMRDI(QQ, Namespace => "Oscar")
+validateMRDI saveMRDI(5, Namespace => "Oscar")
+validateMRDI saveMRDI(1/2, Namespace => "Oscar")
+R = ZZ[x,y,z,w]
+validateMRDI saveMRDI(R, Namespace => "Oscar")
+validateMRDI saveMRDI(random(3, R), Namespace => "Oscar")
 ///
 
 end
