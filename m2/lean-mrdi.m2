@@ -83,3 +83,66 @@ addLoadMethod("ConcretePoly",
 	    (i, coeff) -> {value i, (loadCoefficient params) coeff}),
 	"params" => params},
     Namespace => "Lean")
+
+------------------------------------------
+-- JSON-RPC method for ideal membership --
+------------------------------------------
+
+needsPackage "JSON"
+needsPackage "JSONRPC"
+
+server = new JSONRPCServer
+
+-- input:
+--   polymrdi: MRDI-serialized ConcretePoly
+--   idealmrdi: list of MRDI-serialized ConcretePoly's
+-- output:
+--   a hash table:
+--     "quotient" => list of MRDI-serialized ConcretePoly's
+--     "remainder" => MRDI-serialized ConcretePoly (hopefully 0)
+
+registerMethod(server, "quotientRemainder", (polymrdi, idealmrdi) -> (
+	f := value loadMRDI polymrdi;
+	R := ring f;
+	I := ideal apply(fromJSON idealmrdi, g -> (
+	       sub(value loadMRDI g, R)));
+	(q, r) := quotientRemainder(matrix f, gens I);
+	hashTable {
+	    "quotient" => apply(flatten entries q,
+		g -> saveMRDI(ConcretePoly g,
+		    Namespace => "Lean",
+		    ToString => false)),
+	    "remainder" => saveMRDI(ConcretePoly r_(0,0),
+		Namespace => "Lean",
+		ToString => false)}))
+
+end
+
+-------------
+-- example --
+-------------
+
+-- construct and serialize the ideal and polynomial
+
+R = QQ[x,y,z,w]
+I = monomialCurveIdeal(R, {1,2,3})
+f = random(3, I)
+polymrdi = saveMRDI(ConcretePoly f, Namespace => "Lean")
+idealmrdi = toJSON apply(I_*, g ->
+    saveMRDI(ConcretePoly g, Namespace => "Lean", ToString => false))
+
+-- make the request
+
+request = makeRequest("quotientRemainder", {polymrdi, idealmrdi}, 1)
+response = handleRequest(server, request)
+
+-- de-serialize and check
+
+result = (fromJSON response)#"result"
+assert zero value loadMRDI result#"remainder" -- in ideal! 🎉
+certificate = apply(result#"quotient", gmrdi -> (
+	g := value loadMRDI gmrdi;
+	-- since we don't store the ring, they're all in different rings
+	phi := map(R, ring g, vars R);
+	phi g))
+assert Equation(f, (matrix {certificate} * transpose gens I)_(0,0))
