@@ -26,6 +26,10 @@ export {
     "UseID",
     }
 
+importFrom(Core, {
+	"noMethod",
+	"nullf"})
+
 ------------
 -- saving --
 ------------
@@ -54,80 +58,101 @@ loadMethods = new MutableHashTable
 addNamespace = method()
 addNamespace(String, String, String) := (ns, url, v) -> (
     namespaces#ns = (url, v);
-    loadMethods#ns = new MutableHashTable;)
+    loadMethods#ns = new MutableHashTable;
+    Thing#{ns, UseID} = false;)
 
 addNamespace("Macaulay2", "https://macaulay2.com", version#"VERSION")
 addNamespace("Oscar", "https://github.com/oscar-system/Oscar.jl", "1.6.0")
 
--- low-level unexported method
--- input: string ns (namespace), some object x
--- returns a pair (mrdi, refs)
--- mdri = hash table representing x (type & data only)
--- refs = list of hash tables representing x's refs (type & data only)
+-- low-level unexported function
+-- input: ns: string (namespace)
+--        x: the object to serialize
+--        refs: mutable hash table (keys = uuids of refs)
+-- output: hash table representing x (type & data only)
+-- side effect: new refs are added to refs
 -- use addSaveMethod to define for a given class
-toMRDI = method()
-toMRDI(String, Thing) := (ns, x) -> (lookup((toMRDI, ns), class x)) x
+toMRDI = (ns, x, refs) -> (
+    if (f := lookup({ns, toMRDI}, class x)) === null
+    then error noMethod({ns, toMRDI}, x,)
+    else f(x, refs))
+
+useID = (ns, x) -> (
+    if (u := lookup({ns, UseID}, class x)) === null
+    then error noMethod({ns, UseID}, x,)
+    else if not instance(u, Boolean)
+    then error("expected ", {ns, UseID}, " for ", class x,
+	" to be true or false")
+    else u)
+
+toMRDIorUuid = (ns, x, refs) -> (
+    r := toMRDI(ns, x, refs);
+    if useID(ns, x) then (
+	i := thingToUuid x;
+	refs#i = r;
+	i)
+    else r)
+
+-- low-level unexported method
+-- same interface as toMRDI, but attempts to separate out objects we'd like
+-- to serialize from json-level objects that we're using to describe
+-- other objects
+processMRDI = method()
+processMRDI(String, Thing, MutableHashTable) := toMRDIorUuid
+processMRDI(String, String, MutableHashTable) := (ns, x, refs) -> x
+processMRDI(String, Nothing, MutableHashTable) := (ns, x, refs) -> null
+processMRDI(String, ZZ, MutableHashTable) := (ns, x, refs) -> toString x
+processMRDI(String, List, MutableHashTable) := (ns, x, refs) -> (
+    if class x === List then apply(x, y -> processMRDI(ns, y, refs))
+    else toMRDIorUuid(ns, x, refs))
+processMRDI(String, HashTable, MutableHashTable) := (ns, x, refs) -> (
+    if class x === HashTable then applyValues(x, v -> processMRDI(ns, v, refs))
+    else toMRDIorUuid(ns, x, refs))
+
 
 addSaveMethod = method(Options => {
 	UseID => false,
 	Name => toString @@ class,
 	Namespace => "Macaulay2"})
 
+getType = method()
+getType(Function, Thing) := (f, x) -> f x
+getType(String,   Thing) := (s, x) -> s
+
+
 addSaveMethod Type := o -> T -> (
-    installMethod((toMRDI, o.Namespace), T, x -> (
-	    if o.UseID then thingToUuid x;
-	    hashTable {"_type" => o.Name x},
-	    {}));
-    T#(UseID, o.Namespace) = o.UseID)
+    addSaveMethod(T, nullf, nullf, o))
 addSaveMethod(Type, Function) := o -> (T, dataf) -> (
-    installMethod((toMRDI, o.Namespace), T, x -> (
-	    if o.UseID then thingToUuid x;
-	    hashTable {
-		"_type" => o.Name x,
-		"data" => dataf x},
-	    {}));
-    T#(UseID, o.Namespace) = o.UseID)
+    addSaveMethod(T, nullf, dataf, o))
 addSaveMethod(Type, Function, Function) := o -> (T, paramsf, dataf) -> (
-    installMethod((toMRDI, o.Namespace), T, x -> (
-	    if o.UseID then thingToUuid x;
-	    params := paramsf x;
-	    (mrdi, refs) := toMRDI(o.Namespace, params);
-	    if lookup((UseID, o.Namespace), class params) then (
-		mrdi = thingToUuid params;
-		refs = append(refs, mrdi));
-	    (
-		hashTable {
-		    "_type" => hashTable {
-			"name" => o.Name x,
-			"params" => mrdi},
-		    "data" => dataf x},
-		refs)));
-    T#(UseID, o.Namespace) = o.UseID)
+    T#{o.Namespace, toMRDI} = (x, refs) -> (
+	if o.UseID then thingToUuid x; -- save uuid
+	params := processMRDI(o.Namespace, paramsf x, refs);
+	data := processMRDI(o.Namespace, dataf x, refs);
+	hashTable {
+	    "_type" => (
+		if params =!= null then hashTable {
+		    "name" => getType(o.Name, x),
+		    "params" => params}
+		else getType(o.Name, x)),
+	    if data =!= null then "data" => data});
+    T#{o.Namespace, UseID} = o.UseID;)
 
-addSaveMethod(Thing, toString)
+addSaveMethod(ZZ, identity)
 
-addSaveMethod(VisibleList, L ->  (
-	mrdis := toMRDI_"Macaulay2" \ L;
-	(
-	    hashTable {
-		"_type" => hashTable {
-		    "name" => toString class L,
-		    "params" => apply(mrdis, (mrdi, ref) -> mrdi#"_type")},
-		"data" => apply(#L, i ->
-		    ?? (uuidsByThing#(L#i) ?? mrdis#i#0#"data"))},
-	    join(
-		flatten apply(mrdis, (mrdi, ref) -> ref),
-		for x in L list uuidsByThing#x ?? continue))))
+addSaveMethod(Ring,
+    R -> (
+	if isMember(R, {ZZ, QQ}) then toString R
+	else error "not implemented yet"))
 
 addSaveMethod(QuotientRing,
     R -> (
-	if isFinitePrimeField R then toString char R
+	if isFinitePrimeField R then char R
 	else error "not implemented yet"))
 
 addSaveMethod(GaloisField,
     F -> hashTable {
-	"char"   => toString F.char,
-	"degree" => toString F.degree},
+	"char"   => F.char,
+	"degree" => F.degree},
     UseID => true)
 
 addSaveMethod(PolynomialRing,
@@ -136,28 +161,23 @@ addSaveMethod(PolynomialRing,
 	"variables" => toString \ gens R},
     UseID => true)
 
--- TODO: maybe add to Core
--- or should we deal w/ the Number v. RingElement cases separately?
-listForm Number := x -> {({}, x)}
+mrdiCoefficient = method()
+mrdiCoefficient ZZ := identity
+mrdiCoefficient QQ := x -> {numerator x, denominator x}
+
+mrdiListForm = f -> apply(listForm f,
+    (mon, coeff) -> {mon, mrdiCoefficient coeff})
 
 addSaveMethod(RingElement,
     ring,
-    f -> apply(listForm f,
-	(exps, coeff) -> (toString \ exps, toString coeff)),
-    Name => f -> "RingElement")
+    mrdiListForm,
+    Name => "RingElement")
 
 addSaveMethod(Ideal,
     ring,
-    I -> apply(I_*, f -> (
-	    apply(listForm f,
-		(exps, coeff) -> (toString \ exps, toString coeff)))))
+    I -> apply(I_*, mrdiListForm))
 
-addSaveMethod(Matrix,
-    ring,
-    A -> apply(entries A, row -> (
-	    apply(row, f -> (
-		    apply(listForm f,
-			(exps, coeff) -> (toString \ exps, toString coeff)))))))
+addSaveMethod(Matrix, ring, A -> apply(entries A, row -> mrdiListForm \ row))
 
 saveMRDI = method(
     Dispatch => Thing,
@@ -168,17 +188,14 @@ saveMRDI = method(
 saveMRDI Thing := o -> x -> (
     if not namespaces#?(o.Namespace)
     then error("unknown namespace: ", o.Namespace);
-    (mrdi, refs) := toMRDI(o.Namespace, x);
+    refs := new MutableHashTable;
+    mrdi := toMRDI(o.Namespace, x, refs);
     r := (if o.ToString then toJSON else identity) merge(
 	hashTable {
 	    "_ns" => hashTable {
 		o.Namespace => namespaces#(o.Namespace)},
-	    if lookup((UseID, o.Namespace), class x)
-	    then "id" => thingToUuid x,
-	    if #refs > 0 then "_refs" => hashTable apply(refs,
-		ref -> ref => first toMRDI(
-		    o.Namespace,
-		    uuidToThing(ref, () -> error("unknown uuid: ", ref))))},
+	    if useID(o.Namespace, x) then "id" => thingToUuid x,
+	    if #refs > 0 then "_refs" => new HashTable from refs},
 	mrdi,
 	(x, y) -> error "unexpected key collision");
     if o.FileName =!= null then o.FileName << r << endl << close;
@@ -203,22 +220,31 @@ loadMRDI HashTable := r -> (
     else fromMRDI(ns, r))
 
 -- unexported helper function
--- inputs: string (namespace) and either a hash table (type & data) or uuid
+-- inputs: string (namespace) and object to de-serialize
 -- outputs: a de-serialized M2 object
 fromMRDI = method()
 fromMRDI(String, HashTable) := (ns, r) -> (
-    (name, params) := (
-	if instance(r#"_type", HashTable)
-	then (r#"_type"#"name", r#"_type"#"params")
-	else (r#"_type", null));
-    if not loadMethods#ns#?name then error ("unknown type: ", name);
-    loadMethods#ns#name(params, ?? r#"data", fromMRDI_ns))
-fromMRDI(String, String) := (ns, i) -> (
-    if not isUuid i then error "expected a uuid"
-    else uuidToThing(i, () -> (
-	    if uuidsToCreate#?i
-	    then fromMRDI(ns, remove(uuidsToCreate, i))
-	    else error("unknown uuid: ", i))))
+    -- if it has a _type key, then it's an object to de-serialize
+    if r#?"_type" then (
+	(name, params) := (
+	    if instance(r#"_type", HashTable)
+	    then (r#"_type"#"name", r#"_type"#"params")
+	    else (r#"_type", null));
+	if not loadMethods#ns#?name then error ("unknown type: ", name);
+	loadMethods#ns#name(
+	    if params =!= null then fromMRDI(ns, params),
+	    if r#?"data" then fromMRDI(ns, r#"data")))
+    -- otherwise, de-serialize its values
+    else applyValues(r, fromMRDI_ns))
+fromMRDI(String, String) := (ns, s) -> (
+    -- if the string is a uuid, then return the corresponding object
+    if isUuid s then uuidToThing(s, () -> (
+	    if uuidsToCreate#?s
+	    then fromMRDI(ns, remove(uuidsToCreate, s))
+	    else error("unknown uuid: ", s)))
+    -- otherwise, just return the string
+    else s)
+fromMRDI(String, List) := (ns, x) -> apply(x, fromMRDI_ns)
 
 -- input function takes two args: params (de-serialized) & data
 addLoadMethod = method(Options => {Namespace => "Macaulay2"})
@@ -227,28 +253,29 @@ addLoadMethod(String, Function) := o -> (type, f) -> (
     then error("unknown namespace: ", o.Namespace);
     loadMethods#(o.Namespace)#type = f)
 
-addLoadMethod("ZZ", (params, data, f) -> value data)
-addLoadMethod("Ring", (params, data, f) -> (
+addLoadMethod("ZZ", (params, data) -> value data)
+addLoadMethod("Ring", (params, data) -> (
 	if data == "ZZ" then ZZ
 	else if data == "QQ" then QQ
 	else error "unknown ring"))
-addLoadMethod("QuotientRing", (params, data, f) -> ZZ/(value data))
-addLoadMethod("GaloisField", (params, data, f) -> (
+addLoadMethod("QuotientRing", (params, data) -> ZZ/(value data))
+addLoadMethod("GaloisField", (params, data) -> (
 	GF(value data#"char", value data#"degree")))
-addLoadMethod("PolynomialRing", (params, data, f) -> (
-	R := f params;
-	R[Variables => data#"variables"]))
+addLoadMethod("PolynomialRing", (params, data) -> (
+	params[Variables => data#"variables"]))
+
+mrdiToCoefficient = method(Dispatch => Type)
+mrdiToCoefficient ZZ := R -> value
+mrdiToCoefficient QQ := R -> a -> value a#0 / value a#1
 
 mrdiToPolynomial = (R, f) -> sum(f, term -> (
-	(value term#1)*R_(value \ toList term#0)))
-addLoadMethod("RingElement", (params, data, f) -> (
-	mrdiToPolynomial(f params, data)))
-addLoadMethod("Ideal", (params, data, f) -> (
-	R := f params;
-	ideal apply(data, f -> mrdiToPolynomial(R, f))))
-addLoadMethod("Matrix", (params, data, f) -> (
-	R := f params;
-	matrix apply(data, row -> apply(row, f -> mrdiToPolynomial(R, f)))))
+	((mrdiToCoefficient coefficientRing R) term#1)*R_(value \ toList term#0)))
+addLoadMethod("RingElement", (params, data) -> (
+	mrdiToPolynomial(params, data)))
+addLoadMethod("Ideal", (params, data) -> (
+	ideal apply(data, f -> mrdiToPolynomial(params, f))))
+addLoadMethod("Matrix", (params, data) -> (
+	matrix apply(data, row -> apply(row, f -> mrdiToPolynomial(params, f)))))
 
 -----------
 -- Oscar --
@@ -265,50 +292,34 @@ addSaveMethod(Ring,
 addSaveMethod(ZZ,
     x -> ZZ,
     toString,
-    Name => x -> "ZZRingElem",
+    Name => "ZZRingElem",
     Namespace => "Oscar")
 
 addSaveMethod(QQ,
     x -> QQ,
     x -> concatenate(toString numerator x, "//", toString denominator x),
-    Name => x -> "QQFieldElem",
+    Name => "QQFieldElem",
     Namespace => "Oscar")
 
-addLoadMethod("Base.Int", (params, data, f) -> value data, Namespace => "Oscar")
+addLoadMethod("Base.Int", (params, data) -> value data, Namespace => "Oscar")
 addLoadMethod("ZZRingElem",
-    (params, data, f) -> value data,
+    (params, data) -> value data,
     Namespace => "Oscar")
 addLoadMethod("QQFieldElem",
-    (params, data, f) -> (
+    (params, data) -> (
 	x := separate("//", data);
 	if #x == 2 then value x#0 / value x#1
 	else value x#0 / 1),
     Namespace => "Oscar")
-addLoadMethod("String", (params, data, f) -> data, Namespace => "Oscar")
-addLoadMethod("Float64", (params, data, f) -> value data, Namespace => "Oscar")
-addLoadMethod("ZZRing", (params, data, f) -> ZZ, Namespace => "Oscar")
-addLoadMethod("QQField", (params, data, f) -> QQ, Namespace => "Oscar")
+addLoadMethod("String", (params, data) -> data, Namespace => "Oscar")
+addLoadMethod("Float64", (params, data) -> value data, Namespace => "Oscar")
+addLoadMethod("ZZRing", (params, data) -> ZZ, Namespace => "Oscar")
+addLoadMethod("QQField", (params, data) -> QQ, Namespace => "Oscar")
 addLoadMethod("FiniteField",
-    (params, data, f) -> (
+    (params, data) -> (
 	if params =!= null then error "not implemented yet"
 	else ZZ/(value data)),
     Namespace => "Oscar")
-
-addListLoadMethod = method()
-addListLoadMethod(String, String, Type) := (ns, type, T) -> (
-    addLoadMethod(type,
-	(params, data, f) -> (
-	    new T from apply(#params, i -> (
-		    if instance(data#i, String) and isUuid data#i then f data#i
-		    else f hashTable {
-			"_type" => params#i,
-			"data" => data#i}))),
-	Namespace => ns))
-
-addListLoadMethod("Macaulay2", "List", List)
-addListLoadMethod("Macaulay2", "Sequence", Sequence)
-addListLoadMethod("Macaulay2", "Array", Array)
-addListLoadMethod("Oscar", "Tuple", Sequence)
 
 -------------------
 -- documentation --
@@ -391,9 +402,9 @@ checkMRDI "{\"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}
 checkMRDI "{\"_type\": \"GaloisField\", \"data\": {\"degree\": \"3\", \"char\": \"2\"}, \"id\": \"366eef8c-095b-4675-bc4c-c815a6706f52\", \"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}}"
 checkMRDI "{\"_type\": {\"params\": {\"_type\": \"Ring\", \"data\": \"QQ\"}, \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"x\"]}, \"id\": \"31292984-9503-4034-9a78-7badbc3d5710\", \"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}}"
 checkMRDI "{\"_type\": {\"params\": \"8731803f-89bd-4ff7-a599-79375b33cf4c\", \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"z\"]}, \"id\": \"27447205-6c41-4ed5-91ba-f7b96c0a65ce\", \"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}, \"_refs\": {\"8731803f-89bd-4ff7-a599-79375b33cf4c\": {\"_type\": {\"params\": \"81e005bb-a348-423a-a627-e96ff29a3597\", \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"y\"]}}, \"81e005bb-a348-423a-a627-e96ff29a3597\": {\"_type\": {\"params\": {\"_type\": \"Ring\", \"data\": \"QQ\"}, \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"x\"]}}}}"
-checkMRDI "{\"_type\": {\"params\": \"ef9ecd1d-0a22-49d1-aeae-c02def9fc876\", \"name\": \"RingElement\"}, \"data\": [[[\"0\", \"0\", \"2\", \"0\"], \"1\"], [[\"0\", \"1\", \"0\", \"1\"], \"-1\"]], \"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}, \"_refs\": {\"ef9ecd1d-0a22-49d1-aeae-c02def9fc876\": {\"_type\": {\"params\": {\"_type\": \"Ring\", \"data\": \"QQ\"}, \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"x\", \"y\", \"z\", \"w\"]}}}}"
-checkMRDI "{\"_type\": {\"params\": \"ef9ecd1d-0a22-49d1-aeae-c02def9fc876\", \"name\": \"Ideal\"}, \"data\": [[[[\"0\", \"0\", \"2\", \"0\"], \"1\"], [[\"0\", \"1\", \"0\", \"1\"], \"-1\"]], [[[\"0\", \"1\", \"1\", \"0\"], \"1\"], [[\"1\", \"0\", \"0\", \"1\"], \"-1\"]], [[[\"0\", \"2\", \"0\", \"0\"], \"1\"], [[\"1\", \"0\", \"1\", \"0\"], \"-1\"]]], \"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}, \"_refs\": {\"ef9ecd1d-0a22-49d1-aeae-c02def9fc876\": {\"_type\": {\"params\": {\"_type\": \"Ring\", \"data\": \"QQ\"}, \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"x\", \"y\", \"z\", \"w\"]}}}}"
-checkMRDI "{\"_type\": {\"params\": \"ef9ecd1d-0a22-49d1-aeae-c02def9fc876\", \"name\": \"Matrix\"}, \"data\": [[[[[\"0\", \"0\", \"2\", \"0\"], \"1\"], [[\"0\", \"1\", \"0\", \"1\"], \"-1\"]], [[[\"0\", \"1\", \"1\", \"0\"], \"1\"], [[\"1\", \"0\", \"0\", \"1\"], \"-1\"]], [[[\"0\", \"2\", \"0\", \"0\"], \"1\"], [[\"1\", \"0\", \"1\", \"0\"], \"-1\"]]]], \"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}, \"_refs\": {\"ef9ecd1d-0a22-49d1-aeae-c02def9fc876\": {\"_type\": {\"params\": {\"_type\": \"Ring\", \"data\": \"QQ\"}, \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"x\", \"y\", \"z\", \"w\"]}}}}"
+checkMRDI "{\"_type\": {\"params\": \"cfaa114f-9d5a-44e1-abbb-a0ee2ca94fe4\", \"name\": \"RingElement\"}, \"data\": [[[\"0\", \"0\", \"2\", \"0\"], [\"1\", \"1\"]], [[\"0\", \"1\", \"0\", \"1\"], [\"-1\", \"1\"]]], \"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}, \"_refs\": {\"cfaa114f-9d5a-44e1-abbb-a0ee2ca94fe4\": {\"_type\": {\"params\": {\"_type\": \"Ring\", \"data\": \"QQ\"}, \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"x\", \"y\", \"z\", \"w\"]}}}}"
+checkMRDI "{\"_type\": {\"params\": \"cfaa114f-9d5a-44e1-abbb-a0ee2ca94fe4\", \"name\": \"Ideal\"}, \"data\": [[[[\"0\", \"0\", \"2\", \"0\"], [\"1\", \"1\"]], [[\"0\", \"1\", \"0\", \"1\"], [\"-1\", \"1\"]]], [[[\"0\", \"1\", \"1\", \"0\"], [\"1\", \"1\"]], [[\"1\", \"0\", \"0\", \"1\"], [\"-1\", \"1\"]]], [[[\"0\", \"2\", \"0\", \"0\"], [\"1\", \"1\"]], [[\"1\", \"0\", \"1\", \"0\"], [\"-1\", \"1\"]]]], \"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}, \"_refs\": {\"cfaa114f-9d5a-44e1-abbb-a0ee2ca94fe4\": {\"_type\": {\"params\": {\"_type\": \"Ring\", \"data\": \"QQ\"}, \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"x\", \"y\", \"z\", \"w\"]}}}}"
+checkMRDI "{\"_type\": {\"params\": \"cfaa114f-9d5a-44e1-abbb-a0ee2ca94fe4\", \"name\": \"Matrix\"}, \"data\": [[[[[\"0\", \"0\", \"2\", \"0\"], [\"1\", \"1\"]], [[\"0\", \"1\", \"0\", \"1\"], [\"-1\", \"1\"]]], [[[\"0\", \"1\", \"1\", \"0\"], [\"1\", \"1\"]], [[\"1\", \"0\", \"0\", \"1\"], [\"-1\", \"1\"]]], [[[\"0\", \"2\", \"0\", \"0\"], [\"1\", \"1\"]], [[\"1\", \"0\", \"1\", \"0\"], [\"-1\", \"1\"]]]]], \"_ns\": {\"Macaulay2\": [\"https://macaulay2.com\", \"@VERSION@\"]}, \"_refs\": {\"cfaa114f-9d5a-44e1-abbb-a0ee2ca94fe4\": {\"_type\": {\"params\": {\"_type\": \"Ring\", \"data\": \"QQ\"}, \"name\": \"PolynomialRing\"}, \"data\": {\"variables\": [\"x\", \"y\", \"z\", \"w\"]}}}}"
 ///
 
 TEST ///
@@ -404,42 +415,6 @@ checkMRDI ZZ
 checkMRDI QQ
 checkMRDI 5
 checkMRDI(1/2)
-///
-
-----------
--- Lean --
-----------
-
--- TODO: Move this to some Macaulean package
--- keep MRDI just the Macaulay2 namespace (+ maybe Oscar?)
-
-addNamespace("Lean", "https://github.com/leanprover/lean4", "4.26.0-rc1")
-
-addSaveMethod(RingElement,
-    f -> (
-	if baseRing ring f =!= ZZ then error "expected a ring over ZZ";
-	apply(listForm f, mon -> {
-		mon#1,
-		apply(select(#mon#0, i -> mon#0#i != 0), j -> {j, mon#0#j})})),
-    Name => f -> "Lean.Grind.CommRing.Poly",
-    Namespace => "Lean")
-
-addLoadMethod("Lean.Grind.CommRing.Poly",
-    (params, data, f) -> (
-	-- for now, just guess number of vars based on the highest index
-	n := max flatten apply(last \ data, m -> first \ m) + 1;
-	R := ZZ[vars(0..<n)];
-	sum(data, mon -> mon#0 * product(mon#1, vp -> R_(vp#0)^(vp#1)))),
-    Namespace => "Lean")
-
-TEST ///
--- save/load Lean objects
-R = ZZ[x,y,z]
-f = 3 + 5*z^3
-g = loadMRDI saveMRDI(f, Namespace => "Lean")
-S = ring g
-phi = map(R, S, {x, y, z})
-assert Equation(f, phi g)
 ///
 
 end
