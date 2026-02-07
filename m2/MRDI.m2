@@ -220,22 +220,31 @@ loadMRDI HashTable := r -> (
     else fromMRDI(ns, r))
 
 -- unexported helper function
--- inputs: string (namespace) and either a hash table (type & data) or uuid
+-- inputs: string (namespace) and object to de-serialize
 -- outputs: a de-serialized M2 object
 fromMRDI = method()
 fromMRDI(String, HashTable) := (ns, r) -> (
-    (name, params) := (
-	if instance(r#"_type", HashTable)
-	then (r#"_type"#"name", r#"_type"#"params")
-	else (r#"_type", null));
-    if not loadMethods#ns#?name then error ("unknown type: ", name);
-    loadMethods#ns#name(params, ?? r#"data", fromMRDI_ns))
-fromMRDI(String, String) := (ns, i) -> (
-    if not isUuid i then error "expected a uuid"
-    else uuidToThing(i, () -> (
-	    if uuidsToCreate#?i
-	    then fromMRDI(ns, remove(uuidsToCreate, i))
-	    else error("unknown uuid: ", i))))
+    -- if it has a _type key, then it's an object to de-serialize
+    if r#?"_type" then (
+	(name, params) := (
+	    if instance(r#"_type", HashTable)
+	    then (r#"_type"#"name", r#"_type"#"params")
+	    else (r#"_type", null));
+	if not loadMethods#ns#?name then error ("unknown type: ", name);
+	loadMethods#ns#name(
+	    if params =!= null then fromMRDI(ns, params),
+	    if r#?"data" then fromMRDI(ns, r#"data")))
+    -- otherwise, de-serialize its values
+    else applyValues(r, fromMRDI_ns))
+fromMRDI(String, String) := (ns, s) -> (
+    -- if the string is a uuid, then return the corresponding object
+    if isUuid s then uuidToThing(s, () -> (
+	    if uuidsToCreate#?s
+	    then fromMRDI(ns, remove(uuidsToCreate, s))
+	    else error("unknown uuid: ", s)))
+    -- otherwise, just return the string
+    else s)
+fromMRDI(String, List) := (ns, x) -> apply(x, fromMRDI_ns)
 
 -- input function takes two args: params (de-serialized) & data
 addLoadMethod = method(Options => {Namespace => "Macaulay2"})
@@ -244,17 +253,16 @@ addLoadMethod(String, Function) := o -> (type, f) -> (
     then error("unknown namespace: ", o.Namespace);
     loadMethods#(o.Namespace)#type = f)
 
-addLoadMethod("ZZ", (params, data, f) -> value data)
-addLoadMethod("Ring", (params, data, f) -> (
+addLoadMethod("ZZ", (params, data) -> value data)
+addLoadMethod("Ring", (params, data) -> (
 	if data == "ZZ" then ZZ
 	else if data == "QQ" then QQ
 	else error "unknown ring"))
-addLoadMethod("QuotientRing", (params, data, f) -> ZZ/(value data))
-addLoadMethod("GaloisField", (params, data, f) -> (
+addLoadMethod("QuotientRing", (params, data) -> ZZ/(value data))
+addLoadMethod("GaloisField", (params, data) -> (
 	GF(value data#"char", value data#"degree")))
-addLoadMethod("PolynomialRing", (params, data, f) -> (
-	R := f params;
-	R[Variables => data#"variables"]))
+addLoadMethod("PolynomialRing", (params, data) -> (
+	params[Variables => data#"variables"]))
 
 mrdiToCoefficient = method(Dispatch => Type)
 mrdiToCoefficient ZZ := R -> value
@@ -262,14 +270,12 @@ mrdiToCoefficient QQ := R -> a -> value a#0 / value a#1
 
 mrdiToPolynomial = (R, f) -> sum(f, term -> (
 	((mrdiToCoefficient coefficientRing R) term#1)*R_(value \ toList term#0)))
-addLoadMethod("RingElement", (params, data, f) -> (
-	mrdiToPolynomial(f params, data)))
-addLoadMethod("Ideal", (params, data, f) -> (
-	R := f params;
-	ideal apply(data, f -> mrdiToPolynomial(R, f))))
-addLoadMethod("Matrix", (params, data, f) -> (
-	R := f params;
-	matrix apply(data, row -> apply(row, f -> mrdiToPolynomial(R, f)))))
+addLoadMethod("RingElement", (params, data) -> (
+	mrdiToPolynomial(params, data)))
+addLoadMethod("Ideal", (params, data) -> (
+	ideal apply(data, f -> mrdiToPolynomial(params, f))))
+addLoadMethod("Matrix", (params, data) -> (
+	matrix apply(data, row -> apply(row, f -> mrdiToPolynomial(params, f)))))
 
 -----------
 -- Oscar --
@@ -295,41 +301,25 @@ addSaveMethod(QQ,
     Name => "QQFieldElem",
     Namespace => "Oscar")
 
-addLoadMethod("Base.Int", (params, data, f) -> value data, Namespace => "Oscar")
+addLoadMethod("Base.Int", (params, data) -> value data, Namespace => "Oscar")
 addLoadMethod("ZZRingElem",
-    (params, data, f) -> value data,
+    (params, data) -> value data,
     Namespace => "Oscar")
 addLoadMethod("QQFieldElem",
-    (params, data, f) -> (
+    (params, data) -> (
 	x := separate("//", data);
 	if #x == 2 then value x#0 / value x#1
 	else value x#0 / 1),
     Namespace => "Oscar")
-addLoadMethod("String", (params, data, f) -> data, Namespace => "Oscar")
-addLoadMethod("Float64", (params, data, f) -> value data, Namespace => "Oscar")
-addLoadMethod("ZZRing", (params, data, f) -> ZZ, Namespace => "Oscar")
-addLoadMethod("QQField", (params, data, f) -> QQ, Namespace => "Oscar")
+addLoadMethod("String", (params, data) -> data, Namespace => "Oscar")
+addLoadMethod("Float64", (params, data) -> value data, Namespace => "Oscar")
+addLoadMethod("ZZRing", (params, data) -> ZZ, Namespace => "Oscar")
+addLoadMethod("QQField", (params, data) -> QQ, Namespace => "Oscar")
 addLoadMethod("FiniteField",
-    (params, data, f) -> (
+    (params, data) -> (
 	if params =!= null then error "not implemented yet"
 	else ZZ/(value data)),
     Namespace => "Oscar")
-
-addListLoadMethod = method()
-addListLoadMethod(String, String, Type) := (ns, type, T) -> (
-    addLoadMethod(type,
-	(params, data, f) -> (
-	    new T from apply(#params, i -> (
-		    if instance(data#i, String) and isUuid data#i then f data#i
-		    else f hashTable {
-			"_type" => params#i,
-			"data" => data#i}))),
-	Namespace => ns))
-
-addListLoadMethod("Macaulay2", "List", List)
-addListLoadMethod("Macaulay2", "Sequence", Sequence)
-addListLoadMethod("Macaulay2", "Array", Array)
-addListLoadMethod("Oscar", "Tuple", Sequence)
 
 -------------------
 -- documentation --
