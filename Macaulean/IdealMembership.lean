@@ -178,11 +178,34 @@ def toExprPoly (p : CommRing.Poly) : StateT VariableState MetaM (ExprPoly) := do
     coefficients := coeff
   }
 
+
+-- This shouldn't be an instance of ToExpr because it's not the expression
+-- that realizes the object p.
+def exprFromPoly (ringExpr : Expr) (variables : Std.TreeMap CommRing.Var Expr) (exprPoly : ExprPoly) : MetaM Expr :=
+  expandPoly exprPoly.poly
+  where
+    monomialExpr (v : CommRing.Mon) : MetaM Expr :=
+      match v with
+      | .unit => mkAppOptM ``OfNat.ofNat #[ringExpr, Expr.lit <| Literal.natVal 1, none]
+      | .mult ⟨x, k⟩ m => do
+        let some varExpr := (variables.get? x) <|> (exprPoly.coefficients.get? x)
+          | throwError "Invalid Polynomial"
+        let varPower ← mkAppM ``HPow.hPow #[varExpr, toExpr k]
+        mkMul varPower (← monomialExpr m)
+    expandPoly (p : CommRing.Poly) : MetaM Expr := do
+      match p with
+      | .num k => pure <| toExpr k
+      | .add k m p' => do
+        let tailPoly ← expandPoly p'
+        let term ← mkMul (toExpr k) (← monomialExpr m)
+        mkAdd term tailPoly
+
+-- TODO implement this, for now this returns the ideal as a wrong but correctly
+-- formated response so that the code can be tested
 def m2IdealMembership
-  [Macaulay2Ring R]
-  (I : List CommRing.Poly)
-  (f : CommRing.Poly) :
-  IO (Option (List CommRing.Poly)) := sorry
+  (I : List Mrdi)
+  (f : Mrdi) :
+  IO (Option (List Mrdi)) := pure <| some I
 
 def proveIdealMembership : TacticM Unit := do
   sorry
@@ -202,7 +225,7 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (idealExprs : Array Expr) (polyE
     let exprPoly ← toExprPoly poly
     let genPolys ← idealExprs.mapM (getPoly ring)
     pure <| some (ring, genPolys, exprPoly)
-  let some (ring, idealGens, poly) ← getPolys.run' .empty | throwTacticEx `m2idealmem goal "Expected a polynomial expression"
+  let (some (ring, idealGens, poly), vars) ← getPolys.run .empty | throwTacticEx `m2idealmem goal "Expected a polynomial expression"
 
   let serializerExpr ← mkAppOptM ``serializePoly #[ring, none]
   let serializerType ← inferType serializerExpr
@@ -216,12 +239,21 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (idealExprs : Array Expr) (polyE
   runMrdiWithSeed s do
     let some serializedPoly ← serializer poly
       | throwTacticEx `m2idealmem goal "Unable to serialize polynomial"
-    let serializedGens : Array (Option Mrdi) ← idealGens.mapM serializer
+    let serializedGens : Array (Option Mrdi) ← (idealGens.mapM serializer)
+    let some serializedGens := serializedGens.mapM id
+      | throwTacticEx `m2idealmem goal "Unable to serialize ideal generators"
     --check that ring is a ring we know how to work with
     logInfo <| toString <| toJson serializedPoly
     logInfo <| toString <| toJson serializedGens
+    let some result ← m2IdealMembership serializedGens.toList serializedPoly
+      | throwTacticEx `m2idealmem goal "Ideal membership failed"
+    let .ok coefficients ← ExceptT.run (result.mapM deserializer)
+      | throwTacticEx `m2idealmem goal "Deserialization failed"
     let .ok (newExprPoly : ExprPoly) ← deserializer serializedPoly
       | throwTacticEx `m2idealmem goal "Unable to deserialize polynomial"
+    let varTable := List.map (fun (v, fvarId) => (v, Expr.fvar fvarId)) <|
+      vars.varTable.toList.map Prod.swap
+    let polyExpr ← exprFromPoly ring (.ofList varTable) newExprPoly
     -- logInfo <| repr <| newExprPoly
 
 @[tactic m2idealmem]
