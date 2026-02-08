@@ -2,3 +2,4 @@ import MacauleanTest.Poly
 import MacauleanTest.Uuid
 import MacauleanTest.Benchmarks
 import MacauleanTest.Factorization
+import Macaulean.IdealMembership
