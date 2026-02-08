@@ -48,3 +48,4 @@ theorem foo
           (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 3) = 0 := by
   m2idealmem [ho, hi, hpq, hk]
   sorry
+  sorry
