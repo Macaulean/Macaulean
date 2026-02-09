@@ -209,9 +209,6 @@ def m2IdealMembership
   (f : Mrdi) :
   IO (Option (List Mrdi)) := pure <| some I
 
-def proveIdealMembership : TacticM Unit := do
-  sorry
-
 syntax (name := m2idealmem) "m2idealmem" notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
 /--
@@ -276,12 +273,13 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
       | e => pure <| e)
     let some (targetRing,targetLhs,targetRhs) := target.eq? |
       throwTacticEx `m2idealmem goal "Expected an equality for the target"
-    if not (← isDefEq targetRhs (← intAsRingElem targetRing 0)) then
+    let zeroExpr ← intAsRingElem targetRing 0
+    if not (← isDefEq targetRhs zeroExpr) then
       throwTacticEx `m2idealmem goal "Expected an equaltiy of the form ...=0 for the target"
     let targetPoly := targetLhs
     let genPolys ← gens.mapM (fun e => do
       let (ring,lhs,rhs) := (e.eq?).get!
-      if (← isDefEq targetRing ring) && (← isDefEq rhs (← intAsRingElem ring 0))
+      if (← isDefEq targetRing ring) && (← isDefEq rhs zeroExpr)
       then pure <| lhs
       else throwTacticEx `m2idealmem goal "Expected equalities to zero over the same ring")
     let .ok coeffs ← m2IdealMemTacticImpl goal targetRing genPolys targetPoly |
@@ -289,28 +287,34 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
     let expectedTarget ←
       liftM <| List.foldlM
         mkAdd
-        (← intAsRingElem targetRing 0)
+        zeroExpr
         (← liftM <| List.zipWithM mkMul coeffs genPolys.toList)
+    logInfo expectedTarget
     let equalityGoal ← mkEq expectedTarget targetPoly
     let eqGoalExpr ← mkFreshExprMVar equalityGoal
     logInfo equalityGoal
     let rewriteResult ← goal.rewrite target eqGoalExpr (symm := true)
     let newGoal ← goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
-    setGoals [newGoal, eqGoalExpr.mvarId!]
+    --use the hypotheses to simplify the lhs of newGoal
+    let reducedGoal : MVarId ← liftM <| args.getElems.foldlM (fun goal gen => do
+      let genExpr ← elabTerm gen none
+      --FIXME this might rewrite too much and cause later rewrites to fail
+      let rewriteResult ← goal.rewrite (← goal.getType) genExpr
+      goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
+      )
+      newGoal
+    -- For now at least, we just call grind to prove reducedGoal
+    -- reducedGoal is basically just `0 = 0`, so we should be able
+    -- to do it more directly
+    _ ← runTactic reducedGoal (← `(tactic|grind))
+    -- set the goal to the polynomial equality
+    -- TODO prove this ourselves
+    setGoals [eqGoalExpr.mvarId!]
   | _ => throwTacticEx `m2idealmem (← getMainGoal) "Expect list of equalities for the ideal"
 
---a random theorem that Rat doesn't have by default
-@[simp]
-theorem Rat.sub_zero (a : Rat) : a - 0 = a := by grind
-
 example {x y : Rat} (f : 1/2*x + 1/2*y = 0) (g : 1/2*x + 1/2*y = 0) : (x + y)^2 = 0 := by
-  m2idealmem [f, g]
-  --prove the resulting expression is equal to 0
-  --TODO automate this and add to m2idealmem
-  simp [Rat.zero_add, Rat.add_zero]
-  rewrite [f]
-  simp [Rat.mul_zero]
-  exact Rat.zero_add 0
+  m2idealmem [f]
+  --exact Rat.zero_add 0
   --prove that the result expression equals the original target polynomial
   --TODO automate this and add to m2idealmem
   simp [Rat.zero_add, Rat.add_zero]
