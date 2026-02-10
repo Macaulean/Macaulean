@@ -182,7 +182,7 @@ server#"logger" = (str) -> (stderr << str << endl)
 registerMethod(server, "quotientRemainder", (polymrdi, idealmrdi) -> (
 	f := value loadMRDI polymrdi;
 	R := ring f;
-	I := ideal apply(fromJSON idealmrdi, g -> (
+	I := ideal apply(idealmrdi, g -> (
 	       sub(value loadMRDI g, R)));
 	(q, r) := quotientRemainder(matrix f, gens I);
 	hashTable {

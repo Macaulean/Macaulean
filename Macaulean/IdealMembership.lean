@@ -1,6 +1,7 @@
 import Lean
 import MRDI.Basic
 import MRDI.Poly
+import Macaulean.Macaulay2
 open Lean Grind Elab Tactic Meta
 
 structure VariableState where
@@ -202,12 +203,28 @@ def exprFromPoly (ringExpr : Expr) (variables : Std.TreeMap CommRing.Var Expr) (
         let term ← mkMul (← intAsRingElem ringExpr k) (← monomialExpr m)
         mkAdd term tailPoly
 
+/--
+  This structure is simply to capture the return from the Macaulay2 request
+  "quotientRemainder"
+-/
+structure QuotientRemainder where
+  quotient : List Mrdi
+  remainder : Mrdi
+  deriving FromJson, ToJson
+
 -- TODO implement this, for now this returns the ideal as a wrong but correctly
 -- formated response so that the code can be tested
 def m2IdealMembership
   (I : List Mrdi)
   (f : Mrdi) :
-  IO (Option (List Mrdi)) := pure <| some I
+  IO (Except String (List Mrdi)) := do
+    let server ← globalM2Server
+    let reply : Json ← server.sendRequest "quotientRemainder" (f, I)
+    match (fromJson? reply : Except String QuotientRemainder) with
+    | .error e =>
+      pure <| .error e
+    | .ok v =>
+      pure <| .ok v.quotient
 
 syntax (name := m2idealmem) "m2idealmem" notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
@@ -219,7 +236,7 @@ the candidate polynomial. The returned list of expressions is a list of
 coefficients such that the product with the generators in idealExprs gives polyExpr
 -/
 unsafe def m2IdealMemTacticImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
-  : MetaM (Except String (List Expr)) := do
+  : MetaM (List Expr) := do
   --parse a expression into a polynomial, checking that the ring matches using isDefEq
   let getPoly (expectedRing : Expr) (pExpr : Expr) : StateT VariableState MetaM ExprPoly := do
     let some poly ← toCommRingExpr? pExpr
@@ -251,12 +268,15 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (ring : Expr) (idealExprs : Arra
     let some serializedGens := serializedGens.mapM id
       | throwTacticEx `m2idealmem goal "Unable to serialize ideal generators"
     --run Macaulay2
-    let some result ← m2IdealMembership serializedGens.toList serializedPoly
+    let .ok result ← m2IdealMembership serializedGens.toList serializedPoly
       | throwTacticEx `m2idealmem goal "Ideal membership failed"
     --deserialize the result
-    ExceptT.run do
+    let deserializedCoefficients ← ExceptT.run do
       let coefficients ← result.mapM deserializer
       coefficients.mapM (liftM ∘ exprFromPoly ring (.ofList varTable))
+    match deserializedCoefficients with
+    | .ok c => pure c
+    | .error e => throwTacticEx `m2idealmem goal e
 
 @[tactic m2idealmem]
 unsafe def m2IdealMemTactic : Tactic := fun stx => do
@@ -282,8 +302,7 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
       if (← isDefEq targetRing ring) && (← isDefEq rhs zeroExpr)
       then pure <| lhs
       else throwTacticEx `m2idealmem goal "Expected equalities to zero over the same ring")
-    let .ok coeffs ← m2IdealMemTacticImpl goal targetRing genPolys targetPoly |
-      throwTacticEx `m2idealmem goal "Ideal Membership Failed" --TODO extract the error
+    let coeffs ← m2IdealMemTacticImpl goal targetRing genPolys targetPoly
     let expectedTarget ←
       liftM <| List.foldlM
         mkAdd
@@ -307,15 +326,9 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
     -- reducedGoal is basically just `0 = 0`, so we should be able
     -- to do it more directly
     _ ← runTactic reducedGoal (← `(tactic|grind))
+    --use grind to prove the equality
+    _ ← runTactic eqGoalExpr.mvarId! (← `(tactic|grind))
     -- set the goal to the polynomial equality
     -- TODO prove this ourselves
-    setGoals [eqGoalExpr.mvarId!]
+    -- setGoals [eqGoalExpr.mvarId!]
   | _ => throwTacticEx `m2idealmem (← getMainGoal) "Expect list of equalities for the ideal"
-
-example {x y : Rat} (f : 1/2*x + 1/2*y = 0) (g : 1/2*x + 1/2*y = 0) : (x + y)^2 = 0 := by
-  m2idealmem [f]
-  --exact Rat.zero_add 0
-  --prove that the result expression equals the original target polynomial
-  --TODO automate this and add to m2idealmem
-  simp [Rat.zero_add, Rat.add_zero]
-  sorry

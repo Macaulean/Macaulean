@@ -193,7 +193,7 @@ instance : FromJson Mrdi where
       let .some ns := entries.get? "_ns" | .error "MRDI objects without namespaces are unspported"
       let dataPart ← fromJson? json
       let refs : Std.TreeMap String MrdiData ←
-        fromJson? <| entries.getD "refs" (.obj .empty)
+        fromJson? <| entries.getD "_refs" (.obj .empty)
       let parsedRefs : Std.TreeMap Uuid MrdiData  ←
         .ofArray (cmp := Ord.compare) <$>
         refs.toArray.mapM (fun (k,v) =>
@@ -223,7 +223,6 @@ unsafe def getRef [MrdiType α] [TypeName α] [Monad m] (uuid : Uuid) : MrdiDeco
       pure <| .ok val
     | .error e => pure <| .error e
 
--- doesn't implement references yet
 def fromMrdi? [Monad m] [MrdiType α] (mrdi : Mrdi) : MrdiT m (Except String α) :=
   if MrdiType.mrdiType α != mrdi.type
   then pure <| .error "MRDI type does not match"
