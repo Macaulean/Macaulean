@@ -3,3 +3,4 @@
 import Macaulean.Basic
 import Macaulean.Macaulay2
 import Macaulean.Factorization
+import Macaulean.SumOfSquares

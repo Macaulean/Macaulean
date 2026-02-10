@@ -5,6 +5,7 @@ needsPackage "JSONRPC"
 needsPackage "MRDI"
 needsPackage "JSON"
 needsPackage "Parsing"
+needsPackage "SumsOfSquares"
 --get the actual parser from the JSON package so we can run it character by character
 importFrom_JSON {"jsonTextP"}
 --get the helper function from JSONRPC that can take already parsed JSON objects
@@ -220,6 +221,24 @@ registerMethod(server, "mrdiFactor", (mrdi) -> (
         apply(toList \ toList factor f, term -> (saveMRDI(term#0, Namespace => "Lean"), term#1))
     )
 )
+
+registerMethod(server, "sumOfSquares", (polymrdi) -> (
+	f := value loadMRDI polymrdi;
+	R := ring f;
+	result := solveSOS f;
+	if result#Status != "SDP solved, primal-dual feasible" then
+	    JSONRPCError(-32001, "SOS decomposition failed: " | result#Status)
+	else (
+	    sol := sosPoly result;
+	    theGens := sol#generators;
+	    theCoeffs := sol#coefficients;
+	    hashTable {
+		"generators" => apply(theGens,
+		    g -> saveMRDI(new ConcretePoly from sub(g, R),
+			Namespace => "Lean", ToString => false)),
+		"coefficients" => apply(theCoeffs,
+		    c -> {toString numerator sub(c, QQ),
+			  toString denominator sub(c, QQ)})})))
 
 macauleanMainLoop(server, stdio);
 -- inputJSON = fromJSONStream stdio;
