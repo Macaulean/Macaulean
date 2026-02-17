@@ -158,7 +158,14 @@ macauleanMainLoop (JSONRPCServer, File) := (server, file) -> (
             headers := readLSPHeaders file;
             stderr << headers << endl;
             requestLength := (NNParser : charAnalyzer) headers#"Content-Length";
-            requestBody := read(file,requestLength);
+            requestBody := concatenate while requestLength > 0 list (
+                block := read(file,requestLength);
+                if length block == 0 then (
+                    stderr << "Truncated Request" << endl;
+                    return);
+                requestLength -= length block;
+                block
+                );
             response := handleRequest_server requestBody;
             file << "Content-Length: " << length response << "\r\n";
             file << "\r\n";
@@ -169,7 +176,7 @@ macauleanMainLoop (JSONRPCServer, File) := (server, file) -> (
 
 --setup the server, copied from example.m2
 server = new JSONRPCServer
-server#"logger" = (str) -> (stderr << str << endl)
+--server#"logger" = (str) -> (stderr << str << endl)
 
 -- input:
 --   polymrdi: MRDI-serialized ConcretePoly

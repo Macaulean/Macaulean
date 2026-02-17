@@ -90,16 +90,18 @@ unsafe instance [MrdiType R] : MrdiType (ConcretePoly R) where
       let some (.str polyUuid) := fields.get? "poly" | throw "Expected a JSON object with a 'poly' field"
       let some polyUuid := toUuid? polyUuid | throw "Expect a reference for the 'poly' field"
       let some (.arr coeffArray) := fields.get? "coefficients" | throw "Expected a JSON object with a 'coefficients' field"
-      let coefficients : Array (String × R) ← coeffArray.mapM <| fun c => do
+      let coefficients : Array (Nat × R) ← coeffArray.mapM <| fun c => do
         match c with
         | .arr #[i, r] =>
-          pure (← i.getStr?, ← MrdiType.decode? (α := R) r)
+          let istr ← i.getStr?
+          let some inat := istr.toNat? | throw s!"Expected a String representing a Nat {istr}"
+          pure (inat, ← MrdiType.decode? (α := R) r)
         | _ => throw "Expected a pair of an index and a rational number"
       let poly ← getRef polyUuid
       pure {
         poly := poly
         --TODO deal with the failure case of toNat
-        coefficients := .ofArray <| coefficients.map (fun (i,c) => (i.toNat!, c))
+        coefficients := .ofArray coefficients
       }
     | _ => throw "Expected a JSON object"
   --TODO use UUID's and references to do this properly
@@ -178,15 +180,22 @@ def intAsRingElem (ringExpr : Expr) (k : Int) : MetaM Expr := do
 
 -- This shouldn't be an instance of ToExpr because it's not the expression
 -- that realizes the object p.
-def exprFromPoly (ringExpr : Expr) (variables : Std.TreeMap CommRing.Var Expr) (exprPoly : ExprPoly) : MetaM Expr :=
-  expandPoly exprPoly.poly
+def exprFromPoly (ringExpr : Expr) (variables : Std.TreeMap CommRing.Var Expr) (exprPoly : ExprPoly) (reindex : Bool := true) : MetaM Expr :=
+  expandPoly none exprPoly.poly
   where
+    varList := variables.keys.mergeSort.toArray
     monomialExpr (v : CommRing.Mon) : MetaM Expr :=
       match v with
       | .unit => mkAppOptM ``OfNat.ofNat #[ringExpr, Expr.lit <| Literal.natVal 1, none]
       | .mult ⟨x, k⟩ m => do
-        let some varExpr := (variables.get? x) <|> (exprPoly.coefficients.get? x)
-          | throwError "Invalid Polynomial"
+        -- Macaulay2 returns the variables in the same order but as the first
+        -- variables of the poly field, this reindexes.
+        -- We should probably use a more purpose built polynomial type to avoid this
+        -- In particular, we should probably just have a polynomial that deals with
+        -- coefficients separately
+        let x' := if reindex then varList[x]? else some x
+        let some varExpr := (x' >>= variables.get?) <|> (exprPoly.coefficients.get? x)
+          | throwError s!"Invalid variable index {x} exceeds the number of variables {varList.size}"
         let varPower ←
           match k with
           | 1 => pure varExpr
@@ -195,13 +204,19 @@ def exprFromPoly (ringExpr : Expr) (variables : Std.TreeMap CommRing.Var Expr) (
         match m with
         | .unit => pure <| varPower
         | _ => mkMul varPower (← monomialExpr m)
-    expandPoly (p : CommRing.Poly) : MetaM Expr := do
+    expandPoly (currExpr : Option Expr) (p : CommRing.Poly) : MetaM Expr := do
       match p with
-      | .num k => intAsRingElem ringExpr k
+      | .num k =>
+        let newTerm ← intAsRingElem ringExpr k
+        match currExpr with
+        | none => pure newTerm
+        | some expr => mkAdd expr newTerm
       | .add k m p' => do
-        let tailPoly ← expandPoly p'
         let term ← mkMul (← intAsRingElem ringExpr k) (← monomialExpr m)
-        mkAdd term tailPoly
+        let newExpr ← match currExpr with
+        | none => pure term
+        | some expr => mkAdd expr term
+        expandPoly newExpr p'
 
 /--
   This structure is simply to capture the return from the Macaulay2 request
@@ -212,8 +227,7 @@ structure QuotientRemainder where
   remainder : Mrdi
   deriving FromJson, ToJson
 
--- TODO implement this, for now this returns the ideal as a wrong but correctly
--- formated response so that the code can be tested
+-- TODO This currently ignores the remainder, use it to return an error
 def m2IdealMembership
   (I : List Mrdi)
   (f : Mrdi) :
@@ -237,6 +251,9 @@ coefficients such that the product with the generators in idealExprs gives polyE
 -/
 unsafe def m2IdealMemTacticImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
   : MetaM (List Expr) := do
+  dbg_trace "M2IdealMem Start"
+  --(← IO.getStdout).flush
+
   --parse a expression into a polynomial, checking that the ring matches using isDefEq
   let getPoly (expectedRing : Expr) (pExpr : Expr) : StateT VariableState MetaM ExprPoly := do
     let some poly ← toCommRingExpr? pExpr
@@ -268,8 +285,10 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (ring : Expr) (idealExprs : Arra
     let some serializedGens := serializedGens.mapM id
       | throwTacticEx `m2idealmem goal "Unable to serialize ideal generators"
     --run Macaulay2
+    dbg_trace "Calling Macaulay2"
     let .ok result ← m2IdealMembership serializedGens.toList serializedPoly
       | throwTacticEx `m2idealmem goal "Ideal membership failed"
+    dbg_trace "Coefficients Returned"
     --deserialize the result
     let deserializedCoefficients ← ExceptT.run do
       let coefficients ← result.mapM deserializer
@@ -285,8 +304,9 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
     --TODO rewrite the goals/hypotheses so that they are of the form f = 0
     let goal ← getMainGoal
     let target ← getMainTarget
-    let gens ← args.getElems.mapM (fun g => do
-      match (← elabTerm g none) with
+    let genHyps ← args.getElems.mapM (elabTerm · none)
+    let gens ← genHyps.mapM (fun genH => do
+      match genH with
       | .fvar var =>
         let varDec ← var.getDecl
         pure <| varDec.type
@@ -303,15 +323,18 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
       then pure <| lhs
       else throwTacticEx `m2idealmem goal "Expected equalities to zero over the same ring")
     let coeffs ← m2IdealMemTacticImpl goal targetRing genPolys targetPoly
+    dbg_trace "Coefficients Read"
     let expectedTarget ←
       liftM <| List.foldlM
         mkAdd
         zeroExpr
         (← liftM <| List.zipWithM mkMul coeffs genPolys.toList)
-    logInfo expectedTarget
+    dbg_trace "Target Expr Created"
+    --logInfo expectedTarget
     let equalityGoal ← mkEq expectedTarget targetPoly
     let eqGoalExpr ← mkFreshExprMVar equalityGoal
-    logInfo equalityGoal
+    dbg_trace "Equality Goal Created"
+    --logInfo equalityGoal
     let rewriteResult ← goal.rewrite target eqGoalExpr (symm := true)
     let newGoal ← goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
     --use the hypotheses to simplify the lhs of newGoal
@@ -326,8 +349,10 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
     -- reducedGoal is basically just `0 = 0`, so we should be able
     -- to do it more directly
     _ ← runTactic reducedGoal (← `(tactic|grind))
+    dbg_trace "Vanishing shown"
     --use grind to prove the equality
     _ ← runTactic eqGoalExpr.mvarId! (← `(tactic|grind))
+    dbg_trace "Equality Shown"
     -- set the goal to the polynomial equality
     -- TODO prove this ourselves
     -- setGoals [eqGoalExpr.mvarId!]

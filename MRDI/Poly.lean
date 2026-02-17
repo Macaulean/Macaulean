@@ -13,8 +13,9 @@ instance : FromJson Grind.CommRing.Power where
     | .arr #[x, k] => do
       let xstr ← x.getStr?
       let kstr ← k.getStr?
-      --TODO deal with the failure case of toNat
-      pure ⟨xstr.toNat!, kstr.toNat!⟩
+      let some x := xstr.toNat? | throw s!"Expected a String representing a Nat {xstr}"
+      let some k := kstr.toNat? | throw s!"Expected a String representing a Nat {kstr}"
+      pure ⟨x, k⟩
     | _ => .error "Expected a pair of naturals"
 
 /-- An array of powers representing a monomial. -/
@@ -37,8 +38,8 @@ instance : FromJson Term where
     | .arr #[c, m] => do
       let cstr ← c.getStr?
       let mon ← fromJson? m
-      --TODO deal with the failure case of toNat
-      pure ⟨cstr.toNat!, mon⟩
+      let some c := cstr.toInt? | throw s!"Expected a String representing a Int {cstr}"
+      pure ⟨c, mon⟩
     | _ => .error "Expected a pair of a coefficient and a monomial"
 
 /-- A polynomial represented as an array of terms. -/
