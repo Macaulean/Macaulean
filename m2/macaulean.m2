@@ -25,6 +25,7 @@ toLean QQ := x -> {numerator x, denominator x}
 
 leanRings = hashTable {
     QQ => "Rat",
+    ZZ => "Int",
     }
 M2Rings = applyPairs(leanRings, reverse)
 
@@ -46,6 +47,7 @@ new ConcretePoly from RingElement := (T, f) -> (
 
 fromLean = method(Dispatch => Type)
 fromLean QQ := R -> x -> x#0 / x#1
+fromLean ZZ := R -> identity
 
 value ConcretePoly := f -> (
     kk := M2Rings#(f#"params");
