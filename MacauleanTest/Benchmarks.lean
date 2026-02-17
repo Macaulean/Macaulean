@@ -2,6 +2,8 @@ import Lean
 import Macaulean.IdealMembership
 open Lean Grind Elab Tactic Meta
 
+set_option maxHeartbeats 10000000
+
 /- From https://github.com/leanprover/lean4/issues/11861 -/
 theorem foo
   (u r k x y z a b c : Rat)

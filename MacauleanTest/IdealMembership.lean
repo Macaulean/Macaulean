@@ -32,9 +32,13 @@ info:  ↑  3   *   1  /  2   *   y   ^   2   +   ↑  1   *   1  /  2   *   x  
         coefficients := .ofList [(0,toExpr (1/2 : Rat))]
       }
       let vars := Std.TreeMap.ofList [(1, x), (2, y)]
-      let expr ← exprFromPoly ringType vars exprPoly
+      let expr ← exprFromPoly (reindex := false) ringType vars exprPoly
       let exprSyntax ← PrettyPrinter.delab expr
       pure <| Syntax.prettyPrint exprSyntax
 
 example {x y : Rat} (f : 1/2*x + 1/2*y = 0) (g : 1/2*x + 1/2*y = 0) : (x + y)^2 = 0 := by
+  m2idealmem [f]
+
+
+example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
   m2idealmem [f]
