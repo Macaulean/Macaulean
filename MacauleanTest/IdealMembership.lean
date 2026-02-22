@@ -18,7 +18,7 @@ info: some (((CommRing.Expr.var 0).mul (CommRing.Expr.var 1)).add (CommRing.Expr
       (toCommRingExpr? expr).run' .empty
 
 /--
-info:  ↑  3   *   1  /  2   *   y   ^   2   +   ↑  1   *   1  /  2   *   x   ^   2   +   ↑  0
+info:  IntCast.intCast  3   *   1  /  2   *   y   ^   2   +   IntCast.intCast  1   *   1  /  2   *   x   ^   2   +   IntCast.intCast  0
 -/
 #guard_msgs in
 #eval do
