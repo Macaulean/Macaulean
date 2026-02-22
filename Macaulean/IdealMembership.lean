@@ -173,9 +173,11 @@ def toExprPoly (p : CommRing.Poly) : StateT VariableState MetaM (ExprPoly) := do
     coefficients := coeff
   }
 
+def natAsRingElem (ringExpr : Expr) (k : Nat) : MetaM Expr :=
+  mkAppOptM ``OfNat.ofNat #[ringExpr, toExpr k, none]
+
 def intAsRingElem (ringExpr : Expr) (k : Int) : MetaM Expr := do
-  let (.some e) ← coerce? (toExpr k) ringExpr | throwError "Invalid Ring"
-  pure e
+  mkAppOptM ``IntCast.intCast #[ringExpr, none, toExpr k]
 
 
 -- This shouldn't be an instance of ToExpr because it's not the expression
@@ -297,6 +299,11 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (ring : Expr) (idealExprs : Arra
     | .ok c => pure c
     | .error e => throwTacticEx `m2idealmem goal e
 
+--TODO rename this
+theorem helper [CommRing R] (a b c : R) (h1 : a = 0) (h2 : b = 0) : a+c*b = 0 := by
+  rewrite [h1,h2]
+  simp [Semiring.mul_zero,Semiring.add_zero]
+
 @[tactic m2idealmem]
 unsafe def m2IdealMemTactic : Tactic := fun stx => do
   match stx with
@@ -313,7 +320,7 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
       | e => pure <| e)
     let some (targetRing,targetLhs,targetRhs) := target.eq? |
       throwTacticEx `m2idealmem goal "Expected an equality for the target"
-    let zeroExpr ← intAsRingElem targetRing 0
+    let zeroExpr ← natAsRingElem targetRing 0
     if not (← isDefEq targetRhs zeroExpr) then
       throwTacticEx `m2idealmem goal "Expected an equaltiy of the form ...=0 for the target"
     let targetPoly := targetLhs
@@ -324,36 +331,29 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
       else throwTacticEx `m2idealmem goal "Expected equalities to zero over the same ring")
     let coeffs ← m2IdealMemTacticImpl goal targetRing genPolys targetPoly
     dbg_trace "Coefficients Read"
-    let expectedTarget ←
-      liftM <| List.foldlM
-        mkAdd
-        zeroExpr
-        (← liftM <| List.zipWithM mkMul coeffs genPolys.toList)
-    dbg_trace "Target Expr Created"
-    --logInfo expectedTarget
-    let equalityGoal ← mkEq expectedTarget targetPoly
-    let eqGoalExpr ← mkFreshExprMVar equalityGoal
-    dbg_trace "Equality Goal Created"
-    --logInfo equalityGoal
-    let rewriteResult ← goal.rewrite target eqGoalExpr (symm := true)
-    let newGoal ← goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
-    --use the hypotheses to simplify the lhs of newGoal
-    let reducedGoal : MVarId ← liftM <| args.getElems.foldlM (fun goal gen => do
-      let genExpr ← elabTerm gen none
-      --FIXME this might rewrite too much and cause later rewrites to fail
-      let rewriteResult ← goal.rewrite (← goal.getType) genExpr
-      goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
-      )
-      newGoal
-    -- For now at least, we just call grind to prove reducedGoal
-    -- reducedGoal is basically just `0 = 0`, so we should be able
-    -- to do it more directly
-    _ ← runTactic reducedGoal (← `(tactic|grind))
-    dbg_trace "Vanishing shown"
+    let startingExpr ← mkAppM ``Eq.refl #[zeroExpr]
+    let zeroProof ← (coeffs.zip genHyps.toList).foldlM
+      (fun mvar (c,f) => do
+        mkAppOptM ``helper #[targetRing, none, none, none, c, mvar, f]
+        )
+      startingExpr
+    dbg_trace "Vanishing Proven"
+    let zeroProofType ← inferType zeroProof
+    let some (_,expectedTarget,_) := zeroProofType.eq?
+      | throwTacticEx `m2idealmem goal "Impossible"
+    --  | throwTacticEx `m2idealmem goal "Unexpected non-equality theorem"
+    --rewrite the goal using the fact that the previous expression equals zero
+    let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs expectedTarget)
+    goal.assign (← mkAppM ``Eq.trans #[eqGoalMVar,zeroProof])
+
+    -- let rewriteResult ← goal.rewrite target zeroProof (symm := true)
+    -- let newGoal ← goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
+    dbg_trace "New Goal Created"
     --use grind to prove the equality
-    _ ← runTactic eqGoalExpr.mvarId! (← `(tactic|grind))
+    _ ← runTactic eqGoalMVar.mvarId! (← `(tactic|grind))
     dbg_trace "Equality Shown"
     -- set the goal to the polynomial equality
     -- TODO prove this ourselves
-    -- setGoals [eqGoalExpr.mvarId!]
+    -- setGoals [eqGoalMVar.mvarId!]
+    dbg_trace "m2idealmem finished"
   | _ => throwTacticEx `m2idealmem (← getMainGoal) "Expect list of equalities for the ideal"
