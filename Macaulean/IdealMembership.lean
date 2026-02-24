@@ -174,21 +174,26 @@ def toExprPoly (p : CommRing.Poly) : StateT VariableState MetaM (ExprPoly) := do
   }
 
 def natAsRingElem (ringExpr : Expr) (k : Nat) : MetaM Expr :=
-  mkAppOptM ``OfNat.ofNat #[ringExpr, toExpr k, none]
+  mkAppOptM ``OfNat.ofNat #[ringExpr, mkRawNatLit k, none]
 
 def intAsRingElem (ringExpr : Expr) (k : Int) : MetaM Expr := do
-  mkAppOptM ``IntCast.intCast #[ringExpr, none, toExpr k]
-
+  let a := k.natAbs
+  let aExpr ← natAsRingElem ringExpr a
+  if k >= 0
+  then pure aExpr
+  else mkAppM ``Neg.neg #[aExpr]
 
 -- This shouldn't be an instance of ToExpr because it's not the expression
 -- that realizes the object p.
-def exprFromPoly (ringExpr : Expr) (variables : Std.TreeMap CommRing.Var Expr) (exprPoly : ExprPoly) (reindex : Bool := true) : MetaM Expr :=
+def exprFromPoly (ringExpr : Expr)
+  (variables : Std.TreeMap CommRing.Var Expr)
+  (exprPoly : ExprPoly) (reindex : Bool := true) : MetaM Expr := do
   expandPoly none exprPoly.poly
   where
     varList := variables.keys.mergeSort.toArray
-    monomialExpr (v : CommRing.Mon) : MetaM Expr :=
+    monomialExpr (currExpr : Option Expr) (v : CommRing.Mon) : MetaM Expr := do
       match v with
-      | .unit => mkAppOptM ``OfNat.ofNat #[ringExpr, Expr.lit <| Literal.natVal 1, none]
+      | .unit => pure <| currExpr.getD (← natAsRingElem ringExpr 1)
       | .mult ⟨x, k⟩ m => do
         -- Macaulay2 returns the variables in the same order but as the first
         -- variables of the poly field, this reindexes.
@@ -201,20 +206,23 @@ def exprFromPoly (ringExpr : Expr) (variables : Std.TreeMap CommRing.Var Expr) (
         let varPower ←
           match k with
           | 1 => pure varExpr
-          | _ => mkAppM ``HPow.hPow #[varExpr, toExpr k]
-        --avoid extraneous 1's at the end of the term
-        match m with
-        | .unit => pure <| varPower
-        | _ => mkMul varPower (← monomialExpr m)
+          | _ => mkAppM ``HPow.hPow #[varExpr, mkNatLit k]
+        match currExpr with
+        | none => monomialExpr varPower m
+        | some e => monomialExpr (← mkMul e varPower) m
     expandPoly (currExpr : Option Expr) (p : CommRing.Poly) : MetaM Expr := do
       match p with
       | .num k =>
         let newTerm ← intAsRingElem ringExpr k
         match currExpr with
         | none => pure newTerm
-        | some expr => mkAdd expr newTerm
+        | some expr =>
+          if k == 0
+          then pure expr --avoid the trailing zero
+          else mkAdd expr newTerm
       | .add k m p' => do
-        let term ← mkMul (← intAsRingElem ringExpr k) (← monomialExpr m)
+        let coeff ← intAsRingElem ringExpr k
+        let term ← monomialExpr (if k == 1 then none else some coeff) m
         let newExpr ← match currExpr with
         | none => pure term
         | some expr => mkAdd expr term

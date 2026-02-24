@@ -18,7 +18,7 @@ info: some (((CommRing.Expr.var 0).mul (CommRing.Expr.var 1)).add (CommRing.Expr
       (toCommRingExpr? expr).run' .empty
 
 /--
-info:  IntCast.intCast  3   *   1  /  2   *   y   ^   2   +   IntCast.intCast  1   *   1  /  2   *   x   ^   2   +   IntCast.intCast  0
+info:  3   *   1  /  2   *   y   ^   2   +   1  /  2   *   x   ^   2
 -/
 #guard_msgs in
 #eval do
@@ -41,4 +41,4 @@ example {x y : Rat} (f : 1/2*x + 1/2*y = 0) (g : 1/2*x + 1/2*y = 0) : (x + y)^2 
 
 
 example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
-  m2idealmem [f]
+  m2idealmem [f,g]
