@@ -1,5 +1,3 @@
-R = ZZ/32003[u,r,k,x,y,z,a,b,c]
-
 f1 = (x - u * z) ^ 2 + y ^ 2 - r ^ 2 * z ^ 2
 f2 = a ^ 2 + b ^ 2 - c ^ 2
 f3 = x * a + y * b - z * c
@@ -44,10 +42,12 @@ g = (r *
                   u * k * c ^ 2) *
                 z) *
           (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 3)
+end
 
-decompose I
-          
-    
+restart
+R = ZZ/32003[u,r,k,x,y,z,a,b,c]
+load "benchmark.m2"
+decompose I          
 radical I
 g % I
 isMember(g,I)
