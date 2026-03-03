@@ -56,5 +56,19 @@ restart
 R = ZZ/32003[u,r,k,x,y,z,a,b,c]
 
 load "grind-challenge--small-subalgebra.m2"
-g'noSpaces == g
-g'simpleTerms == g
+assert(g'noSpaces == g)
+assert(g'simpleTerms == g)
+
+-- how about throwing all ingredients in an LLM?
+assert(g % I == 0)
+q = quotient(matrix{{g}},gens I);
+assert(gens I * q - g == 0)
+inputString = {"f1","f2","f3","f4","g","q"} / (name-> name | " = " | toString value name);
+length\inputString -- hmm...
+
+-- how about taking all subexpressions of g and 
+-- looking at them modulo I?
+subexprVars / (var -> first degree var  => first degree (var % I)) // VerticalList
+-- hmm... there is only one place where degree drops (by 2)
+
+
