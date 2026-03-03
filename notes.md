@@ -51,3 +51,20 @@ g
 ```
 
 ---
+
+## 2026-03-03 Tue - Term 2, Week 8
+
+Logistics about ICMS, visits to London and Warwick, summer intern
+
+`grind`: what kind of Groebner basis computation it does.
+
+The subalgebra approach was not successful.
+We could distill a question and ask Bhavik about kernel tricks to speed up the computation.
+
+Example (over $\mathbb{Q}$): the singular locus of $x ^ 2 + y ^ 2 - 1 = 0$, via proving that $1$ is in the ideal.
+
+Think about how to work over fields other than $\mathbb{Q}$.
+
+Possibly find examples from computer vision of good, representative targets?
+
+---
