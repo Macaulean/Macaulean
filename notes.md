@@ -54,7 +54,12 @@ g
 
 ## 2026-03-03 Tue - Term 2, Week 8
 
-Logistics about ICMS, visits to London and Warwick, summer intern
+Logistics about ICMS, visits to London and Warwick (M2 workshop June 28-July 3?), summer intern
+
+The dates for a potential London event were (as far as I can remember them!)
+* June 30-July 1
+* August 20-21
+* September 15-16
 
 `grind`: what kind of Groebner basis computation it does.
 
