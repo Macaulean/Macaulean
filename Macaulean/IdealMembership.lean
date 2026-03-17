@@ -237,20 +237,14 @@ structure QuotientRemainder where
   remainder : Mrdi
   deriving FromJson, ToJson
 
--- TODO This currently ignores the remainder, use it to return an error
-def m2IdealMembership
+def m2QuotientRemainder
   (I : List Mrdi)
   (f : Mrdi) :
-  IO (Except String (List Mrdi)) := do
+  IO (Except String (QuotientRemainder)) := do
     let server ← globalM2Server
     let reply : Json ← server.sendRequest "quotientRemainder" (f, I)
-    match (fromJson? reply : Except String QuotientRemainder) with
-    | .error e =>
-      pure <| .error e
-    | .ok v =>
-      pure <| .ok v.quotient
+    pure <| fromJson? reply
 
-syntax (name := m2idealmem) "m2idealmem" optional("no_grind") notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
 /--
 This function implements the core of the tactic, serializing and deserializing
@@ -259,8 +253,8 @@ the polynomials to Macaulay2. `ring` should be an expression for the ring
 the candidate polynomial. The returned list of expressions is a list of
 coefficients such that the product with the generators in idealExprs gives polyExpr
 -/
-unsafe def m2IdealMemTacticImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
-  : MetaM (List Expr) := do
+unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
+  : MetaM (List Expr × Expr) := do
   dbg_trace "M2IdealMem Start"
   --(← IO.getStdout).flush
 
@@ -296,19 +290,23 @@ unsafe def m2IdealMemTacticImpl (goal : MVarId) (ring : Expr) (idealExprs : Arra
       | throwTacticEx `m2idealmem goal "Unable to serialize ideal generators"
     --run Macaulay2
     dbg_trace "Calling Macaulay2"
-    let .ok result ← m2IdealMembership serializedGens.toList serializedPoly
+    let .ok result ← m2QuotientRemainder serializedGens.toList serializedPoly
       | throwTacticEx `m2idealmem goal "Ideal membership failed"
     dbg_trace "Coefficients Returned"
     --deserialize the result
     let deserializedCoefficients ← ExceptT.run do
-      let coefficients ← result.mapM deserializer
+      let coefficients ← result.quotient.mapM deserializer
       coefficients.mapM (liftM ∘ exprFromPoly ring (.ofList varTable))
-    match deserializedCoefficients with
-    | .ok c => pure c
-    | .error e => throwTacticEx `m2idealmem goal e
+    let deserializedRemainder ← ExceptT.run do
+      let remainder ← deserializer result.remainder
+      exprFromPoly ring (.ofList varTable) remainder
+    match deserializedCoefficients, deserializedRemainder with
+    | .ok c, .ok r  => pure (c, r)
+    | .error e, _ => throwTacticEx `m2idealmem goal e
+    | _, .error e => throwTacticEx `m2idealmem goal e
 
 --TODO rename this
-theorem helper [CommRing R] (a b c : R) (h1 : a = 0) (h2 : b = 0) : a+c*b = 0 := by
+theorem helper [CommRing R] (a b c d : R) (h1 : a = d) (h2 : b = 0) : a+c*b = d := by
   rewrite [h1,h2]
   simp [Semiring.mul_zero,Semiring.add_zero]
 
@@ -326,12 +324,12 @@ unsafe def m2IdealMemTacticRunner (tacName : Name) (goal : MVarId) (target : Exp
     if (← isDefEq targetRing ring) && (← isDefEq rhs zeroExpr)
     then pure <| lhs
     else tacticError "Expected equalities to zero over the same ring")
-  let coeffs ← m2IdealMemTacticImpl goal targetRing genPolys targetLhs
+  let (coeffs,_) ← m2QuotientRemainderImpl goal targetRing genPolys targetLhs
   dbg_trace "Coefficients Read"
   let startingExpr ← mkAppM ``Eq.refl #[zeroExpr]
   let zeroProof ← (coeffs.zip genHyps.toList).foldlM
     (fun mvar (c,f) => do
-      mkAppOptM ``helper #[targetRing, none, none, none, c, mvar, f])
+      mkAppOptM ``helper #[targetRing, none, none, none, c, zeroExpr, mvar, f])
     startingExpr
   dbg_trace "Vanishing Proven"
   let zeroProofType ← inferType zeroProof
@@ -344,6 +342,47 @@ unsafe def m2IdealMemTacticRunner (tacName : Name) (goal : MVarId) (target : Exp
   setGoals [eqGoalMVar.mvarId!]
   where
     tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
+
+/--
+  This expects goal to be a proposition of the type `g = h` over some ring
+  The rhs of this may be a mvar but the lhs should not be. This uses Macaulay2 and the hypotheses in genHyps
+  to reduce the lhs fully in grevlex order. then it creates a new goal of the form (remainder) = expr
+  the expressions in genHyps should be theorems of the form `f = 0` for a polynoial expression f.
+-/
+unsafe def m2RemainderTacticRunner (tacName : Name) (goal : MVarId) (target : Expr) (genHyps : Array Expr) : TacticM Unit := do
+  let genProps ←  genHyps.mapM (fun genH => inferType genH)
+  let some (targetRing,targetLhs,targetRhs) := target.eq? |
+      tacticError "Expected an equality for the target"
+  let zeroExpr ← natAsRingElem targetRing 0
+  let genPolys ← genProps.mapM (fun e => do
+    let (ring,lhs,rhs) := (e.eq?).get!
+    if (← isDefEq targetRing ring) && (← isDefEq rhs zeroExpr)
+    then pure <| lhs
+    else tacticError "Expected equalities to zero over the same ring")
+  let (coeffs,_) ← m2QuotientRemainderImpl goal targetRing genPolys targetLhs
+  dbg_trace "Coefficients Read"
+  let startingExpr ← mkAppM ``Eq.refl #[targetRhs]
+  let remainderProof ← (coeffs.zip genHyps.toList).foldlM
+    (fun mvar (c,f) => do
+      mkAppOptM ``helper #[targetRing, none, none, none, c, none, mvar, f])
+    startingExpr
+  let remainderProofType ← inferType remainderProof
+  let some (_,expectedTarget,_) := remainderProofType.eq?
+    | tacticError "Impossible"
+  let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs expectedTarget)
+  goal.assign (← mkAppM ``Eq.trans #[eqGoalMVar,remainderProof])
+  -- let eqGoalId : MVarId :=
+  setGoals [eqGoalMVar.mvarId!]
+
+  --let (eqGoal',_) ← eqGoalId.tryClearMany' <| genHyps.map (Expr.fvarId!)
+  --pushGoal eqGoal'
+
+--   let _ ← runTactic eqGoal' (← `(tactic|grind))
+--   sorry
+  where
+    tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
+
+syntax (name := m2idealmem) "m2idealmem" optional("no_grind") notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
 @[tactic m2idealmem]
 unsafe def m2IdealMemTactic : Tactic := fun stx => do
@@ -360,6 +399,29 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
     let target ← getMainTarget
     let genHyps ← args.getElems.mapM (elabTerm · none)
     m2IdealMemTacticRunner `m2idealmem goal target genHyps
+    -- use grind to prove the equality
+    _ ← runTactic (← getMainGoal) (← `(tactic|grind))
+    dbg_trace "Equality Shown"
+    -- set the goal to the polynomial equality
+    dbg_trace "m2idealmem finished"
+  | _ => throwTacticEx `m2idealmem (← getMainGoal) "Expect list of equalities for the ideal"
+
+syntax (name := m2remainder) "m2remainder" optional("no_grind") notFollowedBy("|") (ppSpace colGt term:max)* : tactic
+
+@[tactic m2remainder]
+unsafe def m2RemainderTactic : Tactic := fun stx => do
+  match stx with
+  | `(tactic| m2remainder no_grind [$args,*]) =>
+    let goal ← getMainGoal
+    let target ← getMainTarget
+    let genHyps ← args.getElems.mapM (elabTerm · none)
+    m2RemainderTacticRunner `m2remainder goal target genHyps
+    dbg_trace "m2idealmem finished"
+  | `(tactic| m2remainder [$args,*]) =>
+    let goal ← getMainGoal
+    let target ← getMainTarget
+    let genHyps ← args.getElems.mapM (elabTerm · none)
+    m2RemainderTacticRunner `m2remainder goal target genHyps
     -- use grind to prove the equality
     _ ← runTactic (← getMainGoal) (← `(tactic|grind))
     dbg_trace "Equality Shown"
