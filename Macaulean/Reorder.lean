@@ -20,11 +20,21 @@ theorem congrPow [HPow R Nat R] {a b : R} (n : Nat) (h1 : a = b) : a ^ n = b ^ n
 theorem mulSwap [CommRing R] (a b c : R) : a * b * c = a * c * b := by grind
 theorem plusSwap [Semiring R] (a b c : R) : a + b + c = a + c + b := by grind
 
+theorem semiring_pow_mul [Semiring R] (a : R) (b c : Nat) : (a^b)^c = a^(b*c) := by
+  induction c with
+  | zero => grind
+  | succ n h =>
+    rw [Semiring.pow_succ,h,← Semiring.pow_add,Nat.left_distrib,Nat.mul_one]
+
 inductive FactorType where
   | coeff : FactorType
   | var (v : Nat) : FactorType
   | poly : FactorType
-deriving Ord, BEq
+deriving Ord, BEq, Inhabited
+
+def FactorType.isVariable : FactorType → Bool
+  | .var _ => true
+  | _ => false
 
 instance : LT FactorType := ltOfOrd
 instance : LE FactorType := leOfOrd
@@ -47,26 +57,70 @@ partial def reorderVars (vars : Array FVarId) (e : Expr) : MetaM (Expr × Expr) 
     let firstEquality ← mkAppM ``congrMul #[cProof,dProof]
     pure (← mkAppM ``Eq.trans #[firstEquality,lastEquality], lastReorder)
   | HPow.hPow _ _ _ _ a b =>
+    --TODO consider simplifying the exponents to nat literals
     let (aProof, aReorder) ← reorderVars vars a
-    pure (← mkAppM ``congrPow #[b,aProof], ← mkAppM ``HPow.hPow #[aReorder,b])
+    let liftedProof ← mkAppM ``congrPow #[b,aProof]
+    match_expr aReorder with
+    | HPow.hPow _ _ _ _ aVar aExp =>
+      let powMulStep ← mkAppM ``semiring_pow_mul #[aVar, aExp, b]
+      pure (← mkEqTrans liftedProof powMulStep, ← mkAppM ``HPow.hPow #[aVar, ← mkMul aExp b])
+    | _ =>
+      pure (liftedProof, ← mkAppM ``HPow.hPow #[aReorder,b])
   | _ => pure (← mkEqRefl e, e)
   where
     factorType (e : Expr) : FactorType :=
     match_expr e with
     | HAdd.hAdd _ _ _ _ _ _ => .poly
+    | HPow.hPow _ _ _ _ a _ => factorType a
     | _ =>
       let maybeIdx := e.fvarId? >>= vars.idxOf?
       (maybeIdx.map .var).getD .coeff
+    /--
+      a and b should be powers of the same variable
+    -/
+    mergePowers (a b : Expr) : MetaM (Expr × Expr) := do
+      match_expr a with
+      | HPow.hPow _ _ _ _ aBase aExp =>
+        match_expr b with
+        | HPow.hPow _ _ _ _ bBase bExp =>
+          pure (
+            ← mkAppM ``Semiring.pow_add #[aBase, aExp, bExp] >>= mkEqSymm,
+            ← mkAppM ``HPow.hPow #[aBase, ← mkAppM ``Nat.add #[aExp, bExp]]
+          )
+        | _ =>
+          pure (
+            ← mkAppM ``Semiring.pow_succ #[aBase,aExp] >>= mkEqSymm,
+            ← mkAppM ``HPow.hPow #[aBase, ← mkAppM ``Nat.succ #[aExp]]
+          )
+      | _ =>
+        match_expr b with
+        | HPow.hPow _ _ _ _ _ _ =>
+          --rewrite a as a power and reduce to the previous cases
+          let aAsPow ← mkAppM ``HPow.hPow #[a, toExpr 1]
+          let powProof ← mkAppM ``Semiring.pow_one #[a] >>= mkEqSymm
+          let (mergeProof, mergedExpr) ← mergePowers aAsPow b
+          pure (← mkEqTrans powProof mergeProof, mergedExpr)
+        | _ =>
+          pure
+            (← mkAppM ``Semiring.pow_two #[a] >>= mkEqSymm,
+             ← mkAppM ``HPow.hPow #[a, toExpr 2])
     --assuming that a is a sequence of HMul.hMul applications, insert b into the sequence
     --sorted in the correct way along with a proof that a*b = result
     insertFactorSorted (a b : Expr) : MetaM (Expr × Expr) := do
-      --TODO merge equal factors
-      --TODO if b is a polynomial, put it at the end
       let bOrder := factorType b
       match_expr a with
       | HMul.hMul _ _ _ _ a1 a2 =>
         let a2Order := factorType a2;
-        if a2Order <= bOrder
+        if bOrder.isVariable && a2Order == bOrder
+        then
+          let associateStep ← mkAppM ``Semiring.mul_assoc #[a1, a2, b]
+          let (mergeProof, mergedExpr) ← mergePowers a2 b
+          pure (
+            ← mkEqTrans associateStep mergeProof,
+            ← mkMul a1 mergedExpr
+            )
+
+        else if a2Order <= bOrder
         then pure (← mkEqRefl (← mkMul a b), ← mkMul a b)
         else
           let (nextStep,nextTerm) ← insertFactorSorted a1 b
@@ -76,7 +130,9 @@ partial def reorderVars (vars : Array FVarId) (e : Expr) : MetaM (Expr × Expr) 
           pure (← mkAppM ``Eq.trans #[currStep, liftedNextStep], ← mkMul nextTerm a2)
       | _ =>
         let aOrder := factorType a
-        if aOrder <= bOrder
+        if bOrder.isVariable && aOrder == bOrder
+        then mergePowers a b
+        else if aOrder <= bOrder
         then pure (← mkEqRefl (← mkMul a b), ← mkMul a b)
         else pure (← mkAppM ``CommRing.mul_comm #[a, b], ← mkMul b a)
 
@@ -267,3 +323,9 @@ example (a b c : Rat) : (2*a*b*c+3*a*b+a+6)^2 = (6+b*a*3+a+c*2*b*a)^2 := by
 example (a b c : Rat) : c*(2*a*b*c+3*a*b) = (c*2*b*a+b*a*3)*c := by
   reorder [a,b,c]
   eq_refl
+
+
+example (a b : Rat) : a^3*b + b^6 = a^2*b*a+(b^2)^3 := by
+  reorder [a,b]
+  simp only [Nat.succ_eq_add_one, Nat.reduceAdd, Nat.reduceMul]
+--  eq_refl
