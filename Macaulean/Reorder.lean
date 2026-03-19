@@ -57,17 +57,30 @@ partial def reorderVars (vars : Array FVarId) (e : Expr) : MetaM (Expr × Expr) 
     let firstEquality ← mkAppM ``congrMul #[cProof,dProof]
     pure (← mkAppM ``Eq.trans #[firstEquality,lastEquality], lastReorder)
   | HPow.hPow _ _ _ _ a b =>
-    --TODO consider simplifying the exponents to nat literals
     let (aProof, aReorder) ← reorderVars vars a
     let liftedProof ← mkAppM ``congrPow #[b,aProof]
     match_expr aReorder with
     | HPow.hPow _ _ _ _ aVar aExp =>
       let powMulStep ← mkAppM ``semiring_pow_mul #[aVar, aExp, b]
-      pure (← mkEqTrans liftedProof powMulStep, ← mkAppM ``HPow.hPow #[aVar, ← mkMul aExp b])
+      pure (← mkEqTrans liftedProof powMulStep, ← mkAppM ``HPow.hPow #[aVar, ← mulNatLit aExp b])
     | _ =>
       pure (liftedProof, ← mkAppM ``HPow.hPow #[aReorder,b])
   | _ => pure (← mkEqRefl e, e)
   where
+    -- returns an expression corresponding to a*b, multiplying literals if relevant
+    mulNatLit (a b : Expr) : MetaM Expr := do
+      let prodOpt ← OptionT.run <| do
+        let aVal ← getNatValue? a
+        let bVal ← getNatValue? b
+        pure <| mkNatLit <| aVal * bVal
+      pure <| prodOpt.getD (← mkMul a b)
+    -- returns an expression corresponding to a+b, multiplying literals if relevant
+    addNatLit (a b : Expr) : MetaM Expr := do
+      let prodOpt ← OptionT.run <| do
+        let aVal ← getNatValue? a
+        let bVal ← getNatValue? b
+        pure <| mkNatLit <| aVal + bVal
+      pure <| prodOpt.getD (← mkAdd a b)
     factorType (e : Expr) : FactorType :=
     match_expr e with
     | HAdd.hAdd _ _ _ _ _ _ => .poly
@@ -85,19 +98,21 @@ partial def reorderVars (vars : Array FVarId) (e : Expr) : MetaM (Expr × Expr) 
         | HPow.hPow _ _ _ _ bBase bExp =>
           pure (
             ← mkAppM ``Semiring.pow_add #[aBase, aExp, bExp] >>= mkEqSymm,
-            ← mkAppM ``HPow.hPow #[aBase, ← mkAppM ``Nat.add #[aExp, bExp]]
+            ← mkAppM ``HPow.hPow #[aBase, ← addNatLit aExp bExp]
           )
         | _ =>
           pure (
             ← mkAppM ``Semiring.pow_succ #[aBase,aExp] >>= mkEqSymm,
-            ← mkAppM ``HPow.hPow #[aBase, ← mkAppM ``Nat.succ #[aExp]]
+            ← mkAppM ``HPow.hPow #[aBase, ← addNatLit aExp (mkNatLit 1)]
           )
       | _ =>
         match_expr b with
         | HPow.hPow _ _ _ _ _ _ =>
           --rewrite a as a power and reduce to the previous cases
           let aAsPow ← mkAppM ``HPow.hPow #[a, toExpr 1]
-          let powProof ← mkAppM ``Semiring.pow_one #[a] >>= mkEqSymm
+          let powProof ← mkAppM ``congrMul #[
+            ← mkAppM ``Semiring.pow_one #[a] >>= mkEqSymm,
+            ← mkEqRefl b]
           let (mergeProof, mergedExpr) ← mergePowers aAsPow b
           pure (← mkEqTrans powProof mergeProof, mergedExpr)
         | _ =>
@@ -115,8 +130,9 @@ partial def reorderVars (vars : Array FVarId) (e : Expr) : MetaM (Expr × Expr) 
         then
           let associateStep ← mkAppM ``Semiring.mul_assoc #[a1, a2, b]
           let (mergeProof, mergedExpr) ← mergePowers a2 b
+          let liftedMergeProof ← mkAppM ``congrMul #[← mkEqRefl a1,mergeProof]
           pure (
-            ← mkEqTrans associateStep mergeProof,
+            ← mkEqTrans associateStep liftedMergeProof,
             ← mkMul a1 mergedExpr
             )
 
@@ -324,8 +340,6 @@ example (a b c : Rat) : c*(2*a*b*c+3*a*b) = (c*2*b*a+b*a*3)*c := by
   reorder [a,b,c]
   eq_refl
 
-
-example (a b : Rat) : a^3*b + b^6 = a^2*b*a+(b^2)^3 := by
+example (a b : Rat) : b^6 + a^3*b + 2*a^2*b + b^3 = a^2*b*a+(b^2)^3+2*a*b*a+b*b^2 := by
   reorder [a,b]
-  simp only [Nat.succ_eq_add_one, Nat.reduceAdd, Nat.reduceMul]
---  eq_refl
+  eq_refl
