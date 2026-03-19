@@ -1,5 +1,17 @@
 # Macaulean
 
+The project [Bridging proof and computation](https://www.renaissancephilanthropy.org/bridging-proof-and-computation-a-verified-leanmacaulay2-interface) integrates the theorem-proving capabilities of Lean with the computational power of Macaulay2.
+
+We are working on a tactic for Lean that, on appropriate goals, calls Macaulay2 to perform a computation and then uses the result of the computation to produce a proof of the goal.
+
+Initially, we would like the tactic to cover:
+* ideal membership and
+* factorisation (for integers, polynomials,...).
+
+Once these initial goals are achieved, the infrastructure that we will develop should make it easier to add more features.
+
+We are supported by [AI For Math fund](https://www.renaissancephilanthropy.org/ai-for-math-fund).
+
 ## How to install Macaulay2
 
 ### macOS
@@ -37,7 +49,7 @@ needsPackage "MRDI"
 
 ```m2
 check "JSONRPC"
-check "MRDI" 
+check "MRDI"
 ```
 
 ##  Tests (Lean)
