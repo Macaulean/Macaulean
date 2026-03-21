@@ -185,36 +185,53 @@ theorem denoteTerms_insertTerm (ctx : Context R) (c : R) (m : Mon) (ts : List (P
                  · simp only [denoteTerms_cons]; rw [hm, ← add_assoc, ← right_distrib]
     · simp only [denoteTerms_cons]; rw [ih, add_left_comm']
 
-private theorem denoteTerms_mergeTerms_go (ctx : Context R) (n : Nat)
-    (xs ys : List (PolyTerm R)) (hlen : xs.length + ys.length ≤ n) :
-    denoteTerms ctx (mergeTerms xs ys) = denoteTerms ctx xs + denoteTerms ctx ys := by
-  induction n generalizing xs ys with
-  | zero => have hx : xs = [] := by cases xs <;> simp_all <;> grind
-            subst hx; simp [mergeTerms, zero_add']
-  | succ n ih =>
-    match xs, ys with
-    | [], ys => simp [mergeTerms, zero_add']
-    | _ :: _, [] => simp [mergeTerms, add_zero]
-    | x :: xs', y :: ys' =>
-      simp only [mergeTerms]; split
-      · rw [denoteTerms_cons, ih xs' (y :: ys') (by simp_all; grind), ← add_assoc]
-        simp only [denoteTerms_cons]
-      · next hg =>
-        have hm := Mon.eq_of_grevlex hg
-        split
-        · next hc =>
-          rw [ih xs' ys' (by simp_all; grind), denoteTerms_cons, denoteTerms_cons, hm]
-          exact (add_cancel _ _ _ _ (by rw [← right_distrib, hc, zero_mul])).symm
-        · rw [denoteTerms_cons, ih xs' ys' (by simp_all; grind),
-              denoteTerms_cons, denoteTerms_cons, hm, right_distrib,
-              add_assoc, add_left_comm' (y.coefficient * Mon.denote ctx y.monomial)
-                (denoteTerms ctx xs'), ← add_assoc]
-      · rw [denoteTerms_cons, ih (x :: xs') ys' (by simp_all; grind), add_left_comm']
-        simp only [denoteTerms_cons]
+-- Add instances to let ac_nf work
+instance : Std.Associative (α := R) (.*.) := ⟨mul_assoc⟩
+
+instance : Std.Associative (α := R) (.+.) := ⟨add_assoc⟩
+instance : Std.Commutative (α := R) (.+.) := ⟨add_comm⟩
 
 theorem denoteTerms_mergeTerms (ctx : Context R) (xs ys : List (PolyTerm R)) :
-    denoteTerms ctx (mergeTerms xs ys) = denoteTerms ctx xs + denoteTerms ctx ys :=
-  denoteTerms_mergeTerms_go ctx _ xs ys (Nat.le_refl _)
+    denoteTerms ctx (mergeTerms xs ys) = denoteTerms ctx xs + denoteTerms ctx ys := by
+  fun_induction mergeTerms xs ys with
+  | case1 =>
+    simp [zero_add']
+  | case2 =>
+    simp [add_zero]
+  | case3 x xs y ys ordHyp indHyp =>
+    conv =>
+      lhs
+      unfold denoteTerms
+      right
+      apply indHyp
+    simp
+    ac_rfl
+  | case4 x xs y ys ordHyp coeff coeffZero indHyp =>
+    simp [indHyp]
+    have h : x.monomial = y.monomial := Mon.eq_of_grevlex ordHyp
+    rw [h]
+    conv =>
+      rhs
+      rw [add_assoc]
+      right
+      rw [← add_assoc]
+      left
+      rw [add_comm]
+    simp only [← add_assoc, ← right_distrib]
+    simp only [coeff, coeffZero, zero_mul, zero_add']
+  | case5 x xs y ys ordHyp c coeffHyp indHyp=>
+    simp [indHyp,c,right_distrib]
+    have h : x.monomial = y.monomial := Mon.eq_of_grevlex ordHyp
+    rw [h]
+    ac_nf
+  | case6 x xs y ys ordHyp indHyp =>
+    conv =>
+      lhs
+      unfold denoteTerms
+      right
+      apply indHyp
+    simp
+    ac_rfl
 
 theorem denote_add (ctx : Context R) (p q : Polynomial R) :
     denote ctx (add p q) = denote ctx p + denote ctx q :=
