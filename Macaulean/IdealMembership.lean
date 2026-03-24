@@ -153,6 +153,11 @@ partial def toCommRingExpr?
     .pow <$> (toCommRingExpr? a) <*> (OptionT.mk <| getNatValue? b)
   -- | HDiv.hDiv _ _ _ _ a b => pure <| none
   --^ TODO actually implement, should work if b is an element of R and R is a field
+  | OfNat.ofNat _ x _ =>
+    let n ← OptionT.mk <| getNatValue? x
+    pure <| .num <| .ofNat n
+  | Neg.neg _ _ a =>
+    CommRing.Expr.neg <$> toCommRingExpr? a
   | _ =>
     match x with
     | .fvar varId =>
