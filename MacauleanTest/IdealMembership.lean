@@ -6,15 +6,16 @@ open Lean Grind Elab Tactic Meta
 --Tests for some of the components of the IdealMembership code
 
 /--
-info: some (((CommRing.Expr.var 0).mul (CommRing.Expr.var 1)).add (CommRing.Expr.var 2))
+info: some (((CommRing.Expr.var 0).mul (CommRing.Expr.var 1)).add ((CommRing.Expr.num 2).mul (CommRing.Expr.var 2)).neg)
 -/
 #guard_msgs in
 #eval do
   let ringType := mkConst ``Rat
   withLocalDecl `x .default ringType fun x =>
     withLocalDecl `y .default ringType fun y => do
-      let c : Expr := toExpr (1/2 : Rat)
-      let expr ← mkAdd (← mkMul c x) y
+      let c1 : Expr := toExpr (1/2 : Rat)
+      let c2 : Expr := toExpr (2 : Rat)
+      let expr ← mkAdd (← mkMul c1 x) (← mkAppM `Neg.neg #[← mkMul c2 y])
       (toCommRingExpr? expr).run' .empty
 
 /--
