@@ -7,26 +7,6 @@ import Macaulean.Grind.AlgPoly.Basic
 
 /-!
 # Denotation correctness theorems for AlgPoly
-
-These theorems prove that AlgPoly operations preserve semantics under denotation.
-They are the proof certificates for proof-by-reflection: if two AlgPoly values
-are structurally equal after normalization, their denotations are equal.
-
-## Key theorems
-
-- `denote_combine`: `(p₁.combine p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx`
-- `denote_mul`: `(p₁.mul p₂).denote φ ctx = p₁.denote φ ctx * p₂.denote φ ctx`
-- `denote_neg`: `p.neg.denote φ ctx = -(p.denote φ ctx)`
-
-## Morphism requirements
-
-The morphism `φ : C → A` must be a ring homomorphism:
-- `φ 0 = 0`, `φ 1 = 1`
-- `φ (a + b) = φ a + φ b`
-- `φ (a * b) = φ a * φ b`
-- `φ (-a) = -(φ a)`
-
-This is exactly what `Algebra.algebraMap` provides.
 -/
 
 open Lean.Grind
@@ -37,50 +17,83 @@ namespace Macaulean.AlgPoly
 variable {C : Type u} {A : Type v} [CoeffRing C] [CommRing A]
 variable (φ : C → A) (ctx : CommRing.Context A)
 
-variable (hφ : IsRingHom φ)
+/-! ### Negation -/
 
-/-! ### Additive operation correctness -/
-
-theorem denote_addCoeff (p : AlgPoly C) (c : C) :
-    (p.addCoeff c).denote φ ctx = p.denote φ ctx + φ c := by
-  sorry
-
-theorem denote_concat (p₁ p₂ : AlgPoly C) :
-    (p₁.concat p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx := by
-  sorry
-
-theorem denote_combine (p₁ p₂ : AlgPoly C) :
-    (p₁.combine p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx := by
-  sorry
-
-/-! ### Multiplicative operation correctness -/
-
-theorem denote_mulCoeff (c : C) (p : AlgPoly C) :
-    (mulCoeff c p).denote φ ctx = φ c * p.denote φ ctx := by
-  sorry
-
-theorem denote_mulMon (c : C) (m : Mon) (p : AlgPoly C) :
-    (mulMon c m p).denote φ ctx = φ c * m.denote ctx * p.denote φ ctx := by
-  sorry
-
-theorem denote_mul (p₁ p₂ : AlgPoly C) :
-    (p₁.mul p₂).denote φ ctx = p₁.denote φ ctx * p₂.denote φ ctx := by
-  sorry
-
-/-! ### Negation/subtraction correctness -/
-
-theorem denote_neg (p : AlgPoly C) :
+theorem denote_neg (hφ : IsRingHom φ) (p : AlgPoly C) :
     p.neg.denote φ ctx = -(p.denote φ ctx) := by
-  sorry
+  induction p with
+  | coeff k =>
+    exact IsRingHom.map_neg hφ k
+  | add k m p ih =>
+    show φ (-k) * m.denote ctx + p.neg.denote φ ctx =
+         -(φ k * m.denote ctx + p.denote φ ctx)
+    rw [IsRingHom.map_neg hφ, ih, Ring.neg_mul, AddCommGroup.neg_add]
 
-theorem denote_sub (p₁ p₂ : AlgPoly C) :
+/-! ### addCoeff.go -/
+
+private theorem denote_addCoeff_go (hφ : IsRingHom φ) (p : AlgPoly C) (c : C) :
+    (addCoeff.go c p).denote φ ctx = p.denote φ ctx + φ c := by
+  induction p with
+  | coeff k =>
+    exact IsRingHom.map_add hφ k c
+  | add k m p ih =>
+    show φ k * m.denote ctx + (addCoeff.go c p).denote φ ctx =
+         φ k * m.denote ctx + p.denote φ ctx + φ c
+    rw [ih, Semiring.add_assoc]
+
+/-! ### concat -/
+
+theorem denote_concat (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
+    (p₁.concat p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx := by
+  induction p₁ with
+  | coeff k =>
+    show (p₂.addCoeff k).denote φ ctx = φ k + p₂.denote φ ctx
+    -- addCoeff unfolds to: if k == 0 then p₂ else addCoeff.go k p₂
+    -- In general, we need: addCoeff result has correct denotation
+    -- This requires BEq correctness. Sorry for now.
+    sorry
+  | add k m p₁ ih =>
+    show φ k * m.denote ctx + (p₁.concat p₂).denote φ ctx =
+         φ k * m.denote ctx + p₁.denote φ ctx + p₂.denote φ ctx
+    rw [ih, Semiring.add_assoc]
+
+/-! ### mulCoeff.go -/
+
+private theorem denote_mulCoeff_go (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) :
+    (mulCoeff.go c p).denote φ ctx = φ c * p.denote φ ctx := by
+  induction p with
+  | coeff k =>
+    exact IsRingHom.map_mul hφ c k
+  | add k m p ih =>
+    show φ (c * k) * m.denote ctx + (mulCoeff.go c p).denote φ ctx =
+         φ c * (φ k * m.denote ctx + p.denote φ ctx)
+    rw [IsRingHom.map_mul hφ, ih, Semiring.left_distrib, Semiring.mul_assoc]
+
+/-! ### Remaining theorems (sorry'd — clear dependency structure) -/
+
+theorem denote_combine (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
+    (p₁.combine p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx := by
+  sorry -- Induction on fuel + denote_addCoeff + denote_concat + grevlex case analysis
+
+theorem denote_mulCoeff (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) :
+    (mulCoeff c p).denote φ ctx = φ c * p.denote φ ctx := by
+  sorry -- Unfold mulCoeff, split on c==0/c==1, use denote_mulCoeff_go for general case
+
+theorem denote_mulMon (hφ : IsRingHom φ) (c : C) (m : Mon) (p : AlgPoly C) :
+    (mulMon c m p).denote φ ctx = φ c * m.denote ctx * p.denote φ ctx := by
+  sorry -- Similar to mulCoeff: unfold, split, structural induction
+
+theorem denote_mul (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
+    (p₁.mul p₂).denote φ ctx = p₁.denote φ ctx * p₂.denote φ ctx := by
+  sorry -- Induction on p₁ via mul.go, uses denote_combine + denote_mulCoeff + denote_mulMon
+
+theorem denote_sub (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
     (p₁.sub p₂).denote φ ctx = p₁.denote φ ctx - p₂.denote φ ctx := by
-  sorry
+  show (p₁.combine p₂.neg).denote φ ctx = _
+  rw [denote_combine _ _ hφ, denote_neg _ _ hφ, Ring.sub_eq_add_neg]
 
-/-! ### Power correctness -/
-
-theorem denote_pow (p : AlgPoly C) (k : Nat) :
+theorem denote_pow (hφ : IsRingHom φ) (p : AlgPoly C) (k : Nat) :
     (p.pow k).denote φ ctx = p.denote φ ctx ^ k := by
-  sorry
+  sorry -- Induction on k, uses denote_mul + Semiring.pow_succ
 
 end Macaulean.AlgPoly
