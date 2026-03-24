@@ -3,3 +3,6 @@
 import Macaulean.Basic
 import Macaulean.Macaulay2
 import Macaulean.Factorization
+import Macaulean.Grind.Algebra.Defs
+import Macaulean.Grind.Algebra.Instances
+import Macaulean.Grind.Algebra.Extension
