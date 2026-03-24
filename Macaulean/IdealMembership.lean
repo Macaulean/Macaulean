@@ -277,12 +277,39 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
   let (some (idealGens, poly), vars) ← getPolys.run .empty | throwTacticEx `m2idealmem goal "Expected a polynomial expression"
   let varTable := List.map (fun (v, fvarId) => (v, Expr.fvar fvarId)) <|
     vars.varTable.toList.map Prod.swap
-  let serializerExpr ← mkAppOptM ``serializePoly #[ring, none]
+
+  -- try to build the serializer and deserializer pair, if it fails
+  -- try to universalize to either ZZ or QQ
+  let intExpr := mkConst ``Int
+  let (serializerExpr,universal) ←
+    try
+      let expr ← mkAppOptM ``serializePoly #[ring, none]
+      pure (expr, false)
+    catch _ =>
+      let funcExpr ← mkAppOptM ``serializePoly #[intExpr, none]
+      pure (funcExpr,true)
+  let serializationRing := if universal then intExpr else ring
+  let castInstance ← mkAppOptM ``Ring.intCast #[ring,none]
+  let incExpr ←
+    if universal
+    then mkAppOptM ``IntCast.intCast #[ring,castInstance]
+    else mkAppOptM ``id #[ring]
   let serializerType ← inferType serializerExpr
   let serializer ← evalExpr (ExprPoly → MrdiT MetaM (Option Mrdi)) serializerType serializerExpr DefinitionSafety.unsafe
-  let deserializerExpr ← mkAppOptM ``deserializePoly #[ring, none, none]
+
+  let deserializerExpr ← mkAppOptM ``deserializePoly #[serializationRing, none, none]
   let deserializerType ← inferType deserializerExpr
   let deserializer ← evalExpr (Mrdi → MrdiT MetaM (Except String ExprPoly)) deserializerType deserializerExpr DefinitionSafety.unsafe
+
+  let liftedDeserializer (m : Mrdi) : MrdiT MetaM (Except String ExprPoly) := do
+    match ← deserializer m with
+    | .ok poly =>
+      let liftedCoefficients := poly.coefficients.map (fun _ x => mkApp incExpr x)
+      pure <| .ok {
+        poly := poly.poly
+        coefficients := liftedCoefficients
+      }
+    | e => pure e
   let s ← IO.rand 0 (2^64-1)
   --I should be able to use the runMrdiIO variant
   -- but I can't get it to infer the right MonadLift instance
@@ -300,10 +327,10 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
     dbg_trace "Coefficients Returned"
     --deserialize the result
     let deserializedCoefficients ← ExceptT.run do
-      let coefficients ← result.quotient.mapM deserializer
+      let coefficients ← result.quotient.mapM liftedDeserializer
       coefficients.mapM (liftM ∘ exprFromPoly ring (.ofList varTable))
     let deserializedRemainder ← ExceptT.run do
-      let remainder ← deserializer result.remainder
+      let remainder ← liftedDeserializer result.remainder
       exprFromPoly ring (.ofList varTable) remainder
     match deserializedCoefficients, deserializedRemainder with
     | .ok c, .ok r  => pure (c, r)
