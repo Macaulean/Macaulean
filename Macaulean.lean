@@ -6,3 +6,4 @@ import Macaulean.Factorization
 import Macaulean.Grind.Algebra.Defs
 import Macaulean.Grind.Algebra.Instances
 import Macaulean.Grind.Algebra.Extension
+import Macaulean.Grind.AlgPoly.Basic
