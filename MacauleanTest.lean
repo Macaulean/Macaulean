@@ -1,4 +1,4 @@
 import MacauleanTest.Poly
 import MacauleanTest.Factorization
 import MacauleanTest.Benchmarks
-import MacauleanTest.Algebra
+import MacauleanTest.AlgebraNorm

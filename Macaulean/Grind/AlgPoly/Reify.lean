@@ -127,15 +127,22 @@ Try to build a reification context from a detected Algebra R A instance.
 Returns `none` if synthesis fails.
 -/
 def mkRContext? (R A : Expr) : MetaM (Option RContext) := do
-  let uR ← getLevel R
-  let uA ← getLevel A
-  let csR ← try synthInstance (mkApp (mkConst ``Lean.Grind.CommSemiring [uR]) R)
+  -- Extract universe levels: getLevel returns u+1 for Type u, we need u
+  let uR' ← getLevel R
+  let uA' ← getLevel A
+  let uR := match uR' with | .succ u => u | u => u
+  let uA := match uA' with | .succ u => u | u => u
+  -- Synthesize instances manually with correct universe levels
+  let csRType := mkApp (mkConst ``Lean.Grind.CommSemiring [uR]) R
+  let csR ← try synthInstance csRType
     catch _ => return none
-  let sA ← try synthInstance (mkApp (mkConst ``Lean.Grind.Semiring [uA]) A)
+  let sAType := mkApp (mkConst ``Lean.Grind.Semiring [uA]) A
+  let sA ← try synthInstance sAType
     catch _ => return none
   let algType := mkApp4 (mkConst ``Lean.Grind.Algebra [uR, uA]) R A csR sA
   let algInst ← try synthInstance algType
     catch _ => return none
+  -- Build algebraMap R A (partially applied)
   let algebraMapFn := mkApp5 (mkConst ``Lean.Grind.algebraMap [uR, uA]) R A csR sA algInst
   return some { R, A, uR, uA, algebraMapFn }
 
