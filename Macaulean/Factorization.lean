@@ -76,7 +76,13 @@ def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
 elab "m2reducible" : tactic => do
   let goal ← getMainGoal
   let target ← getMainTarget
-  let (``Not,#[irrExpr]) := target.getAppFnArgs | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
-  let (``Irreducible,#[_,_,irrTarget]) := irrExpr.getAppFnArgs | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
-  let .lit (Literal.natVal x) ← whnf irrTarget | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
-  macaulay2ProveReducible x
+  let mvar ← mkFreshExprMVar (.some <| Expr.const ``Nat [])
+  let irrExpr ← mkAppM ``Not #[← mkAppM ``Irreducible #[mvar]]
+  if ← isDefEq target irrExpr
+  then
+    let x' ← instantiateMVars mvar
+    let .lit (.natVal x) ← whnf x'
+      | throwTacticEx `m2reducible goal s!"Expected a goal of the form ¬ Irreducible x"
+    macaulay2ProveReducible x
+  else throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
+
