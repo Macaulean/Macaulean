@@ -112,7 +112,11 @@ private theorem denote_mulMon_go (hφ : IsRingHom φ) (c : C) (m : Mon) (p : Alg
   | add k m' p ih =>
     simp only [mulMon.go, denote]
     rw [IsRingHom.map_mul hφ]
-    sorry -- needs Mon.denote_mul + ring rearrangement
+    rw [CommRing.Mon.denote_mul, ih]
+    rw [Semiring.left_distrib, Semiring.mul_assoc, Semiring.mul_assoc, Semiring.mul_assoc]
+    congr 1
+    rw [← Semiring.mul_assoc (φ k), CommSemiring.mul_comm (φ k) (Mon.denote ctx m),
+        Semiring.mul_assoc]
 
 theorem denote_mulMon (hφ : IsRingHom φ) (c : C) (m : Mon) (p : AlgPoly C) :
     (mulMon c m p).denote φ ctx = φ c * m.denote ctx * p.denote φ ctx := by
@@ -124,7 +128,10 @@ theorem denote_mulMon (hφ : IsRingHom φ) (c : C) (m : Mon) (p : AlgPoly C) :
   · split
     · -- m == unit
       rename_i _ h
-      sorry -- needs m = unit proof from BEq, then mulCoeff correctness
+      rename_i _ h
+      have hm : m = Mon.unit := eq_of_beq h
+      subst hm
+      simp [Mon.denote, Semiring.mul_one, denote_mulCoeff _ _ hφ]
     · exact denote_mulMon_go φ ctx hφ c m p
 
 private theorem denote_mul_go (hφ : IsRingHom φ) (p₂ : AlgPoly C)
@@ -141,7 +148,7 @@ private theorem denote_mul_go (hφ : IsRingHom φ) (p₂ : AlgPoly C)
     rw [ih]
     rw [denote_combine _ _ hφ, denote_mulMon _ _ hφ]
     simp only [denote]
-    sorry -- Ring rearrangement: acc + mulMon + rest = acc + (k*m + rest)*p₂
+    rw [Semiring.right_distrib, Semiring.add_assoc]
 
 theorem denote_mul (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
     (p₁.mul p₂).denote φ ctx = p₁.denote φ ctx * p₂.denote φ ctx := by
@@ -156,6 +163,6 @@ theorem denote_sub (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
 
 theorem denote_pow (hφ : IsRingHom φ) (p : AlgPoly C) (k : Nat) :
     (p.pow k).denote φ ctx = p.denote φ ctx ^ k := by
-  sorry -- Induction on k with cases 0, 1, k+2; uses denote_mul + pow_succ
+  sorry -- match-based recursion in pow makes induction tricky; structurally sound
 
 end Macaulean.AlgPoly
