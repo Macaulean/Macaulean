@@ -48,10 +48,14 @@ theorem denote_concat (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
   induction p₁ with
   | coeff k =>
     show (p₂.addCoeff k).denote φ ctx = φ k + p₂.denote φ ctx
-    -- addCoeff unfolds to: if k == 0 then p₂ else addCoeff.go k p₂
-    -- In general, we need: addCoeff result has correct denotation
-    -- This requires BEq correctness. Sorry for now.
-    sorry
+    unfold addCoeff
+    split
+    · -- k == 0
+      rename_i h
+      have hk := Macaulean.CoeffRing.beq_sound _ _ h
+      rw [hk, IsRingHom.map_zero hφ, AddCommMonoid.zero_add]
+    · -- k ≠ 0
+      rw [denote_addCoeff_go _ _ hφ, Semiring.add_comm]
   | add k m p₁ ih =>
     show φ k * m.denote ctx + (p₁.concat p₂).denote φ ctx =
          φ k * m.denote ctx + p₁.denote φ ctx + p₂.denote φ ctx
@@ -77,15 +81,73 @@ theorem denote_combine (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
 
 theorem denote_mulCoeff (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) :
     (mulCoeff c p).denote φ ctx = φ c * p.denote φ ctx := by
-  sorry -- Unfold mulCoeff, split on c==0/c==1, use denote_mulCoeff_go for general case
+  unfold mulCoeff
+  split
+  · -- c == 0
+    rename_i h
+    have hc := Macaulean.CoeffRing.beq_sound _ _ h
+    subst hc
+    simp [denote, IsRingHom.map_zero hφ, Semiring.zero_mul]
+  · split
+    · -- c == 1
+      rename_i _ h
+      have hc := Macaulean.CoeffRing.beq_sound _ _ h
+      subst hc
+      simp [IsRingHom.map_one hφ, Semiring.one_mul]
+    · -- general
+      exact denote_mulCoeff_go φ ctx hφ c p
+
+private theorem denote_mulMon_go (hφ : IsRingHom φ) (c : C) (m : Mon) (p : AlgPoly C) :
+    (mulMon.go c m p).denote φ ctx = φ c * m.denote ctx * p.denote φ ctx := by
+  induction p with
+  | coeff k =>
+    unfold mulMon.go
+    split
+    · -- k == 0
+      rename_i h; have hk := Macaulean.CoeffRing.beq_sound _ _ h; subst hk
+      simp [denote, IsRingHom.map_zero hφ, Semiring.mul_zero, IsRingHom.map_mul hφ]
+    · -- k ≠ 0
+      simp only [denote, IsRingHom.map_mul hφ, IsRingHom.map_zero hφ, Semiring.add_zero]
+      rw [Semiring.mul_assoc, CommSemiring.mul_comm (φ k) (m.denote ctx), ← Semiring.mul_assoc]
+  | add k m' p ih =>
+    simp only [mulMon.go, denote]
+    rw [IsRingHom.map_mul hφ]
+    sorry -- needs Mon.denote_mul + ring rearrangement
 
 theorem denote_mulMon (hφ : IsRingHom φ) (c : C) (m : Mon) (p : AlgPoly C) :
     (mulMon c m p).denote φ ctx = φ c * m.denote ctx * p.denote φ ctx := by
-  sorry -- Similar to mulCoeff: unfold, split, structural induction
+  unfold mulMon
+  split
+  · -- c == 0
+    rename_i h; have hc := Macaulean.CoeffRing.beq_sound _ _ h; subst hc
+    simp [denote, IsRingHom.map_zero hφ, Semiring.zero_mul]
+  · split
+    · -- m == unit
+      rename_i _ h
+      sorry -- needs m = unit proof from BEq, then mulCoeff correctness
+    · exact denote_mulMon_go φ ctx hφ c m p
+
+private theorem denote_mul_go (hφ : IsRingHom φ) (p₂ : AlgPoly C)
+    (p₁ acc : AlgPoly C) :
+    (mul.go p₂ p₁ acc).denote φ ctx =
+    acc.denote φ ctx + p₁.denote φ ctx * p₂.denote φ ctx := by
+  induction p₁ generalizing acc with
+  | coeff k =>
+    show (acc.combine (p₂.mulCoeff k)).denote φ ctx = _
+    simp only [denote]
+    rw [denote_combine _ _ hφ, denote_mulCoeff _ _ hφ]
+  | add k m p₁ ih =>
+    simp only [mul.go]
+    rw [ih]
+    rw [denote_combine _ _ hφ, denote_mulMon _ _ hφ]
+    simp only [denote]
+    sorry -- Ring rearrangement: acc + mulMon + rest = acc + (k*m + rest)*p₂
 
 theorem denote_mul (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
     (p₁.mul p₂).denote φ ctx = p₁.denote φ ctx * p₂.denote φ ctx := by
-  sorry -- Induction on p₁ via mul.go, uses denote_combine + denote_mulCoeff + denote_mulMon
+  simp only [mul]
+  rw [denote_mul_go _ _ hφ]
+  simp [denote, IsRingHom.map_zero hφ, AddCommMonoid.zero_add]
 
 theorem denote_sub (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
     (p₁.sub p₂).denote φ ctx = p₁.denote φ ctx - p₂.denote φ ctx := by
@@ -94,6 +156,6 @@ theorem denote_sub (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
 
 theorem denote_pow (hφ : IsRingHom φ) (p : AlgPoly C) (k : Nat) :
     (p.pow k).denote φ ctx = p.denote φ ctx ^ k := by
-  sorry -- Induction on k, uses denote_mul + Semiring.pow_succ
+  sorry -- Induction on k with cases 0, 1, k+2; uses denote_mul + pow_succ
 
 end Macaulean.AlgPoly

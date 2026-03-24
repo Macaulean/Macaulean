@@ -35,10 +35,13 @@ open Lean.Grind.CommRing (Var Power Mon)
 namespace Macaulean
 
 /-- Operations required on coefficients for polynomial normalization. -/
-class CoeffRing (C : Type u) extends Zero C, One C, Add C, Mul C, Neg C, BEq C
+class CoeffRing (C : Type u) extends Zero C, One C, Add C, Mul C, Neg C, BEq C where
+  /-- BEq is sound: `(a == b) = true → a = b`. -/
+  beq_sound : ∀ a b : C, (a == b) = true → a = b
 
 instance : CoeffRing Int where
   zero := 0; one := 1; add := (· + ·); mul := (· * ·); neg := Int.neg; beq := (· == ·)
+  beq_sound := fun _ _ h => decide_eq_true_eq.mp h
 
 /--
 Polynomial with coefficients in `C` and variables tracked by `Mon`.
@@ -214,6 +217,9 @@ instance instCoeffRing : CoeffRing (AlgPoly C) where
   mul := mul
   neg := neg
   beq := beq
+  beq_sound := by
+    intro a b h
+    sorry -- Needs structural induction showing beq reflects equality
 
 end AlgPoly
 
