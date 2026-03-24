@@ -9,3 +9,4 @@ import Macaulean.Grind.Algebra.Extension
 import Macaulean.Grind.AlgPoly.Basic
 import Macaulean.Grind.AlgPoly.Denote
 import Macaulean.Grind.AlgPoly.Expr
+import Macaulean.Grind.AlgPoly.Reify
