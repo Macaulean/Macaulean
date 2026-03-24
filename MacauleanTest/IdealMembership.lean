@@ -50,3 +50,16 @@ example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
 
 example {x y z : Rat} (f : 2*x= 0) (g : 3*y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
   m2idealmem [f, g, h]
+
+variable {R : Type} [CommRing R] [ToExpr R]
+instance : Std.Associative (α := R) (.*.) := ⟨Semiring.mul_assoc⟩
+instance : Std.Commutative (α := R) (.*.) := ⟨CommRing.mul_comm⟩
+
+instance : Std.Associative (α := R) (.+.) := ⟨Semiring.add_assoc⟩
+instance : Std.Commutative (α := R) (.+.) := ⟨Semiring.add_comm⟩
+
+#check Semiring.pow_succ
+example {x y z : R} (f : 2*x= 0) (g : 3*y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
+  m2idealmem no_grind [f, g, h]
+  ac_nf
+  sorry
