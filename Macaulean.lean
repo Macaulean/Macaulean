@@ -10,3 +10,4 @@ import Macaulean.Grind.AlgPoly.Basic
 import Macaulean.Grind.AlgPoly.Denote
 import Macaulean.Grind.AlgPoly.Expr
 import Macaulean.Grind.AlgPoly.Reify
+import Macaulean.Grind.AlgPoly.Tactic
