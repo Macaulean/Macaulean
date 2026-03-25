@@ -8,37 +8,26 @@ abbrev Uuid := String
 
 inductive MrdiTypeDesc where
   | string : String → MrdiTypeDesc
-  | parameterized : String → List Uuid → MrdiTypeDesc
-  deriving Repr,BEq,Ord
+  | parameterized : String → Json → MrdiTypeDesc
+  deriving BEq
 
 instance : ToJson MrdiTypeDesc where
   toJson := fun
     | .string s => .str s
-    | .parameterized s uuids => .mkObj [("name", s), ("params", toJson uuids)]
+    | .parameterized s params => .mkObj [("name", s), ("params", params)]
 instance : FromJson MrdiTypeDesc where
   fromJson? := fun
     | .str s => .ok <| .string s
-    | .obj terms =>  .parameterized
-      <$> (terms.get? "name").elim (.error "Missing name field from MRDI Type") fromJson?
-      <*> (terms.get? "params").elim (.error "Missing params field from MRDI Type") fromJson?
+    | .obj terms => do
+      let some nameJson := terms.get? "name" | .error "Missing name field from MRDI Type"
+      let .str name := nameJson | .error "MRDI type name must be a string"
+      pure <| .parameterized name (terms.getD "params" .null)
     | _ => .error "Invalid MRDI Type Descriptor"
-
-structure MrdiState where
-  types : Std.TreeMap Uuid Type
-  values : Std.DTreeMap Uuid (types.getD · Empty)
-
-def MrdiState.empty : MrdiState := ⟨.empty,.empty⟩
-
-class MrdiType (α : Type u) : Type _ extends ToJson α where
-  mrdiType : MrdiTypeDesc
-  --not using StateM because of universe issues
-  decode? : Json → MrdiState → Except String α
-
-def trivialDecode? [FromJson α] (json : Json) (_ : MrdiState) : Except String α := fromJson? json
 
 structure MrdiData where
   type : MrdiTypeDesc
-  data : Json
+  data : Json := .null
+  deriving BEq
 
 instance : ToJson MrdiData where
   toJson data :=
@@ -58,39 +47,54 @@ instance : FromJson MrdiData where
         }
     | _ => .error "Expected an object"
 
---TODO FromJson instance
 structure Mrdi extends MrdiData where
-  ns : Json
-  refs : Std.TreeMap Uuid MrdiData
+  ns? : Option Json := none
+  refs : Std.TreeMap Uuid Json := .empty
+
+structure MrdiState where
+  refs : Std.TreeMap Uuid Json := .empty
+  resolving : List Uuid := []
+
+def MrdiState.empty : MrdiState := ⟨.empty, []⟩
+
+def MrdiState.withRefs (state : MrdiState) (refs : Std.TreeMap Uuid Json) : MrdiState :=
+  { state with refs := refs.foldl (fun acc uuid mrdi => acc.insert uuid mrdi) state.refs }
+
+class MrdiType (α : Type u) : Type _ extends ToJson α where
+  mrdiType : MrdiTypeDesc
+  decode? : MrdiData → MrdiState → Except String α
+
+def trivialDecode? [FromJson α] (expectedType : MrdiTypeDesc)
+    (mrdi : MrdiData) (_ : MrdiState) : Except String α := do
+  if expectedType != mrdi.type then
+    .error "MRDI type does not match"
+  else
+    fromJson? mrdi.data
 
 instance : ToJson Mrdi where
   toJson mrdi :=
-    if mrdi.refs.isEmpty
-    then .mkObj [
-      ("_ns", mrdi.ns),
+    let fields : List (String × Json) := [
       ("_type", toJson mrdi.type),
       ("data", mrdi.data)
     ]
-    else .mkObj [
-      ("_ns", mrdi.ns),
-      ("_type", toJson mrdi.type),
-      ("_refs", toJson mrdi.refs),
-      ("data", mrdi.data)
-    ]
+    let fields :=
+      match mrdi.ns? with
+      | some ns => ("_ns", ns) :: fields
+      | none => fields
+    let fields :=
+      if mrdi.refs.isEmpty then fields else ("_refs", toJson mrdi.refs) :: fields
+    .mkObj fields.reverse
 
 instance : FromJson Mrdi where
   fromJson? := fun
     | json@(.obj entries) => do
-      -- The json schema seems to allow a file not to have a _ns parameter
-      -- I don't know what we should do with that
-      let .some ns := entries.get? "_ns" | .error "MRDI objects without namespaces are unspported"
-      let dataPart ← fromJson? json
-      let refs : Std.TreeMap Uuid MrdiData <-
-        fromJson? <| entries.getD "refs" (.obj .empty)
+      let dataPart ← fromJson? (α := MrdiData) json
+      let refs : Std.TreeMap Uuid Json <-
+        fromJson? <| entries.getD "_refs" (.obj .empty)
       pure {
         toMrdiData := dataPart
         refs := refs
-        ns := ns
+        ns? := entries.get? "_ns"
       }
     | _ => .error "Expected an object"
 
@@ -103,16 +107,54 @@ def toMrdiData [MrdiType α] (x: α) : MrdiData :=
 def toMrdi [MrdiType α] (x: α) : Mrdi :=
   {
     toMrdiData x with
-    ns := .mkObj [("Lean", .arr #[.str Lean.githubURL, .str Lean.versionString])],
+    ns? := some <| .mkObj [("Lean", .arr #[.str Lean.githubURL, .str Lean.versionString])],
     refs := .empty
   }
-  -- .mkObj [("_ns", .mkObj [
-  --   ("Lean", .arr #[.str Lean.githubURL, .str Lean.versionString])]),
-  --   ("_type", .str $ mrdiName x),
-  --   ("data", toJson x)]
 
--- doesn't implement references yet
+mutual
+
+partial def MrdiState.resolveRef? [MrdiType α] (state : MrdiState) (uuid : Uuid) : Except String α := do
+  if uuid ∈ state.resolving then
+    .error s!"Cyclic MRDI reference: {uuid}"
+  let some mrdiJson := state.refs.get? uuid
+    | .error s!"Unknown MRDI reference: {uuid}"
+  let mrdi : Mrdi ← fromJson? mrdiJson
+  fromMrdiWithState? mrdi { (state.withRefs mrdi.refs) with resolving := uuid :: state.resolving }
+
+partial def fromMrdiWithState? [MrdiType α] (mrdi : Mrdi) (state : MrdiState := .empty) : Except String α := do
+  let state := state.withRefs mrdi.refs
+  MrdiType.decode? { type := mrdi.type, data := mrdi.data } state
+
+end
+
+def MrdiState.decodeRefOrData? [MrdiType α] (state : MrdiState) (json : Json) : Except String α := do
+  match json with
+  | .str uuid =>
+      if state.refs.contains uuid then
+        state.resolveRef? uuid
+      else
+        .error s!"Unknown MRDI reference: {uuid}"
+  | .obj _ =>
+      let mrdiData ← fromJson? (α := MrdiData) json
+      MrdiType.decode? mrdiData state
+  | _ =>
+      .error "Expected an MRDI reference string or inline MRDI data object"
+
 def fromMrdi? [MrdiType α] (mrdi : Mrdi) : Except String α :=
-  if MrdiType.mrdiType α != mrdi.type
-  then .error "MRDI type does not match"
-  else MrdiType.decode? mrdi.data MrdiState.empty
+  fromMrdiWithState? mrdi MrdiState.empty
+
+instance : MrdiType Nat where
+  mrdiType := .string "Lean.Nat"
+  decode? := trivialDecode? (.string "Lean.Nat")
+
+instance : MrdiType Int where
+  mrdiType := .string "Lean.Int"
+  decode? := trivialDecode? (.string "Lean.Int")
+
+instance : MrdiType String where
+  mrdiType := .string "Lean.String"
+  decode? := trivialDecode? (.string "Lean.String")
+
+instance : MrdiType Bool where
+  mrdiType := .string "Lean.Bool"
+  decode? := trivialDecode? (.string "Lean.Bool")

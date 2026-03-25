@@ -12,6 +12,8 @@ Once these initial goals are achieved, the infrastructure that we will develop s
 
 We are supported by [AI For Math fund](https://www.renaissancephilanthropy.org/ai-for-math-fund).
 
+The CAS backend architecture and its current implementation status are documented in [CAS_ARCHITECTURE.md](CAS_ARCHITECTURE.md).
+
 ## How to install Macaulay2
 
 ### macOS

@@ -1,5 +1,6 @@
 import Lean
 import Macaulean.Macaulay2
+import Macaulean.CAS
 
 open Lean Grind Elab Tactic Meta
 
@@ -42,16 +43,16 @@ def macaualy2ProvideFactorization : Tactic := fun stx => do
   | `(tactic| m2factor $x_stx:term) =>
       let x_expr ← elabTermEnsuringType x_stx (.some $ Expr.const ``Nat [])
       let .lit (Literal.natVal x) ← Meta.whnf x_expr | throwTacticEx `m2factor (← getMainGoal) m!"Expected a Nat but got {x_expr}"
-      let m2Server ← globalM2Server
-      let factorization ← m2Server.factorNat x
+      let session ← Macaulean.CAS.globalMacaulay2Session
+      let factorization ← Macaulean.CAS.factorNatUsingBackend session x
       let factorizationExpr ← factorizationExpr factorization
       closeMainGoal `m2factor factorizationExpr
   | _ => throwUnsupportedSyntax
 
 -- This will try to close a goal of the form ¬ Irreducible x
 def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
-  let m2Server <- globalM2Server
-  let factorization <- m2Server.factorNat x
+  let session ← Macaulean.CAS.globalMacaulay2Session
+  let factorization <- Macaulean.CAS.factorNatUsingBackend session x
   match factorization with
     | [] | [(_,0)] | [(_,1)] => throwTacticEx `m2reducible (← getMainGoal) m!"Cannot prove reducibility of {x}"
     | _ =>

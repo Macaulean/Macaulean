@@ -4,6 +4,8 @@ import Lean.Data.Json
 --but I'm using the LSP base protocol to
 --send the messages
 import Lean.Data.Lsp.Communication
+import MRDI.Basic
+import MRDI.Poly
 
 --TODO: consider framing this as a monad instead
 structure Macaulay2 where
@@ -59,3 +61,34 @@ def Macaulay2.factorNat (m2 : Macaulay2) (x : Nat) : IO (List (Nat × Nat)) := d
     match p with
       | [a,b] => (a,b)
       | _ => ⟨1,1⟩) <$> response)
+
+def Macaulay2.quotientRemainderMrdi (m2 : Macaulay2) (poly ideal : Mrdi) : IO (Mrdi × Mrdi) := do
+  let response : Array Mrdi ← m2.sendRequest "quotientRemainder" #[poly, ideal]
+  let some q := response[0]?
+    | throw <| IO.userError "Macaulay2 quotientRemainder returned no quotient"
+  let some r := response[1]?
+    | throw <| IO.userError "Macaulay2 quotientRemainder returned no remainder"
+  pure (q, r)
+
+structure QuotientRemainderPolyRequest where
+  numVars : Nat
+  polyData : MRDI.PolynomialData
+  idealData : Array MRDI.PolynomialData
+  deriving Repr, Lean.ToJson, Lean.FromJson
+
+structure QuotientRemainderPolyResponse where
+  ok : Bool
+  status : String
+  quotients : Array MRDI.PolynomialData
+  remainder : MRDI.PolynomialData
+  deriving Repr, Lean.ToJson, Lean.FromJson
+
+def Macaulay2.quotientRemainderPolyData (m2 : Macaulay2) (numVars : Nat)
+    (polyData : MRDI.PolynomialData) (idealData : Array MRDI.PolynomialData) :
+    IO QuotientRemainderPolyResponse := do
+  let req : QuotientRemainderPolyRequest := {
+    numVars := numVars
+    polyData := polyData
+    idealData := idealData
+  }
+  m2.sendRequest "quotientRemainderPolyData" req

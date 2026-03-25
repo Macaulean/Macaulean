@@ -12,6 +12,42 @@ importFrom_JSONRPC {"handleRequestHelper"}
 
 stderr << "Packages Loaded" << endl
 
+mkZZRing = numVars -> ZZ[apply(numVars, i -> "x" | toString i)]
+
+polyDataToRing = (R, data) -> (
+    sum(apply(data, term -> (
+        coeff := term#0;
+        mon := term#1;
+        coeff * product(mon, vp -> R_(vp#0)^(vp#1))
+    )))
+    )
+
+polyToLeanData = f -> (
+    monsAndCoeffs := coefficients f;
+    mons := flatten entries first monsAndCoeffs;
+    coeffs := flatten entries last monsAndCoeffs;
+    apply(#mons, i -> (
+        expVec := flatten exponents mons#i;
+        {lift(coeffs#i, ZZ), apply(select(#expVec, j -> expVec#j != 0), j -> {j, expVec#j})}
+    ))
+    )
+
+quotientRemainderPolyData = (numVars, polyData, idealData) -> (
+    R := mkZZRing numVars;
+    f := polyDataToRing(R, polyData);
+    gensList := apply(idealData, g -> polyDataToRing(R, g));
+    I := ideal gensList;
+    (q, r) := quotientRemainder(matrix{{f}}, gens I);
+    quotients := flatten entries q;
+    remainderEntries := flatten entries r;
+    hashTable {
+        "ok" => true,
+        "status" => "ok",
+        "quotients" => apply(quotients, polyToLeanData),
+        "remainder" => if #remainderEntries == 0 then {{0, {}}} else polyToLeanData first remainderEntries
+        }
+    )
+
 
 
 --read in a single JSON object from the stream
@@ -103,6 +139,12 @@ registerMethod(server, "testMethod", (expr) -> (
 
 registerMethod(server, "factorInt", (x) -> (
         toList \ toList factor x
+    )
+)
+
+registerMethod(server, "quotientRemainderPolyData", {"numVars", "polyData", "idealData"},
+    (numVars, polyData, idealData) -> (
+        quotientRemainderPolyData(numVars, polyData, idealData)
     )
 )
 

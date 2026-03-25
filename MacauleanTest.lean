@@ -1,3 +1,7 @@
 import MacauleanTest.Poly
+import MacauleanTest.MRDI
+import MacauleanTest.CASBackend
+import MacauleanTest.CASChain
 import MacauleanTest.Factorization
 import MacauleanTest.Benchmarks
+import MacauleanTest.IdealMembership
