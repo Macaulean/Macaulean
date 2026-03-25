@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
 import Macaulean.Grind.Algebra.Defs
+import Init.Grind.FieldNormNum
 
 /-!
 # Standard algebra instances for `grind`
@@ -51,5 +52,22 @@ instance (priority := 99) Ring.toIntAlgebra (A : Type u) [Ring A] : Algebra Int 
   map_mul := Ring.intCast_mul
   commutes := Ring.intCast_mul_comm
   smul_def := fun _ _ => Ring.zsmul_eq_intCast_mul
+
+/-! ### Characteristic-zero fields are Rat-algebras -/
+
+instance (priority := 98) Field.toRatAlgebra (A : Type u) [Field A] [IsCharP A 0] :
+    Algebra Rat A where
+  smul := fun r a => Lean.Grind.Field.NormNum.ofRat r * a
+  toFun := Lean.Grind.Field.NormNum.ofRat
+  map_zero := by
+    simpa [Semiring.natCast_zero] using (Lean.Grind.Field.NormNum.natCast_eq (α := A) 0).symm
+  map_one := by
+    simpa [Semiring.natCast_one] using (Lean.Grind.Field.NormNum.natCast_eq (α := A) 1).symm
+  map_add := Lean.Grind.Field.NormNum.ofRat_add
+  map_mul := Lean.Grind.Field.NormNum.ofRat_mul
+  commutes := fun r x => CommSemiring.mul_comm (Lean.Grind.Field.NormNum.ofRat r) x
+  smul_def := by
+    intro r a
+    rfl
 
 end Lean.Grind

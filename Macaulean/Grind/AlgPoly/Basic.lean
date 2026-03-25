@@ -43,6 +43,15 @@ instance : CoeffRing Int where
   zero := 0; one := 1; add := (· + ·); mul := (· * ·); neg := Int.neg; beq := (· == ·)
   beq_sound := fun _ _ h => decide_eq_true_eq.mp h
 
+instance : CoeffRing Lean.Grind.CommRing.Poly where
+  zero := .num 0
+  one := .num 1
+  add := Lean.Grind.CommRing.Poly.combine
+  mul := Lean.Grind.CommRing.Poly.mul
+  neg := fun p => p.mulConst (-1)
+  beq := (· == ·)
+  beq_sound := fun _ _ h => eq_of_beq h
+
 /--
 Polynomial with coefficients in `C` and variables tracked by `Mon`.
 Invariant: terms sorted by grevlex monomial order (descending).

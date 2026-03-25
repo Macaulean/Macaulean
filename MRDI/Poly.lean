@@ -34,9 +34,9 @@ instance : ToJson Term where
 instance : FromJson Term where
   fromJson? := fun
     | .arr #[c, m] => do
-      let cnat ← c.getNat?
+      let cint ← c.getInt?
       let mon ← fromJson? m
-      pure ⟨cnat, mon⟩
+      pure ⟨cint, mon⟩
     | _ => .error "Expected a pair of a coefficient and a monomial"
 
 /-- A polynomial represented as an array of terms. -/

@@ -2,3 +2,4 @@ import MacauleanTest.Poly
 import MacauleanTest.Factorization
 import MacauleanTest.Benchmarks
 import MacauleanTest.AlgebraNorm
+import MacauleanTest.SumOfSquares

@@ -4,12 +4,30 @@ import Lean.Data.Json
 --but I'm using the LSP base protocol to
 --send the messages
 import Lean.Data.Lsp.Communication
+import MRDI.Poly
 
 --TODO: consider framing this as a monad instead
 structure Macaulay2 where
   requestStream : IO.FS.Stream
   responseStream : IO.FS.Stream
   nextRequestId : IO.Ref Nat
+
+structure SosSummand where
+  weight : Nat
+  poly : MRDI.PolynomialData
+  deriving Repr, Lean.ToJson, Lean.FromJson
+
+structure SosCertificate where
+  ok : Bool
+  status : String
+  scale : Nat
+  summands : Array SosSummand
+  deriving Repr, Lean.ToJson, Lean.FromJson
+
+structure SosCertificateRequest where
+  numVars : Nat
+  polyData : MRDI.PolynomialData
+  deriving Repr, Lean.ToJson, Lean.FromJson
 
 def startM2Server : IO (IO.Process.Child {stdin := .null, stdout := .piped, stderr := .inherit} × Macaulay2) :=
   do let (m2stdin,m2Process) <-
@@ -59,3 +77,8 @@ def Macaulay2.factorNat (m2 : Macaulay2) (x : Nat) : IO (List (Nat × Nat)) := d
     match p with
       | [a,b] => (a,b)
       | _ => ⟨1,1⟩) <$> response)
+
+def Macaulay2.sosCertificateData (m2 : Macaulay2) (numVars : Nat)
+    (poly : MRDI.PolynomialData) : IO SosCertificate :=
+  let req : SosCertificateRequest := { numVars := numVars, polyData := poly }
+  m2.sendRequest "sosCertificate" req
