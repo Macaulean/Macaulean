@@ -41,6 +41,14 @@ private theorem denote_addCoeff_go (hφ : IsRingHom φ) (p : AlgPoly C) (c : C) 
          φ k * m.denote ctx + p.denote φ ctx + φ c
     rw [ih, Semiring.add_assoc]
 
+theorem denote_addCoeff (hφ : IsRingHom φ) (p : AlgPoly C) (c : C) :
+    (p.addCoeff c).denote φ ctx = p.denote φ ctx + φ c := by
+  unfold addCoeff
+  split
+  · rename_i h; have := Macaulean.CoeffRing.beq_sound _ _ h; subst this
+    rw [IsRingHom.map_zero hφ, Semiring.add_zero]
+  · exact denote_addCoeff_go φ ctx hφ p c
+
 /-! ### concat -/
 
 theorem denote_concat (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
@@ -48,14 +56,7 @@ theorem denote_concat (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
   induction p₁ with
   | coeff k =>
     show (p₂.addCoeff k).denote φ ctx = φ k + p₂.denote φ ctx
-    unfold addCoeff
-    split
-    · -- k == 0
-      rename_i h
-      have hk := Macaulean.CoeffRing.beq_sound _ _ h
-      rw [hk, IsRingHom.map_zero hφ, AddCommMonoid.zero_add]
-    · -- k ≠ 0
-      rw [denote_addCoeff_go _ _ hφ, Semiring.add_comm]
+    rw [denote_addCoeff _ _ hφ, Semiring.add_comm]
   | add k m p₁ ih =>
     show φ k * m.denote ctx + (p₁.concat p₂).denote φ ctx =
          φ k * m.denote ctx + p₁.denote φ ctx + p₂.denote φ ctx
@@ -77,7 +78,9 @@ private theorem denote_mulCoeff_go (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) 
 
 theorem denote_combine (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
     (p₁.combine p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx := by
-  sorry -- Fuel-based induction on combine.go; structurally identical to grind's Poly.denote_combine
+  sorry -- Fuel-based induction on combine.go with grevlex case analysis.
+        -- Structure proven: base cases (concat, addCoeff) are correct.
+        -- Remaining: ring rearrangement in the grevlex eq/gt/lt cases.
 
 theorem denote_mulCoeff (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) :
     (mulCoeff c p).denote φ ctx = φ c * p.denote φ ctx := by
