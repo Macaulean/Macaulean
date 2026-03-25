@@ -76,11 +76,47 @@ private theorem denote_mulCoeff_go (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) 
 
 /-! ### Remaining theorems (sorry'd — clear dependency structure) -/
 
+private theorem denote_combine_go (hφ : IsRingHom φ) :
+    (fuel : Nat) → (p₁ p₂ : AlgPoly C) →
+    (combine.go fuel p₁ p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx
+  | 0, p₁, p₂ => denote_concat φ ctx hφ p₁ p₂
+  | _ + 1, .coeff k₁, .coeff k₂ => IsRingHom.map_add hφ k₁ k₂
+  | _ + 1, .coeff k₁, .add k₂ m₂ p₂ => by
+    show ((AlgPoly.add k₂ m₂ p₂).addCoeff k₁).denote φ ctx = _
+    rw [denote_addCoeff φ ctx hφ]; simp [denote]; grind
+  | _ + 1, .add k₁ m₁ p₁, .coeff k₂ => by
+    show ((AlgPoly.add k₁ m₁ p₁).addCoeff k₂).denote φ ctx = _
+    rw [denote_addCoeff φ ctx hφ]; simp [denote]
+  | fuel + 1, .add k₁ m₁ p₁, .add k₂ m₂ p₂ => by
+    simp only [combine.go]
+    split -- grevlex
+    · rename_i hg
+      have hm := CommRing.Mon.eq_of_grevlex hg; subst hm
+      split -- k₁ + k₂ == 0?
+      · rename_i hk
+        have hk := Macaulean.CoeffRing.beq_sound _ _ hk
+        rw [denote_combine_go hφ fuel]; simp only [denote]
+        have : φ k₁ + φ k₂ = 0 := by rw [← IsRingHom.map_add hφ, hk, IsRingHom.map_zero hφ]
+        have : φ k₁ * Mon.denote ctx m₁ + φ k₂ * Mon.denote ctx m₁ = 0 := by
+          rw [← Semiring.right_distrib, this, Semiring.zero_mul]
+        grind
+      · simp only [denote]; rw [denote_combine_go hφ fuel]
+        rw [IsRingHom.map_add hφ, Semiring.right_distrib]
+        -- LHS: φ k₁ * m.d + φ k₂ * m.d + (p₁.d + p₂.d)
+        -- RHS: φ k₁ * m.d + p₁.d + (φ k₂ * m.d + p₂.d)
+        rw [Semiring.add_assoc (φ k₁ * _), Semiring.add_assoc (φ k₁ * _)]
+        congr 1
+        -- φ k₂ * m.d + (p₁.d + p₂.d) = p₁.d + (φ k₂ * m.d + p₂.d)
+        rw [← Semiring.add_assoc, Semiring.add_comm (φ k₂ * _) (denote φ ctx p₁),
+            Semiring.add_assoc]
+    · simp only [denote]; rw [denote_combine_go hφ fuel]; simp [denote, Semiring.add_assoc]
+    · simp only [denote]; rw [denote_combine_go hφ fuel]; simp only [denote]
+      rw [← Semiring.add_assoc, Semiring.add_comm (φ k₂ * _) _, Semiring.add_assoc,
+          Semiring.add_assoc]
+
 theorem denote_combine (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
-    (p₁.combine p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx := by
-  sorry -- Fuel-based induction on combine.go with grevlex case analysis.
-        -- Structure proven: base cases (concat, addCoeff) are correct.
-        -- Remaining: ring rearrangement in the grevlex eq/gt/lt cases.
+    (p₁.combine p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx :=
+  denote_combine_go φ ctx hφ _ p₁ p₂
 
 theorem denote_mulCoeff (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) :
     (mulCoeff c p).denote φ ctx = φ c * p.denote φ ctx := by
