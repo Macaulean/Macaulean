@@ -218,8 +218,26 @@ instance instCoeffRing : CoeffRing (AlgPoly C) where
   neg := neg
   beq := beq
   beq_sound := by
-    intro a b h
-    sorry -- Needs structural induction showing beq reflects equality
+    intro a
+    induction a with
+    | coeff k₁ =>
+      intro b h
+      match b with
+      | .coeff k₂ =>
+        simp [beq] at h
+        exact congrArg _ (Macaulean.CoeffRing.beq_sound _ _ h)
+      | .add _ _ _ => simp [beq] at h
+    | add k₁ m₁ p₁ ih =>
+      intro b h
+      match b with
+      | .coeff _ => simp [beq] at h
+      | .add k₂ m₂ p₂ =>
+        simp only [beq, Bool.and_eq_true] at h
+        obtain ⟨⟨hk, hm⟩, hp⟩ := h
+        have hk' := Macaulean.CoeffRing.beq_sound _ _ hk
+        have hm' := eq_of_beq hm
+        have hp' := ih _ hp
+        subst hk'; subst hm'; subst hp'; rfl
 
 end AlgPoly
 

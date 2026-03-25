@@ -114,6 +114,7 @@ theorem AlgExpr.eq_of_toAlgPoly_eq {C : Type u} {A : Type v}
     (h : e₁.toAlgPoly.beq e₂.toAlgPoly = true) :
     e₁.denote φ ctx = e₂.denote φ ctx := by
   rw [← denote_toAlgPoly φ ctx hφ e₁, ← denote_toAlgPoly φ ctx hφ e₂]
-  sorry -- needs: beq = true → equal → denotes equal (AlgPoly.beq_sound)
+  have heq := @Macaulean.CoeffRing.beq_sound (AlgPoly C) AlgPoly.instCoeffRing _ _ h
+  rw [heq]
 
 end Macaulean

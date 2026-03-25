@@ -164,8 +164,17 @@ theorem denote_sub (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
   show (p₁.combine p₂.neg).denote φ ctx = _
   rw [denote_combine _ _ hφ, denote_neg _ _ hφ, Ring.sub_eq_add_neg]
 
-theorem denote_pow (hφ : IsRingHom φ) (p : AlgPoly C) (k : Nat) :
-    (p.pow k).denote φ ctx = p.denote φ ctx ^ k := by
-  sorry -- match-based recursion in pow makes induction tricky; structurally sound
+theorem denote_pow (hφ : IsRingHom φ) (p : AlgPoly C) : (k : Nat) →
+    (p.pow k).denote φ ctx = p.denote φ ctx ^ k
+  | 0 => by
+    -- pow 0 = one = .add 1 .unit (.coeff 0)
+    simp [pow, one, denote, IsRingHom.map_one hφ, IsRingHom.map_zero hφ,
+          CommRing.Mon.denote, Semiring.mul_one, Semiring.add_zero, Semiring.pow_zero]
+  | 1 => by simp [pow, Semiring.pow_succ, Semiring.pow_zero, Semiring.one_mul]
+  | k + 2 => by
+    show (p.mul (p.pow (k + 1))).denote φ ctx = _
+    rw [denote_mul _ _ hφ, denote_pow hφ p (k + 1), Semiring.pow_succ (n := k)]
+    -- a * (a^k * a) = a^(k+2)
+    grind
 
 end Macaulean.AlgPoly
