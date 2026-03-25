@@ -5,6 +5,7 @@ import Macaulean.Grind.AlgPoly.Tactic
 import Macaulean.Grind.Algebra.Instances
 import Lean.Elab.Tactic.Basic
 import Lean.Meta.Eval
+import Lean.Meta.Tactic.Simp
 import Init.Data.Rat.Lemmas
 import Init.Grind.FieldNormNum
 import Init.Grind.Ordered.Field
@@ -76,6 +77,22 @@ theorem add_nonneg {A : Type} [LE A] [Std.IsPreorder A] [AddCommMonoid A] [Lean.
 theorem zero_nonneg {A : Type} [LE A] [Std.IsPreorder A] [AddCommMonoid A] : 0 ≤ (0 : A) :=
   by
     apply Std.IsPreorder.le_refl
+
+structure SosWitness (A : Type) [Lean.Grind.Field A]
+    [LE A] [LT A] [Std.LawfulOrderLT A] [Std.IsLinearOrder A] [OrderedRing A]
+    [Lean.Grind.Algebra Rat A] (p : A) where
+  scale : Nat
+  scale_pos : 0 < scale
+  witness : A
+  witness_nonneg : 0 ≤ witness
+  equality : Lean.Grind.algebraMap Rat A (scale : Rat) * p = witness
+
+theorem SosWitness.proves_nonneg {A : Type} [Lean.Grind.Field A]
+    [LE A] [LT A] [Std.LawfulOrderLT A] [Std.IsLinearOrder A] [OrderedRing A]
+    [Lean.Grind.Algebra Rat A] {p : A} (w : SosWitness A p) : 0 ≤ p := by
+  have hScaled : 0 ≤ Lean.Grind.algebraMap Rat A (w.scale : Rat) * p := by
+    simpa [w.equality] using w.witness_nonneg
+  exact nonneg_of_natScale_nonneg (A := A) (k := w.scale) w.scale_pos hScaled
 
 private inductive ReflectedVar where
   | indeterminate (idx : Nat)
@@ -182,6 +199,22 @@ private def clearReflectedPoly (poly : Lean.Grind.CommRing.Poly) (vars : Array E
   let (scale, polyData) ← clearRatTerms terms
   pure { scale, vars := indeterminates, polyData }
 
+private def getSmulSimpContext : MetaM Simp.Context := do
+  let mut s : SimpTheorems := {}
+  s ← s.addConst ``Lean.Grind.Algebra.algebraMap_smul_def
+  Simp.mkContext
+    (simpTheorems := #[s])
+    (congrTheorems := (← getSimpCongrTheorems))
+
+private def preprocessSosExpr (e : Expr) : MetaM (Expr × Expr) := do
+  let ctx ← getSmulSimpContext
+  let (r, _) ← Meta.simp e ctx
+  let proof ←
+    match r.proof? with
+    | some h => pure h
+    | none => mkEqRefl e
+  pure (← instantiateMVars r.expr, ← instantiateMVars proof)
+
 private def proveByTactic (goalType : Expr) (tac : Syntax) : TacticM Expr := do
   let mvar ← mkFreshExprMVar goalType
   let savedGoals ← getGoals
@@ -260,6 +293,11 @@ private def mkFinalNonnegProof (A : Expr) (natPosProof hScaledProof : Expr) : Ta
     mkAppM ``Macaulean.SumOfSquares.nonneg_of_natScale_nonnegRat #[natPosProof, hScaledProof]
   else
     mkAppM ``Macaulean.SumOfSquares.nonneg_of_natScale_nonneg #[natPosProof, hScaledProof]
+
+private def mkScaledCongrProof (A scaleExpr polyEqProof : Expr) : TacticM Expr := do
+  let scaledPred ← withLocalDeclD `t A fun t => do
+    mkLambdaFVars #[t] (← mkMul scaleExpr t)
+  mkAppM ``congrArg #[scaledPred, polyEqProof]
 
 private unsafe def monomialToExpr (A : Expr) (vars : Array Expr) (mon : MRDI.Monomial) :
     TacticM Expr := do
@@ -352,67 +390,78 @@ private def getGoalPolyExpr? (target : Expr) : MetaM (Option Expr) := do
     if lhsVal == 0 then pure (some rhs) else pure none
   | _ => pure none
 
-private unsafe def solveNonnegGoal (polyExpr : Expr) : TacticM Unit := withMainContext do
-  let A ← inferType polyExpr
+private def getWitnessPolyExpr? (target : Expr) : MetaM (Option Expr) := do
+  let target ← whnf target
+  if target.getAppFn.constName? == some ``Macaulean.SumOfSquares.SosWitness then
+    pure target.getAppArgs.back?
+  else
+    pure none
+
+private unsafe def buildWitnessExpr (origPolyExpr : Expr) : TacticM Expr := withMainContext do
+  let A ← inferType origPolyExpr
+  let (polyExpr, polyEqProof) ← preprocessSosExpr origPolyExpr
   let (poly, reflectedVars) ← Macaulean.AlgPoly.Reify.evalCoeffPoly polyExpr
   let cleared ← clearReflectedPoly poly reflectedVars
-  if cleared.vars.isEmpty then
-    evalTactic (← `(tactic| grind))
-    return
   let m2Server ← globalM2Server
   let cert ← m2Server.sosCertificateData cleared.vars.size cleared.polyData
   unless cert.ok do
     throwError m!"m2sos failed: {cert.status}"
   if cert.scale == 0 then
     throwError "m2sos returned an invalid zero scale"
-  let mainGoal ← getMainGoal
   let totalScale := cleared.scale * cert.scale
+  let natPosType ← mkAppM ``LT.lt #[mkNatLit 0, mkNatLit totalScale]
+  let natPosProof ← proveByTactic natPosType (← `(tactic| decide))
   if A.isConstOf ``Rat then do
     let (sosExpr, sosProof) ← buildSosExprAndProof mkCoeffExpr A cleared.vars cert.summands
     let scaleExpr ← mkCoeffExpr A (totalScale : Rat)
-    let scaledExpr ← mkMul scaleExpr polyExpr
-    let hEqType ← mkEq scaledExpr sosExpr
-    let hEqProof ← proveByTactic hEqType (← `(tactic| grind))
-    let nonnegPred ← withLocalDeclD `t A fun t => do
-      mkLambdaFVars #[t] (← mkAppM ``LE.le #[← mkZeroOf A, t])
-    let hScaledEq ← mkAppM ``congrArg #[nonnegPred, hEqProof]
-    let hScaledProof ← mkEqMPR hScaledEq sosProof
-    let natPosType ← mkAppM ``LT.lt #[mkNatLit 0, mkNatLit totalScale]
-    let natPosProof ← proveByTactic natPosType (← `(tactic| decide))
-    let finalProof ← mkFinalNonnegProof A natPosProof hScaledProof
-    mainGoal.assign finalProof
-    setGoals ((← getGoals).erase mainGoal)
+    let scaledPreExpr ← mkMul scaleExpr polyExpr
+    let hEqType ← mkEq scaledPreExpr sosExpr
+    let hEqPreProof ← proveByTactic hEqType (← `(tactic| grind))
+    let hEqOrigScaled ← mkScaledCongrProof A scaleExpr polyEqProof
+    let hEqProof ← mkAppM ``Eq.trans #[hEqOrigScaled, hEqPreProof]
+    mkAppM ``Macaulean.SumOfSquares.SosWitness.mk
+      #[mkNatLit totalScale, natPosProof, sosExpr, sosProof, hEqProof]
   else
     let (sosExpr, sosProof) ← buildSosExprAndProof mkReflectCoeffExpr A cleared.vars cert.summands
     let scaleExpr ← mkReflectCoeffExpr A (totalScale : Rat)
-    let scaledExpr ← mkMul scaleExpr polyExpr
-    let hEqType ← mkEq scaledExpr sosExpr
-    let hEqProof ←
+    let scaledPreExpr ← mkMul scaleExpr polyExpr
+    let hEqType ← mkEq scaledPreExpr sosExpr
+    let hEqPreProof ←
       try
         proveByTactic hEqType (← `(tactic| algebra_norm))
       catch _ =>
         proveByTactic hEqType (← `(tactic| grind))
-    let nonnegPred ← withLocalDeclD `t A fun t => do
-      mkLambdaFVars #[t] (← mkAppM ``LE.le #[← mkZeroOf A, t])
-    let hScaledEq ← mkAppM ``congrArg #[nonnegPred, hEqProof]
-    let hScaledProof ← mkEqMPR hScaledEq sosProof
-    let natPosType ← mkAppM ``LT.lt #[mkNatLit 0, mkNatLit totalScale]
-    let natPosProof ← proveByTactic natPosType (← `(tactic| decide))
-    let finalProof ← mkFinalNonnegProof A natPosProof hScaledProof
-    mainGoal.assign finalProof
-    setGoals ((← getGoals).erase mainGoal)
+    let hEqOrigScaled ← mkScaledCongrProof A scaleExpr polyEqProof
+    let hEqProof ← mkAppM ``Eq.trans #[hEqOrigScaled, hEqPreProof]
+    mkAppM ``Macaulean.SumOfSquares.SosWitness.mk
+      #[mkNatLit totalScale, natPosProof, sosExpr, sosProof, hEqProof]
+
+elab "m2sos_witness" : tactic => withMainContext do
+  let goal ← getMainGoal
+  let target ← instantiateMVars (← getMainTarget)
+  let some polyExpr ← getWitnessPolyExpr? target
+    | throwTacticEx `m2sos_witness goal
+        "expected a goal of the form `Macaulean.SumOfSquares.SosWitness p`"
+  let witnessExpr ← unsafe buildWitnessExpr polyExpr
+  goal.assign witnessExpr
+  setGoals ((← getGoals).erase goal)
+
+syntax (name := m2sosWitnessTerm) "m2sos_witness% " term:max : term
+
+macro_rules
+  | `(m2sos_witness% $p) =>
+      `(show Macaulean.SumOfSquares.SosWitness _ $p from by
+          m2sos_witness)
 
 elab "m2sos" : tactic => withMainContext do
-  try
-    evalTactic (← `(tactic| simp only [Lean.Grind.Algebra.algebraMap_smul_def]))
-  catch _ =>
-    pure ()
   let goal ← getMainGoal
   let target ← instantiateMVars (← getMainTarget)
   let some polyExpr ← getGoalPolyExpr? target
     | throwTacticEx `m2sos goal
         "expected a goal of the form `0 ≤ p` over a linearly ordered field with a `Rat`-algebra structure"
-  unsafe do
-    solveNonnegGoal polyExpr
+  let witnessExpr ← unsafe buildWitnessExpr polyExpr
+  let finalProof ← mkAppM ``Macaulean.SumOfSquares.SosWitness.proves_nonneg #[witnessExpr]
+  goal.assign finalProof
+  setGoals ((← getGoals).erase goal)
 
 end Macaulean.SumOfSquares
