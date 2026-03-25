@@ -77,7 +77,7 @@ private theorem denote_mulCoeff_go (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) 
 
 theorem denote_combine (hφ : IsRingHom φ) (p₁ p₂ : AlgPoly C) :
     (p₁.combine p₂).denote φ ctx = p₁.denote φ ctx + p₂.denote φ ctx := by
-  sorry -- Induction on fuel + denote_addCoeff + denote_concat + grevlex case analysis
+  sorry -- Fuel-based induction on combine.go; structurally identical to grind's Poly.denote_combine
 
 theorem denote_mulCoeff (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) :
     (mulCoeff c p).denote φ ctx = φ c * p.denote φ ctx := by
