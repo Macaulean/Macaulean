@@ -22,6 +22,12 @@ structure CheckedQuotientRemainder where
   quotientRemainderJudgment : Judgment
   idealMembershipJudgment? : Option Judgment := none
 
+structure CheckedSumOfSquares where
+  scale : Nat
+  summands : Array SumOfSquaresSummand
+  sumOfSquaresJudgment : Judgment
+  nonnegativityJudgment? : Option Judgment := none
+
 def Macaulay2Session.start : IO Macaulay2Session := do
   let (child, server) ← startM2Server
   let nextArtifactId ← IO.mkRef 0
@@ -52,6 +58,10 @@ def Macaulay2Session.mkStoredArtifact [MrdiType α] (session : Macaulay2Session)
     ref := ref
     artifact := Artifact.ofValue kind value (some <| macaulay2Provenance task)
   }
+
+private def numVarsOfPolynomialData (polyData : MRDI.PolynomialData) : Nat :=
+  polyData.foldl (init := 0) fun acc term =>
+    term.mon.foldl (init := acc) fun acc power => max acc (power.x + 1)
 
 def Macaulay2Session.factorTask (session : Macaulay2Session)
     (request : ResolvedTaskRequest) : IO TaskResult := do
@@ -121,6 +131,44 @@ def Macaulay2Session.quotientRemainderTask (session : Macaulay2Session)
     provenance? := some provenance
   }
 
+def Macaulay2Session.sumOfSquaresTask (session : Macaulay2Session)
+    (request : ResolvedTaskRequest) : IO TaskResult := do
+  let some target := request.inputs[0]?
+    | pure { status := .failure, message? := some "sumOfSquares expects exactly one polynomial artifact" }
+  let .ok polyData := StoredArtifact.decodePayload? (α := MRDI.Poly) target
+    | pure { status := .failure, message? := some "sumOfSquares expects a polynomial payload" }
+  let numVars := numVarsOfPolynomialData polyData.data
+  let response ← session.server.sosCertificateData numVars polyData.data
+  if !response.ok then
+    return {
+      status := .failure
+      provenance? := some <| macaulay2Provenance "sumOfSquares"
+      message? := some response.status
+    }
+  if response.scale == 0 then
+    return {
+      status := .failure
+      provenance? := some <| macaulay2Provenance "sumOfSquares"
+      message? := some "sumOfSquares returned an invalid zero scale"
+    }
+  let scaleArtifact ← session.mkStoredArtifact "sosScale" .scalar response.scale "sumOfSquares"
+  let mut produced : Array StoredArtifact := #[scaleArtifact]
+  let mut summandRefs : Array ArtifactRef := #[]
+  for summand in response.summands do
+    let summandArtifact ← session.mkStoredArtifact "sosSummand" .sumOfSquaresSummand
+      ({ weight := summand.weight, poly := { data := summand.poly } } : SumOfSquaresSummand) "sumOfSquares"
+    produced := produced.push summandArtifact
+    summandRefs := summandRefs.push summandArtifact.ref
+  let judgment := Judgment.sumOfSquares target.ref scaleArtifact.ref summandRefs
+  let certificate := Certificate.sumOfSquaresWitness target.ref scaleArtifact.ref summandRefs
+  pure {
+    status := .success
+    artifacts := produced
+    judgments := #[judgment]
+    certificates := #[certificate]
+    provenance? := some <| macaulay2Provenance "sumOfSquares"
+  }
+
 instance : BackendSession Macaulay2Session where
   name _ := "Macaulay2"
   capabilities _ := pure #[
@@ -135,12 +183,19 @@ instance : BackendSession Macaulay2Session where
       certificateBearing := true
       deterministic := true
       inputKinds := #[.polynomial, .ideal]
-      outputKinds := #[.polynomial, .polynomial] }
+      outputKinds := #[.polynomial, .polynomial] },
+    { task := .sumOfSquares
+      exact := true
+      certificateBearing := true
+      deterministic := true
+      inputKinds := #[.polynomial]
+      outputKinds := #[.scalar, .sumOfSquaresSummand] }
   ]
   runTask session request := do
     match request.task with
     | .factor => session.factorTask request
     | .quotientRemainder => session.quotientRemainderTask request
+    | .sumOfSquares => session.sumOfSquaresTask request
     | other =>
         pure {
           status := .unsupported
@@ -257,6 +312,59 @@ def quotientRemainderUsingBackend (session : Macaulay2Session) (polyData : MRDI.
 def idealMembershipUsingBackend (session : Macaulay2Session) (polyData : MRDI.Poly)
     (idealData : MRDI.Ideal) : IO Bool := do
   return (← quotientRemainderUsingBackend session polyData idealData).idealMembershipJudgment?.isSome
+
+def sumOfSquaresUsingBackend (session : Macaulay2Session) (polyData : MRDI.Poly) :
+    IO CheckedSumOfSquares := do
+  let polyInput : StoredArtifact := {
+    ref := { id := "input:sos:poly" }
+    artifact := Artifact.ofValue .polynomial polyData
+  }
+  let initialState := ChainState.recordArtifacts {} #[polyInput]
+  let step : ChainStep := {
+    backend := "Macaulay2"
+    request := {
+      task := TaskKind.sumOfSquares
+      inputs := #[polyInput.ref]
+    }
+    checker? := some { name := "sumOfSquares" }
+    discharger? := some { name := "sumOfSquaresNonnegativity" }
+  }
+  let outcome ← executeStep session initialState step
+  let state ←
+    match outcome with
+    | .ok state => pure state
+    | .error err => throw <| IO.userError err
+  let some sosJudgment := state.checkedJudgments.find? fun judgment =>
+      match judgment with
+      | .sumOfSquares target _ _ => target == polyInput.ref
+      | _ => false
+    | throw <| IO.userError "sum-of-squares step did not produce a checked SOS judgment"
+  let (.sumOfSquares _ scaleRef summandRefs) := sosJudgment
+    | throw <| IO.userError "unexpected non-SOS judgment"
+  let scaleArtifact ←
+    match state.getArtifact? scaleRef with
+    | .ok artifact => pure artifact
+    | .error err => throw <| IO.userError err
+  let scale ←
+    match StoredArtifact.decodePayload? (α := Nat) scaleArtifact with
+    | .ok scale => pure scale
+    | .error err => throw <| IO.userError err
+  let summandArtifacts ←
+    match state.artifacts.resolveInputs? summandRefs with
+    | .ok artifacts => pure artifacts
+    | .error err => throw <| IO.userError err
+  let summands ← summandArtifacts.toList.mapM fun artifact =>
+    match StoredArtifact.decodePayload? (α := SumOfSquaresSummand) artifact with
+    | .ok summand => pure summand
+    | .error err => throw <| IO.userError err
+  let nonnegativityJudgment? := state.derivedJudgments.find? fun judgment =>
+    judgment == Judgment.nonnegativity polyInput.ref
+  pure {
+    scale := scale
+    summands := summands.toArray
+    sumOfSquaresJudgment := sosJudgment
+    nonnegativityJudgment? := nonnegativityJudgment?
+  }
 
 def macaulay2Backend : BackendFactory where
   Session := Macaulay2Session

@@ -5,6 +5,7 @@ needsPackage "JSONRPC"
 needsPackage "MRDI"
 needsPackage "JSON"
 needsPackage "Parsing"
+needsPackage "SumsOfSquares"
 --get the actual parser from the JSON package so we can run it character by character
 importFrom_JSON {"jsonTextP"}
 --get the helper function from JSONRPC that can take already parsed JSON objects
@@ -13,6 +14,7 @@ importFrom_JSONRPC {"handleRequestHelper"}
 stderr << "Packages Loaded" << endl
 
 mkZZRing = numVars -> ZZ[apply(numVars, i -> "x" | toString i)]
+mkQQRing = numVars -> QQ[apply(numVars, i -> "x" | toString i)]
 
 polyDataToRing = (R, data) -> (
     sum(apply(data, term -> (
@@ -30,6 +32,58 @@ polyToLeanData = f -> (
         expVec := flatten exponents mons#i;
         {lift(coeffs#i, ZZ), apply(select(#expVec, j -> expVec#j != 0), j -> {j, expVec#j})}
     ))
+    )
+
+coeffDen = c -> denominator lift(c, QQ)
+
+polyDenAndInt = f -> (
+    coeffs := flatten entries last coefficients f;
+    d := fold(apply(coeffs, coeffDen), 1, lcm);
+    (d, d * f)
+    )
+
+sosCertificate = (numVars, polyData) -> (
+    R := mkQQRing numVars;
+    f := polyDataToRing(R, polyData);
+    sol := solveSOS f;
+    S := sosPoly sol;
+    if S === null then return hashTable {
+        "ok" => false,
+        "status" => status sol,
+        "scale" => 0,
+        "summands" => {}
+        };
+    gensList := gens S;
+    coeffList := coefficients S;
+    factors := apply(#gensList, i -> (
+        wi := coeffList#i;
+        qi := gensList#i;
+        (di, qiInt) := polyDenAndInt qi;
+        denomFactor := denominator lift(wi, QQ) * di^2;
+        hashTable {
+            "weight" => numerator lift((denominator lift(wi, QQ) * wi), QQ),
+            "denomFactor" => denomFactor,
+            "poly" => polyToLeanData qiInt
+            }
+        ));
+    scale := fold(apply(factors, t -> t#"denomFactor"), 1, lcm);
+    summands := apply(factors, t -> hashTable {
+        "weight" => scale // t#"denomFactor" * t#"weight",
+        "poly" => t#"poly"
+        });
+    lhs := scale * f;
+    rhs := sum(apply(summands, t -> (
+        w := t#"weight";
+        q := polyDataToRing(R, t#"poly");
+        w * q^2
+        )));
+    if lhs =!= rhs then error "internal SOS certificate mismatch";
+    hashTable {
+        "ok" => true,
+        "status" => status sol,
+        "scale" => scale,
+        "summands" => summands
+        }
     )
 
 quotientRemainderPolyData = (numVars, polyData, idealData) -> (
@@ -145,6 +199,12 @@ registerMethod(server, "factorInt", (x) -> (
 registerMethod(server, "quotientRemainderPolyData", {"numVars", "polyData", "idealData"},
     (numVars, polyData, idealData) -> (
         quotientRemainderPolyData(numVars, polyData, idealData)
+    )
+)
+
+registerMethod(server, "sosCertificate", {"numVars", "polyData"},
+    (numVars, polyData) -> (
+        sosCertificate(numVars, polyData)
     )
 )
 

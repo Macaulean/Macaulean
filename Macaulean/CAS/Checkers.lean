@@ -66,6 +66,31 @@ def checkQuotientRemainderCertificate (state : ChainState) (certificate : Certif
   | _ =>
       .error "Certificate is not a quotient-remainder witness"
 
+def checkSumOfSquaresCertificate (state : ChainState) (certificate : Certificate) :
+    Except String Judgment := do
+  match certificate with
+  | .sumOfSquaresWitness target scaleRef summandRefs =>
+      let targetArtifact ← state.getArtifact? target
+      let targetPoly ← targetArtifact.decodePayload? (α := MRDI.Poly)
+      let scaleArtifact ← state.getArtifact? scaleRef
+      let scale ← scaleArtifact.decodePayload? (α := Nat)
+      let summandArtifacts ← state.artifacts.resolveInputs? summandRefs
+      let summands ← summandArtifacts.toList.mapM fun artifact =>
+        artifact.decodePayload? (α := SumOfSquaresSummand)
+      let lhs :=
+        (Lean.Grind.CommRing.PolynomialData.deserialize targetPoly.data).mul
+          (Lean.Grind.CommRing.Poly.num (Int.ofNat scale))
+      let rhsTerms := summands.map fun summand =>
+        let q := Lean.Grind.CommRing.PolynomialData.deserialize summand.poly.data
+        (Lean.Grind.CommRing.Poly.num (Int.ofNat summand.weight)).mul (q.mul q)
+      let rhs := combineMany rhsTerms
+      if lhs == rhs then
+        pure <| Judgment.sumOfSquares target scaleRef summandRefs
+      else
+        .error "Invalid SOS certificate: polynomial identity does not hold"
+  | _ =>
+      .error "Certificate is not a sum-of-squares witness"
+
 def factorizationCertificateChecker : CertificateChecker :=
   { name := { name := "factorization" }
     check := checkFactorizationCertificate }
@@ -74,8 +99,12 @@ def quotientRemainderCertificateChecker : CertificateChecker :=
   { name := { name := "quotientRemainder" }
     check := checkQuotientRemainderCertificate }
 
+def sumOfSquaresCertificateChecker : CertificateChecker :=
+  { name := { name := "sumOfSquares" }
+    check := checkSumOfSquaresCertificate }
+
 def builtinCertificateCheckers : Array CertificateChecker :=
-  #[factorizationCertificateChecker, quotientRemainderCertificateChecker]
+  #[factorizationCertificateChecker, quotientRemainderCertificateChecker, sumOfSquaresCertificateChecker]
 
 def findCertificateChecker? (name : CheckerName) : Option CertificateChecker :=
   builtinCertificateCheckers.find? fun checker => checker.name == name

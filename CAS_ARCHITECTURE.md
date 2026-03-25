@@ -230,6 +230,7 @@ Current built-in certificate checkers:
 
 - factorization certificates
 - quotient-remainder certificates
+- sum-of-squares certificates
 
 The quotient-remainder checker reconstructs exact `Lean.Grind.CommRing.Poly` objects and verifies
 
@@ -243,11 +244,12 @@ Implemented in:
 
 - `Macaulean/CAS/Dischargers.lean`
 
-Current built-in discharger:
+Current built-in dischargers:
 
 - zero remainder implies ideal membership
+- checked sum-of-squares implies a semantic nonnegativity judgment
 
-This is the first example of a theorem-closing step built on top of a checked backend certificate.
+These are the first examples of theorem-closing steps built on top of checked backend certificates.
 
 ### Macaulay2 Backend
 
@@ -261,12 +263,14 @@ Implemented semantic tasks:
 
 - exact factorization of naturals
 - exact quotient-remainder for sparse commutative integer polynomials
+- exact sum-of-squares certificates for sparse commutative integer polynomials
 
 Current public helper APIs on top of the backend:
 
 - `factorNatUsingBackend`
 - `quotientRemainderUsingBackend`
 - `idealMembershipUsingBackend`
+- `sumOfSquaresUsingBackend`
 
 ### User-Facing Vertical Slices
 
@@ -274,12 +278,14 @@ Implemented in:
 
 - `Macaulean/Factorization.lean`
 - `Macaulean/IdealMembership.lean`
+- `Macaulean/SumOfSquares.lean`
 
 Current theorem/tactic-facing slices:
 
 - integer factorization through the checked backend path
 - reducibility via checked factorization
 - ideal membership for explicit generator lists via checked quotient-remainder and derived membership
+- sum-of-squares witness extraction and `0 ≤ p` discharge over `Rat`
 
 The current ideal-membership frontend uses:
 
@@ -288,6 +294,14 @@ The current ideal-membership frontend uses:
 - `m2ideal_member`
 
 The tactic reifies the goal polynomial and the explicit generator list, requests a checked quotient-remainder certificate from Macaulay2, uses the returned quotients as existential witnesses, and closes the final equality in Lean.
+
+The current SOS frontend uses:
+
+- `SosWitness`
+- `m2sos_witness`
+- `m2sos`
+
+It reifies a `Rat` expression into a cleared integer polynomial, requests a checked SOS certificate from the backend, reconstructs the witness expression in Lean, and closes the resulting equality and nonnegativity proof in Lean.
 
 ## Testing
 
@@ -307,13 +321,16 @@ This includes:
 - capability advertisement
 - certified factorization
 - certified quotient-remainder
+- certified sum-of-squares
 - derived ideal membership from zero remainder
-- public quotient-remainder and ideal-membership helper APIs
+- derived nonnegativity from checked sum-of-squares
+- public quotient-remainder, ideal-membership, and SOS helper APIs
 
 ### User-Facing Tests
 
 - `MacauleanTest/Factorization.lean`
 - `MacauleanTest/IdealMembership.lean`
+- `MacauleanTest/SumOfSquares.lean`
 
 The aggregate target is:
 
@@ -323,26 +340,24 @@ At the time of writing, that target passes on this branch except for the pre-exi
 
 ## What Is Still Missing
 
-The branch has established the architecture and two end-to-end slices, but it is not finished.
+The branch has established the architecture and three end-to-end slices, but it is not finished.
 
 The main missing pieces are:
 
-- port sum-of-squares onto this backend/checker/discharger architecture
-- add more certificate families beyond factorization and quotient-remainder
+- generalize the current SOS frontend beyond `Rat`
+- add more certificate families beyond factorization, quotient-remainder, and sum-of-squares
 - enrich the MRDI profile with more explicit ambient/context objects
-- add more theorem-facing frontends beyond explicit-list ideal membership
+- add more theorem-facing frontends beyond explicit-list ideal membership and `Rat`-level SOS
 - generalize beyond the current exact sparse commutative polynomial slice
 
 ## Recommended Next Step
 
-The most important next step is porting the sum-of-squares workflow onto this architecture.
+The most important next step is strengthening the theorem-facing SOS layer.
 
-That would exercise the full intended design:
+The backend/checker/discharger path is now present. The next useful extension is:
 
-- backend task
-- exact certificate transport
-- Lean certificate checker
-- separate order-theoretic discharger
-- thin user-facing tactic
+- transport the checked SOS witness into more general ambient ordered structures
+- make the equality-to-order closing step more reusable across frontends
+- continue enriching the MRDI profile with explicit ambient polynomial context
 
-At that point the branch would have both algebraic and ordered-certificate workflows using the same core execution model.
+That would keep the same core execution model while broadening the user-facing theorem layer.

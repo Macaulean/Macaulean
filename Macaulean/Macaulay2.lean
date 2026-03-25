@@ -13,6 +13,23 @@ structure Macaulay2 where
   responseStream : IO.FS.Stream
   nextRequestId : IO.Ref Nat
 
+structure SosSummand where
+  weight : Nat
+  poly : MRDI.PolynomialData
+  deriving Repr, Lean.ToJson, Lean.FromJson
+
+structure SosCertificate where
+  ok : Bool
+  status : String
+  scale : Nat
+  summands : Array SosSummand
+  deriving Repr, Lean.ToJson, Lean.FromJson
+
+structure SosCertificateRequest where
+  numVars : Nat
+  polyData : MRDI.PolynomialData
+  deriving Repr, Lean.ToJson, Lean.FromJson
+
 def startM2Server : IO (IO.Process.Child {stdin := .null, stdout := .piped, stderr := .inherit} × Macaulay2) :=
   do let (m2stdin,m2Process) <-
       IO.Process.spawn {cmd := "M2"
@@ -92,3 +109,11 @@ def Macaulay2.quotientRemainderPolyData (m2 : Macaulay2) (numVars : Nat)
     idealData := idealData
   }
   m2.sendRequest "quotientRemainderPolyData" req
+
+def Macaulay2.sosCertificateData (m2 : Macaulay2) (numVars : Nat)
+    (polyData : MRDI.PolynomialData) : IO SosCertificate := do
+  let req : SosCertificateRequest := {
+    numVars := numVars
+    polyData := polyData
+  }
+  m2.sendRequest "sosCertificate" req

@@ -1,4 +1,5 @@
 import MRDI.Basic
+import MRDI.Poly
 
 open Lean Json
 
@@ -37,11 +38,17 @@ inductive ArtifactKind where
   | polynomialRing
   | polynomial
   | ideal
+  | sumOfSquaresSummand
   | matrix
   | module
   | judgment
   | certificate
   | backendSpecific (name : String)
+  deriving Repr, BEq, DecidableEq, ToJson, FromJson
+
+structure SumOfSquaresSummand where
+  weight : Nat
+  poly : MRDI.Poly
   deriving Repr, BEq, DecidableEq, ToJson, FromJson
 
 structure Provenance where
@@ -61,6 +68,10 @@ inductive Judgment where
       (quotients : Array ArtifactRef)
       (remainder : ArtifactRef)
   | factorization (target : ArtifactRef) (factors : Array ArtifactRef)
+  | sumOfSquares
+      (target : ArtifactRef)
+      (scale : ArtifactRef)
+      (summands : Array ArtifactRef)
   | nonnegativity (target : ArtifactRef)
   | backendSpecific (name : String) (payload : Json := .null)
   deriving BEq, ToJson, FromJson
@@ -121,6 +132,10 @@ instance : MrdiType ArtifactKind where
 instance : MrdiType Provenance where
   mrdiType := .string "Macaulean.CAS.Provenance"
   decode? := trivialDecode? (.string "Macaulean.CAS.Provenance")
+
+instance : MrdiType SumOfSquaresSummand where
+  mrdiType := .string "Macaulean.CAS.SumOfSquaresSummand"
+  decode? := trivialDecode? (.string "Macaulean.CAS.SumOfSquaresSummand")
 
 instance : MrdiType Judgment where
   mrdiType := .string "Macaulean.CAS.Judgment"

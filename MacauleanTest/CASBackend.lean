@@ -34,6 +34,7 @@ instance : OfNat Expr n where
 
 def qrPoly : MRDI.Poly := { data := (x^3).toPoly.serialize }
 def qrMemberPoly : MRDI.Poly := { data := (x^3 - x*y).toPoly.serialize }
+def sosPoly : MRDI.Poly := { data := (x^2 + y^2).toPoly.serialize }
 def qrIdeal : MRDI.Ideal := {
   numVars := 2
   generators := #[
@@ -66,6 +67,8 @@ def decodeNatArtifact (artifact : StoredArtifact) : IO Nat := do
     "Macaulay2 backend should advertise certified factorization"
   requireIO (caps.any fun cap => cap.task == TaskKind.quotientRemainder && cap.certificateBearing)
     "Macaulay2 backend should advertise certified quotient-remainder"
+  requireIO (caps.any fun cap => cap.task == TaskKind.sumOfSquares && cap.certificateBearing)
+    "Macaulay2 backend should advertise certified SOS"
 
   let result ← BackendSession.runTask session {
     task := TaskKind.factor
@@ -87,11 +90,15 @@ def decodeNatArtifact (artifact : StoredArtifact) : IO Nat := do
   | _ =>
       throw <| IO.userError "factor task returned the wrong certificate shape"
 
-  let unsupported ← BackendSession.runTask session {
+  let sosResult ← BackendSession.runTask session {
     task := TaskKind.sumOfSquares
-    inputs := #[factorInput]
+    inputs := #[{
+      ref := { id := "input:sos" }
+      artifact := Artifact.ofValue .polynomial sosPoly
+    }]
   }
-  requireIO (unsupported.status == TaskStatus.unsupported) "unsupported tasks should report unsupported"
+  requireIO (sosResult.status == TaskStatus.success) "SOS task should succeed on x^2 + y^2"
+  requireIO (sosResult.artifacts.size >= 2) "SOS task should return a scale and at least one summand"
 
   let executed ← executeStep session (ChainState.recordArtifacts {} #[factorInput]) {
     backend := "Macaulay2"
@@ -157,5 +164,11 @@ def decodeNatArtifact (artifact : StoredArtifact) : IO Nat := do
 
   let isNotMember ← idealMembershipUsingBackend session qrPoly qrIdeal
   requireIO (!isNotMember) "idealMembershipUsingBackend should reject non-members"
+
+  let sosWitness ← sumOfSquaresUsingBackend session sosPoly
+  requireIO (sosWitness.scale > 0) "sumOfSquaresUsingBackend should return a positive scale"
+  requireIO (!sosWitness.summands.isEmpty) "sumOfSquaresUsingBackend should return at least one summand"
+  requireIO (sosWitness.nonnegativityJudgment?.isSome)
+    "sumOfSquaresUsingBackend should surface derived nonnegativity"
 
 end MacauleanTest.CASBackend

@@ -25,12 +25,27 @@ def dischargeZeroRemainderIdealMembership (state : ChainState) (judgments : Arra
         pure ()
   pure derived
 
+def dischargeSumOfSquaresNonnegativity (_state : ChainState) (judgments : Array Judgment) :
+    Except String (Array Judgment) := do
+  let mut derived := #[]
+  for judgment in judgments do
+    match judgment with
+    | .sumOfSquares target _ _ =>
+        derived := derived.push <| Judgment.nonnegativity target
+    | _ =>
+        pure ()
+  pure derived
+
 def zeroRemainderIdealMembershipDischarger : JudgmentDischarger :=
   { name := { name := "zeroRemainderIdealMembership" }
     discharge := dischargeZeroRemainderIdealMembership }
 
+def sumOfSquaresNonnegativityDischarger : JudgmentDischarger :=
+  { name := { name := "sumOfSquaresNonnegativity" }
+    discharge := dischargeSumOfSquaresNonnegativity }
+
 def builtinJudgmentDischargers : Array JudgmentDischarger :=
-  #[zeroRemainderIdealMembershipDischarger]
+  #[zeroRemainderIdealMembershipDischarger, sumOfSquaresNonnegativityDischarger]
 
 def findJudgmentDischarger? (name : DischargerName) : Option JudgmentDischarger :=
   builtinJudgmentDischargers.find? fun discharger => discharger.name == name
