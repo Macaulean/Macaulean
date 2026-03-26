@@ -5,3 +5,4 @@ import Macaulean.Macaulay2
 import Macaulean.Factorization
 import Macaulean.IdealMembership
 import Macaulean.SumOfSquares
+import Macaulean.Polyrith

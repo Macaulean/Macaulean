@@ -6,3 +6,4 @@ import MacauleanTest.Factorization
 import MacauleanTest.Benchmarks
 import MacauleanTest.IdealMembership
 import MacauleanTest.SumOfSquares
+import MacauleanTest.Polyrith

@@ -14,12 +14,12 @@ def linearCombination [CommRing R] : List R → List R → R
 def InIdeal [CommRing R] (element : R) (generators : List R) : Prop :=
   ∃ quotients : List R, linearCombination quotients generators = element
 
-private structure PolyReifyState where
+structure PolyReifyState where
   vars : Array Lean.Expr := #[]
 
-private abbrev PolyReifyM := StateRefT PolyReifyState MetaM
+abbrev PolyReifyM := StateRefT PolyReifyState MetaM
 
-private def addVar (e : Lean.Expr) : PolyReifyM Nat := do
+def addVar (e : Lean.Expr) : PolyReifyM Nat := do
   let e ← instantiateMVars e.consumeMData
   let state ← get
   match state.vars.findIdx? fun other => other == e with
@@ -28,7 +28,7 @@ private def addVar (e : Lean.Expr) : PolyReifyM Nat := do
       modify fun state => { state with vars := state.vars.push e }
       pure state.vars.size
 
-private partial def reifyRingExpr (e : Lean.Expr) : PolyReifyM Lean.Grind.CommRing.Expr := do
+partial def reifyRingExpr (e : Lean.Expr) : PolyReifyM Lean.Grind.CommRing.Expr := do
   let e ← instantiateMVars e.consumeMData
   match_expr e with
   | HAdd.hAdd _ _ _ _ a b =>
@@ -70,13 +70,13 @@ private def reifyPolys (element : Lean.Expr) (generators : Array Lean.Expr) :
     ({ data := generatorExpr.toPoly.serialize } : MRDI.Poly)
   pure (state.vars, elementPoly, generatorPolys)
 
-private def mkCoeffExpr (type : Lean.Expr) (k : Int) : MetaM Lean.Expr := do
+def mkCoeffExpr (type : Lean.Expr) (k : Int) : MetaM Lean.Expr := do
   if k < 0 then
     mkAppM ``Neg.neg #[← mkNumeral type k.natAbs]
   else
     mkNumeral type k.natAbs
 
-private def mkPowerExpr (base : Lean.Expr) (k : Nat) : MetaM Lean.Expr := do
+def mkPowerExpr (base : Lean.Expr) (k : Nat) : MetaM Lean.Expr := do
   if k == 0 then
     mkNumeral (← inferType base) 1
   else if k == 1 then
@@ -84,7 +84,7 @@ private def mkPowerExpr (base : Lean.Expr) (k : Nat) : MetaM Lean.Expr := do
   else
     mkAppM ``HPow.hPow #[base, mkNatLit k]
 
-private partial def mkMonomialExpr (type : Lean.Expr) (vars : Array Lean.Expr) (m : Mon) :
+partial def mkMonomialExpr (type : Lean.Expr) (vars : Array Lean.Expr) (m : Mon) :
     MetaM Lean.Expr := do
   match m with
   | .unit =>
@@ -97,7 +97,7 @@ private partial def mkMonomialExpr (type : Lean.Expr) (vars : Array Lean.Expr) (
       | _ =>
           mkMul factor (← mkMonomialExpr type vars rest)
 
-private def mkTermExpr (type : Lean.Expr) (vars : Array Lean.Expr) (k : Int) (m : Mon) :
+def mkTermExpr (type : Lean.Expr) (vars : Array Lean.Expr) (k : Int) (m : Mon) :
     MetaM Lean.Expr := do
   match m with
   | .unit =>
@@ -110,7 +110,7 @@ private def mkTermExpr (type : Lean.Expr) (vars : Array Lean.Expr) (k : Int) (m 
       else
         mkMul (← mkCoeffExpr type k) (← mkMonomialExpr type vars m)
 
-private partial def mkPolyExpr (type : Lean.Expr) (vars : Array Lean.Expr) (p : Poly) :
+partial def mkPolyExpr (type : Lean.Expr) (vars : Array Lean.Expr) (p : Poly) :
     MetaM Lean.Expr := do
   match p with
   | .num k =>
