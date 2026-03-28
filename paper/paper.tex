@@ -13,11 +13,12 @@
 % Used for displaying a sample figure. If possible, figure files should
 % be included in EPS format.
 %
+\usepackage{hyperref}
 % If you use the hyperref package, please uncomment the following two lines
 % to display URLs in blue roman font according to Springer's eBook style:
-%\usepackage{color}
-%\renewcommand\UrlFont{\color{blue}\rmfamily}
-%\urlstyle{rm}
+\usepackage{color}
+\renewcommand\UrlFont{\color{blue}\rmfamily}
+\urlstyle{rm}
 %
 \begin{document}
 %
@@ -63,7 +64,14 @@ This extend abstract discuss our approach and strategy along with current progre
 %
 \section{Design}
 
+\cite{lean}
+\cite{M2}
+
 \section{Implementation}
+
+\cite{jsonrpc}
+\cite{mrdi}
+
 \section{Future Directions}
 
 
@@ -89,27 +97,6 @@ Company X and owns stock in Company Y. Author C is a member of committee Z.
 % BibTeX users should specify bibliography style 'splncs04'.
 % References will then be sorted and formatted in the correct style.
 %
-% \bibliographystyle{splncs04}
-% \bibliography{mybibliography}
-%
-\begin{thebibliography}{8}
-\bibitem{ref_article1}
-Author, F.: Article title. Journal \textbf{2}(5), 99--110 (2016)
-
-\bibitem{ref_lncs1}
-Author, F., Author, S.: Title of a proceedings paper. In: Editor,
-F., Editor, S. (eds.) CONFERENCE 2016, LNCS, vol. 9999, pp. 1--13.
-Springer, Heidelberg (2016). \doi{10.10007/1234567890}
-
-\bibitem{ref_book1}
-Author, F., Author, S., Author, T.: Book title. 2nd edn. Publisher,
-Location (1999)
-
-\bibitem{ref_proc1}
-Author, A.-B.: Contribution title. In: 9th International Proceedings
-on Proceedings, pp. 1--2. Publisher, Location (2010)
-
-\bibitem{ref_url1}
-LNCS Homepage, \url{http://www.springer.com/lncs}, last accessed 2023/10/25
-\end{thebibliography}
+\bibliographystyle{splncs04}
+\bibliography{mybibliography}
 \end{document}
