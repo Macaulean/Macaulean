@@ -96,3 +96,23 @@ Jay showed code for sorting products in monomials.
 We also discussed how to improve performance of manipulations of expressions and polynomials.
 
 ---
+
+## 2026-03-31 Tue - Term 2, Week 12
+
+Last time: handle integer coefficients.
+
+[Spec for CAS](https://github.com/Macaulean/Macaulean/blob/cas-architecture/CAS_ARCHITECTURE.md)
+
+Agree on a spec for the current `ideal_membership` branch:
+* takes as input polynomials with `Nat`/`Int` coefficients, answers ideal membership problem;
+* performant enough to work on some simple examples.
+
+Leave performance and `ZMod p` for a later time.
+
+AI-generated `m2sos` tactic.
+
+Communication in the M2-to-Lean direction: get proof certificates of computations performed initially in M2.
+
+Is it different/harder to verify that the algorithms that M2 uses to multiply polynomials are correct?
+
+---
