@@ -71,6 +71,16 @@ structure FactorizationResult where
   factors : Array (Nat × Nat)
   deriving BEq, ToJson, FromJson
 
+structure GroebnerBasisProblem where
+  ring : PolyRing
+  generators : Array MRDI.PolynomialData
+  order : MonomialOrder := .grevlex
+  deriving BEq, ToJson, FromJson
+
+structure GroebnerBasisResult where
+  generators : Array MRDI.PolynomialData
+  deriving BEq, ToJson, FromJson
+
 -- ============================================================================
 -- MrdiType instances (kind-level descriptors, ring context in payload)
 -- ============================================================================
@@ -110,5 +120,13 @@ instance : MrdiType ReductionResult where
 instance : MrdiType FactorizationResult where
   mrdiType := .string "factorization_result"
   decode? := trivialDecode? (.string "factorization_result")
+
+instance : MrdiType GroebnerBasisProblem where
+  mrdiType := .string "groebner_basis_problem"
+  decode? := trivialDecode? (.string "groebner_basis_problem")
+
+instance : MrdiType GroebnerBasisResult where
+  mrdiType := .string "groebner_basis_result"
+  decode? := trivialDecode? (.string "groebner_basis_result")
 
 end MRDI.CAS

@@ -2,5 +2,6 @@
 -- Import modules here that should be built as part of the library.
 import Macaulean.Basic
 import Macaulean.Macaulay2
+import Macaulean.SymPy
 import Macaulean.Factorization
 import Macaulean.IdealMembership
