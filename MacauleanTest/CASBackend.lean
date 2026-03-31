@@ -1,10 +1,9 @@
-import Macaulean.CAS
-import Macaulean.Serialize
-
-open Lean.Grind.CommRing
+import Macaulean
+import MRDI.CAS
 
 open Lean Json
 open Macaulean.CAS
+open MRDI.CAS
 
 namespace MacauleanTest.CASBackend
 
@@ -12,150 +11,63 @@ def requireIO (cond : Bool) (msg : String) : IO Unit :=
   unless cond do
     throw <| IO.userError msg
 
-def factorInput : StoredArtifact :=
-  { ref := { id := "input:nat:12" }
-    artifact := Artifact.ofValue .scalar (12 : Nat) }
-
-def x : Expr := .var 0
-def y : Expr := .var 1
-
-instance : Add Expr where
-  add a b := .add a b
-instance : Sub Expr where
-  sub a b := .sub a b
-instance : Neg Expr where
-  neg a := .neg a
-instance : Mul Expr where
-  mul a b := .mul a b
-instance : HPow Expr Nat Expr where
-  hPow a k := .pow a k
-instance : OfNat Expr n where
-  ofNat := .num n
-
-def qrPoly : MRDI.Poly := { data := (x^3).toPoly.serialize }
-def qrMemberPoly : MRDI.Poly := { data := (x^3 - x*y).toPoly.serialize }
-def qrIdeal : MRDI.Ideal := {
-  numVars := 2
-  generators := #[
-    (x^2 - y).toPoly.serialize,
-    (y^2).toPoly.serialize
-  ]
-}
-
-def qrPolyInput : StoredArtifact :=
-  { ref := { id := "input:poly:x3" }
-    artifact := Artifact.ofValue .polynomial qrPoly }
-
-def qrIdealInput : StoredArtifact :=
-  { ref := { id := "input:ideal:test" }
-    artifact := Artifact.ofValue .ideal qrIdeal }
-
-def qrMemberPolyInput : StoredArtifact :=
-  { ref := { id := "input:poly:member" }
-    artifact := Artifact.ofValue .polynomial qrMemberPoly }
-
-def decodeNatArtifact (artifact : StoredArtifact) : IO Nat := do
-  match StoredArtifact.decodePayload? (α := Nat) artifact with
-  | .ok n => pure n
-  | .error err => throw <| IO.userError err
-
+-- Test that backends and strategies are registered
 #eval do
-  let session ← Macaulay2Session.start
-  let caps ← BackendSession.capabilities session
-  requireIO (caps.any fun cap => cap.task == TaskKind.factor && cap.certificateBearing)
-    "Macaulay2 backend should advertise certified factorization"
-  requireIO (caps.any fun cap => cap.task == TaskKind.quotientRemainder && cap.certificateBearing)
-    "Macaulay2 backend should advertise certified quotient-remainder"
+  let backends ← getRegisteredBackends
+  requireIO (backends.any fun b => b.name == `Macaulay2)
+    "Macaulay2 backend should be registered"
 
-  let result ← BackendSession.runTask session {
-    task := TaskKind.factor
-    inputs := #[factorInput]
-  }
-  requireIO (result.status == TaskStatus.success) "factor task should succeed"
-  requireIO (result.artifacts.size == 3) "factor task should return three prime factors for 12"
+  let strategies ← getRegisteredStrategies
+  requireIO (strategies.any fun s => s.name == `idealMembership)
+    "idealMembership strategy should be registered"
+  requireIO (strategies.any fun s => s.name == `reducibility)
+    "reducibility strategy should be registered"
 
-  let factors ← result.artifacts.toList.mapM decodeNatArtifact
-  requireIO (factors == [2, 2, 3]) s!"unexpected factorization payloads: {factors}"
+-- Test factorization via CAS backend
+#eval do
+  let ctx ← mkCASContext
+  try
+    let problem : FactorizationProblem := { n := 12 }
+    let response ← ctx.call (toMrdi problem)
+    let result ← match fromMrdi? (α := FactorizationResult) response with
+      | .ok (r : FactorizationResult) => pure r
+      | .error e => throw <| IO.userError s!"decode failed: {e}"
+    requireIO (result.factors.size > 0) "factorization should return factors"
+    let mut product : Nat := 1
+    for (p, e) in result.factors do
+      product := product * p ^ e
+    requireIO (product == 12) s!"factors of 12 should multiply to 12, got {product}"
+  finally
+    ctx.cleanup
 
-  let some cert := result.certificates[0]?
-    | throw <| IO.userError "factor task should return a certificate"
-  match cert with
-  | Certificate.factorizationWitness target factors =>
-      requireIO (target == factorInput.ref) "factorization certificate should point to the input artifact"
-      requireIO (factors == result.artifacts.map (fun (artifact : StoredArtifact) => artifact.ref))
-        "factorization certificate should point to produced factor artifacts"
-  | _ =>
-      throw <| IO.userError "factor task returned the wrong certificate shape"
-
-  let unsupported ← BackendSession.runTask session {
-    task := TaskKind.sumOfSquares
-    inputs := #[factorInput]
-  }
-  requireIO (unsupported.status == TaskStatus.unsupported) "unsupported tasks should report unsupported"
-
-  let executed ← executeStep session (ChainState.recordArtifacts {} #[factorInput]) {
-    backend := "Macaulay2"
-    request := {
-      task := TaskKind.factor
-      inputs := #[factorInput.ref]
+-- Test reduction via CAS backend
+#eval do
+  let ctx ← mkCASContext
+  try
+    let ring : PolyRing := { coeff := .int, vars := #["x", "y"] }
+    let elementData : MRDI.PolynomialData := #[
+      ⟨1, #[⟨0, 3⟩]⟩,
+      ⟨-1, #[⟨0, 1⟩, ⟨1, 1⟩]⟩
+    ]
+    let gen1Data : MRDI.PolynomialData := #[
+      ⟨1, #[⟨0, 2⟩]⟩,
+      ⟨-1, #[⟨1, 1⟩]⟩
+    ]
+    let gen2Data : MRDI.PolynomialData := #[
+      ⟨1, #[⟨1, 2⟩]⟩
+    ]
+    let problem : ReductionProblem := {
+      element := { ring, data := elementData }
+      ideal := { ring, generators := #[gen1Data, gen2Data] }
+      order := .grevlex
     }
-    checker? := some { name := "factorization" }
-  }
-  let state ←
-    match executed with
-    | .ok state => pure state
-    | .error err => throw <| IO.userError err
-  requireIO (state.checkedJudgments.size == 1) "executeStep should record one checked factorization judgment"
-
-  let qrResult ← BackendSession.runTask session {
-    task := TaskKind.quotientRemainder
-    inputs := #[qrPolyInput, qrIdealInput]
-  }
-  requireIO (qrResult.status == TaskStatus.success) "quotient-remainder task should succeed"
-  requireIO (qrResult.artifacts.size == 3) "quotient-remainder should return two quotients and one remainder"
-
-  let executedQr ← executeStep session (ChainState.recordArtifacts {} #[qrPolyInput, qrIdealInput]) {
-    backend := "Macaulay2"
-    request := {
-      task := TaskKind.quotientRemainder
-      inputs := #[qrPolyInput.ref, qrIdealInput.ref]
-    }
-    checker? := some { name := "quotientRemainder" }
-  }
-  let qrState ←
-    match executedQr with
-    | .ok state => pure state
-    | .error err => throw <| IO.userError err
-  requireIO (qrState.checkedJudgments.size == 1)
-    "executeStep should record one checked quotient-remainder judgment"
-
-  let executedMemberQr ← executeStep session (ChainState.recordArtifacts {} #[qrMemberPolyInput, qrIdealInput]) {
-    backend := "Macaulay2"
-    request := {
-      task := TaskKind.quotientRemainder
-      inputs := #[qrMemberPolyInput.ref, qrIdealInput.ref]
-    }
-    checker? := some { name := "quotientRemainder" }
-    discharger? := some { name := "zeroRemainderIdealMembership" }
-  }
-  let memberState ←
-    match executedMemberQr with
-    | .ok state => pure state
-    | .error err => throw <| IO.userError err
-  requireIO (memberState.derivedJudgments ==
-      #[Judgment.idealMembership qrMemberPolyInput.ref qrIdealInput.ref])
-    "zero-remainder discharger should derive ideal membership"
-
-  let qrWitness ← quotientRemainderUsingBackend session qrMemberPoly qrIdeal
-  requireIO (qrWitness.quotients.size == 2)
-    "quotientRemainderUsingBackend should expose both quotient artifacts"
-  requireIO (qrWitness.idealMembershipJudgment?.isSome)
-    "quotientRemainderUsingBackend should surface derived ideal membership"
-
-  let isMember ← idealMembershipUsingBackend session qrMemberPoly qrIdeal
-  requireIO isMember "idealMembershipUsingBackend should report a zero-remainder member"
-
-  let isNotMember ← idealMembershipUsingBackend session qrPoly qrIdeal
-  requireIO (!isNotMember) "idealMembershipUsingBackend should reject non-members"
+    let response ← ctx.call (toMrdi problem)
+    let result ← match fromMrdi? (α := ReductionResult) response with
+      | .ok (r : ReductionResult) => pure r
+      | .error e => throw <| IO.userError s!"decode failed: {e}"
+    let remainderPoly := Lean.Grind.CommRing.PolynomialData.deserialize result.remainder
+    requireIO (remainderPoly == Lean.Grind.CommRing.Poly.num 0) "remainder should be zero for ideal member"
+  finally
+    ctx.cleanup
 
 end MacauleanTest.CASBackend

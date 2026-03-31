@@ -1,21 +1,20 @@
 import Lean
-import Macaulean.Macaulay2
-import Macaulean.CAS
+import Macaulean.CAS.Strategy
+import Macaulean.CAS.Tactic
+import MRDI.CAS
 
 open Lean Grind Elab Tactic Meta
+open MRDI.CAS
 
---based on mathlib
+-- ============================================================================
+-- Mathematical definitions (unchanged)
+-- ============================================================================
 
---instead of what mathlib does which is setting up the class of all units and asking if the element belongs to it
---for simplicity we just check if the element has an inverse
 abbrev IsUnit [CommSemiring R] (a : R) : Prop :=
   ∃ b : R, b*a = 1
 
---this is copied directly from mathlib
 structure Irreducible [CommSemiring R] (p : R) : Prop where
-  /-- An irreducible element is not a unit. -/
   not_isUnit : ¬IsUnit p
-  /-- If an irreducible element factors, then one factor is a unit. -/
   isUnit_or_isUnit ⦃a b : R⦄ : p = a * b → IsUnit a ∨ IsUnit b
 
 theorem factorizationImpliesReducible {a b : R} [CommSemiring R] : ¬ (IsUnit a ∨ IsUnit b) → ¬ Irreducible (a * b) := by
@@ -34,50 +33,92 @@ def factorizationExpr (factorization : List (Nat × Nat)) : MetaM Expr := do
     mkProductExpr a b := mkAppM ``HMul.hMul #[a,b]
     mkPowerExpr a b := mkAppM ``HPow.hPow #[a,b]
 
---this syntax command is based on the one for intro, correct if wrong
+-- ============================================================================
+-- Shared: call CAS for factorization
+-- ============================================================================
+
+private def callFactorNat (ctx : Macaulean.CAS.CASContext) (n : Nat) : TacticM (List (Nat × Nat)) := do
+  let problem : FactorizationProblem := { n }
+  let response ← ctx.call (toMrdi problem)
+  let result ← match fromMrdi? (α := FactorizationResult) response with
+    | .ok r => pure r
+    | .error e => throwError s!"Failed to decode factorization result: {e}"
+  pure result.factors.toList
+
+-- ============================================================================
+-- Strategy: Factorization (m2factor)
+-- ============================================================================
+
+private def executeFactorNat (_ : Macaulean.CAS.CASContext) (goal : MVarId) :
+    TacticM (List MVarId) := do
+  throwTacticEx `cas goal "factorNat strategy should be called via m2factor wrapper"
+
+-- ============================================================================
+-- Strategy: Reducibility (¬ Irreducible n)
+-- ============================================================================
+
+private def executeReducibility (ctx : Macaulean.CAS.CASContext) (goal : MVarId) :
+    TacticM (List MVarId) := do
+  let target ← goal.getType
+  let (``Not, #[irrExpr]) := target.getAppFnArgs
+    | throwTacticEx `cas goal "Expected a goal of the form ¬ Irreducible x"
+  let (``Irreducible, #[_, _, irrTarget]) := irrExpr.getAppFnArgs
+    | throwTacticEx `cas goal "Expected a goal of the form ¬ Irreducible x"
+  let .lit (Literal.natVal x) ← whnf irrTarget
+    | throwTacticEx `cas goal "Expected a goal of the form ¬ Irreducible x"
+  let factorization ← callFactorNat ctx x
+  match factorization with
+  | [] | [(_, 0)] | [(_, 1)] =>
+      throwTacticEx `cas goal m!"Cannot prove reducibility of {x}"
+  | _ =>
+      let factoredExpr ← factorizationExpr factorization
+      let factorEqExpr ← mkAppM ``Eq #[mkNatLit x, factoredExpr]
+      let factorizationMVarExpr ← mkFreshExprMVar $ .some factorEqExpr
+      let factorizationMVarId := factorizationMVarExpr.mvarId!
+      pushGoal factorizationMVarId
+      _ ← runTactic factorizationMVarId (← `(tactic| decide))
+      let rewriteResult ← goal.rewrite (← goal.getType) factorizationMVarExpr
+      let newGoal ← goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
+      setGoals [newGoal]
+      setGoals (← newGoal.apply $ mkConst ``factorizationImpliesReducible [.zero])
+      _ ← runTactic (← getMainGoal) (← `(tactic| grind))
+      pure []
+
+initialize do
+  Macaulean.CAS.registerCASStrategy {
+    name := `reducibility
+    priority := 1000
+    match? := fun goal => do
+      let target ← goal.getType
+      let (fn, args) := target.getAppFnArgs
+      if fn == ``Not then
+        if let #[irrExpr] := args then
+          return irrExpr.isAppOf ``Irreducible
+      pure false
+    execute := executeReducibility
+  }
+
+-- ============================================================================
+-- Legacy tactic wrappers
+-- ============================================================================
+
 syntax (name := m2factor) "m2factor" notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
 @[tactic m2factor]
-def macaualy2ProvideFactorization : Tactic := fun stx => do
+def macaulay2ProvideFactorization : Tactic := fun stx => do
   match stx with
   | `(tactic| m2factor $x_stx:term) =>
       let x_expr ← elabTermEnsuringType x_stx (.some $ Expr.const ``Nat [])
-      let .lit (Literal.natVal x) ← Meta.whnf x_expr | throwTacticEx `m2factor (← getMainGoal) m!"Expected a Nat but got {x_expr}"
-      let session ← Macaulean.CAS.globalMacaulay2Session
-      let factorization ← Macaulean.CAS.factorNatUsingBackend session x
-      let factorizationExpr ← factorizationExpr factorization
-      closeMainGoal `m2factor factorizationExpr
+      let .lit (Literal.natVal x) ← Meta.whnf x_expr
+        | throwTacticEx `m2factor (← getMainGoal) m!"Expected a Nat but got {x_expr}"
+      let ctx ← Macaulean.CAS.mkCASContext
+      try
+        let factorization ← callFactorNat ctx x
+        let factorizationExpr ← factorizationExpr factorization
+        closeMainGoal `m2factor factorizationExpr
+      finally
+        ctx.cleanup
   | _ => throwUnsupportedSyntax
 
--- This will try to close a goal of the form ¬ Irreducible x
-def macaulay2ProveReducible (x : Nat) : TacticM Unit := do
-  let session ← Macaulean.CAS.globalMacaulay2Session
-  let factorization <- Macaulean.CAS.factorNatUsingBackend session x
-  match factorization with
-    | [] | [(_,0)] | [(_,1)] => throwTacticEx `m2reducible (← getMainGoal) m!"Cannot prove reducibility of {x}"
-    | _ =>
-        let factoredExpr ← factorizationExpr factorization
-        let factorEqExpr ← mkAppM ``Eq #[mkNatLit x, factoredExpr]
-        let factorizationMVarExpr ← mkFreshExprMVar $ .some factorEqExpr
-        let factorizationMVarId := factorizationMVarExpr.mvarId!
-        pushGoal factorizationMVarId
-        --use decide to prove that the factorization is a factorization
-        _ ← runTactic factorizationMVarId (← `(tactic|decide))
-        --rewrite the goal with the expression
-        let goal ← getMainGoal
-        let rewriteResult ← goal.rewrite (← getMainTarget) factorizationMVarExpr -- (symm := true)
-        let newGoal ← goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
-        setGoals [newGoal]
-        --use the factorization implies reducible theorem
-        setGoals (← newGoal.apply $ mkConst ``factorizationImpliesReducible [.zero])
-        --get grind to prove that things are not units
-        _ ← runTactic (← getMainGoal) (← `(tactic|grind))
-        pure ()
-
 elab "m2reducible" : tactic => do
-  let goal ← getMainGoal
-  let target ← getMainTarget
-  let (``Not,#[irrExpr]) := target.getAppFnArgs | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
-  let (``Irreducible,#[_,_,irrTarget]) := irrExpr.getAppFnArgs | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
-  let .lit (Literal.natVal x) ← whnf irrTarget | throwTacticEx `m2reducible goal "Expected a goal of the form ¬ Irreducible x"
-  macaulay2ProveReducible x
+  evalTactic (← `(tactic| cas))

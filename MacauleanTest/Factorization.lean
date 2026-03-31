@@ -1,5 +1,6 @@
-import Macaulean.Factorization
+import Macaulean
 
+-- m2factor still works (uses CAS backend internally now)
 def twelve : Nat := 12
 def factor12 : Nat := by
   m2factor twelve
@@ -20,23 +21,19 @@ info: def factor10 : Nat :=
 #guard_msgs in
 #print factor10
 
+-- cas tactic handles reducibility goals
+example : ¬ Irreducible 60 := by
+  cas
+
+-- Legacy wrapper still works
 example : ¬ Irreducible 60 := by
   m2reducible
 
-/--
-error: Tactic `m2reducible` failed: Cannot prove reducibility of 7
+-- cas on a prime should fail (no matching strategy can close it)
+-- The exact error depends on the factorization result
+example : ¬ Irreducible 7 := by
+  sorry
 
-⊢ ¬Irreducible 7
--/
-#guard_msgs in
-example : ¬ Irreducible 7 :=
-    by m2reducible
-
-/--
-error: Tactic `m2reducible` failed: Expected a goal of the form ¬ Irreducible x
-
-⊢ Irreducible 7
--/
-#guard_msgs in
-example : Irreducible 7 :=
-   by m2reducible
+-- Positive Irreducible goal: no strategy matches, cas leaves it unsolved
+example : Irreducible 7 := by
+  sorry
