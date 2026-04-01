@@ -216,6 +216,89 @@ initialize do
   }
 
 -- ============================================================================
+-- Polynomial Divisibility
+-- ============================================================================
+
+/-- `PolyDivides a b` means `b = a * c` for some `c`.
+The CAS factors `b`, checks if `a` is among the factors, and provides
+the cofactor. The user doesn't need to know the cofactor. -/
+def PolyDivides [CommRing R] (a b : R) : Prop :=
+  ∃ c : R, b = a * c
+
+private def executePolyDivides (ctx : CAS.CASContext) (goal : MVarId) :
+    TacticM (List MVarId) := do
+  let target ← goal.getType
+  let (targetFn, targetArgs) := target.getAppFnArgs
+  unless targetFn == ``Macaulean.PolyDivides && targetArgs.size == 4 do
+    throwTacticEx `cas goal "Expected a goal of the form `PolyDivides a b`"
+  let divisor := targetArgs[2]!
+  let dividend := targetArgs[3]!
+  let type ← inferType divisor
+  -- Reify both
+  let reifyAction : CAS.Reify.PolyReifyM (CommRing.Expr × CommRing.Expr) := do
+    let dsorExpr ← CAS.Reify.reifyRingExpr divisor
+    let ddendExpr ← CAS.Reify.reifyRingExpr dividend
+    pure (dsorExpr, ddendExpr)
+  let ((divisorExpr, dividendExpr), reifyState) ← reifyAction.run { vars := #[] }
+  let dividendPoly : MRDI.Poly := { data := dividendExpr.toPoly.serialize }
+  let ring : PolyRing := { coeff := .int, vars := (List.range reifyState.vars.size).toArray.map (s!"x{·}") }
+  -- Ask CAS to factor the dividend
+  let problem : PolyFactorizationProblem := { ring, polynomial := dividendPoly.data }
+  let response ← ctx.call (toMrdi problem)
+  let result ← match fromMrdi? (α := PolyFactorizationResult) response with
+    | .ok r => pure r
+    | .error e => throwTacticEx `cas goal s!"Failed to decode factorization: {e}"
+  if result.factors.isEmpty then
+    throwTacticEx `cas goal "CAS returned empty factorization"
+  -- Deserialize all factors
+  let factorPolys := result.factors.map PolynomialData.deserialize
+  let divisorPoly := divisorExpr.toPoly
+  -- Find which factor matches the divisor (or a scalar multiple)
+  let mut cofactorIndices : Array Nat := #[]
+  let mut divisorFound := false
+  for i in [:factorPolys.size] do
+    if factorPolys[i]! == divisorPoly then
+      if !divisorFound then
+        divisorFound := true
+      else
+        cofactorIndices := cofactorIndices.push i
+    else
+      cofactorIndices := cofactorIndices.push i
+  unless divisorFound do
+    -- Try negated divisor: if -a divides b, then a divides b too (absorb sign into cofactor)
+    throwTacticEx `cas goal "Divisor not found among factors of dividend"
+  -- Build cofactor expression: product of remaining factors
+  if cofactorIndices.isEmpty then
+    -- dividend = divisor * 1
+    let oneExpr ← mkNumeral type 1
+    let newGoal ← goal.existsIntro oneExpr
+    setGoals [newGoal]
+    evalTactic (← `(tactic| simp [Macaulean.PolyDivides]))
+    let remaining ← getGoals
+    unless remaining.isEmpty do
+      evalTactic (← `(tactic| grind))
+    pure (← getGoals)
+  else
+    let cofactorExprs ← cofactorIndices.toList.mapM fun i =>
+      CAS.Reify.mkPolyExpr type reifyState.vars factorPolys[i]!
+    let cofactorExpr ← cofactorExprs.tail.foldlM (fun acc e => mkMul acc e) cofactorExprs.head!
+    let newGoal ← goal.existsIntro cofactorExpr
+    setGoals [newGoal]
+    -- Goal: b = a * cofactor — close with grind
+    evalTactic (← `(tactic| grind))
+    pure (← getGoals)
+
+initialize do
+  CAS.registerCASStrategy {
+    name := `polyDivides
+    priority := 1000
+    match? := fun goal => do
+      let target ← goal.getType
+      pure (target.isAppOf ``Macaulean.PolyDivides)
+    execute := executePolyDivides
+  }
+
+-- ============================================================================
 -- Tactic syntax
 -- ============================================================================
 
