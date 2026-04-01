@@ -54,6 +54,43 @@ example {R : Type} [CommRing R] (x : R) :
   cas
 
 -- ============================================================================
+-- Harder tests: push computational boundary
+-- ============================================================================
+
+-- Cyclotomic: (x²+x+1) divides (x⁶-1). Cofactor is (x-1)(x+1)(x²-x+1).
+-- Non-obvious factorization — 6 irreducible factors of x⁶-1 over ZZ.
+example {R : Type} [CommRing R] (x : R) :
+    Macaulean.PolyDivides (x ^ 2 + x + 1) (x ^ 6 - 1) := by
+  cas
+
+-- 4-variable ideal membership with 16-term polynomial.
+-- f = q₁g₁ + q₂g₂ + q₃g₃ where:
+--   g₁ = x² + yz - w,  g₂ = y² + xw - z,  g₃ = z² + xy - w²
+--   q₁ = x³ - yz + w²,  q₂ = yx² + z²w,  q₃ = zw - xy²
+-- The CAS has to find these quotients from a 16-term expanded polynomial.
+example {R : Type} [CommRing R] (x y z w : R) :
+    Macaulean.InIdeal
+      (x ^ 5 + x ^ 3 * y * z - 2 * x ^ 2 * y * z + w ^ 2 * x ^ 2
+       + w ^ 2 * x * y ^ 2 + w ^ 2 * x * z ^ 2 + w ^ 2 * y * z
+       + w * x ^ 3 * y - w * x ^ 3 + w * x * y * z + w * y ^ 2 * z ^ 2
+       + w * y * z - x * y ^ 2 * z ^ 2 - y ^ 2 * z ^ 2
+       - w ^ 3 * z - w ^ 3)
+      [x ^ 2 + y * z - w, y ^ 2 + x * w - z, z ^ 2 + x * y - w ^ 2] := by
+  cas
+
+-- Radical membership with higher power: xy ∈ √⟨x³, y³⟩
+-- because (xy)³ = x³y³ ∈ ⟨x³, y³⟩. CAS finds n=3.
+example {R : Type} [CommRing R] (x y : R) :
+    Macaulean.InRadical (x * y) [x ^ 3, y ^ 3] := by
+  cas
+
+-- Divisibility in 3 variables: (x+y+z) | (x³+y³+z³-3xyz)
+-- The cofactor is (x²+y²+z²-xy-xz-yz) — non-obvious.
+example {R : Type} [CommRing R] (x y z : R) :
+    Macaulean.PolyDivides (x + y + z) (x ^ 3 + y ^ 3 + z ^ 3 - 3 * x * y * z) := by
+  cas
+
+-- ============================================================================
 -- Backend-level factorization tests (verify CAS computes correct factors)
 -- ============================================================================
 
