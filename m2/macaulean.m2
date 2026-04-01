@@ -148,6 +148,25 @@ registerMethod(server, "quotientRemainderPolyData", {"numVars", "polyData", "ide
     )
 )
 
+groebnerBasisPolyData = (numVars, generators, order) -> (
+    R := mkZZRing numVars;
+    gensList := apply(generators, g -> polyDataToRing(R, g));
+    I := ideal gensList;
+    -- order is a string: "lex", "grlex", "grevlex"
+    -- M2 uses GRevLex by default; for now we compute with the default ring order
+    G := gb I;
+    basisPolys := flatten entries gens G;
+    hashTable {
+        "generators" => apply(basisPolys, polyToLeanData)
+        }
+    )
+
+registerMethod(server, "groebnerBasis", {"numVars", "generators", "order"},
+    (numVars, generators, order) -> (
+        groebnerBasisPolyData(numVars, generators, order)
+    )
+)
+
 macauleanMainLoop(server, stdio);
 -- inputJSON = fromJSONStream stdio;
 -- stdio << toExternalString sum inputJSON << endl;

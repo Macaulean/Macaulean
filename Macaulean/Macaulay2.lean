@@ -95,6 +95,36 @@ def handleFactorizationProblem (streams : CAS.BackendStreams) (state : M2Session
   pure (.ok (toMrdi result))
 
 -- ============================================================================
+-- Gröbner basis
+-- ============================================================================
+
+structure M2GBRequest where
+  numVars : Nat
+  generators : Array MRDI.PolynomialData
+  order : String
+  deriving ToJson, FromJson
+
+structure M2GBResponse where
+  generators : Array MRDI.PolynomialData
+  deriving ToJson, FromJson
+
+def handleGroebnerBasis (streams : CAS.BackendStreams) (state : M2SessionState)
+    (request : Mrdi) : IO CAS.BackendResult := do
+  let problem ← match fromJson? (α := GroebnerBasisProblem) request.data with
+    | .ok p => pure p
+    | .error e => return .unsupported s!"Failed to decode GroebnerBasisProblem: {e}"
+  let orderStr := match problem.order with
+    | .lex => "lex" | .grlex => "grlex" | .grevlex => "grevlex" | .named s => s
+  let gbReq : M2GBRequest := {
+    numVars := problem.ring.vars.size
+    generators := problem.generators
+    order := orderStr
+  }
+  let resp ← sendM2Request streams state "groebnerBasis" gbReq (β := M2GBResponse)
+  let result : GroebnerBasisResult := { generators := resp.generators }
+  pure (.ok (toMrdi result))
+
+-- ============================================================================
 -- Backend Registration
 -- ============================================================================
 
@@ -110,7 +140,9 @@ initialize do
     cwd := some "./m2/"
     requestTimeout := 30000
     supports := fun type =>
-      type == .string "reduction_problem" || type == .string "factorization_problem"
+      type == .string "reduction_problem" ||
+      type == .string "factorization_problem" ||
+      type == .string "groebner_basis_problem"
     handleRequest := fun streams request => do
       -- Lazy init of per-session state (request counter)
       let state ← match ← stateRef.get with
@@ -124,6 +156,8 @@ initialize do
           handleReductionProblem streams state request
       | .string "factorization_problem" =>
           handleFactorizationProblem streams state request
+      | .string "groebner_basis_problem" =>
+          handleGroebnerBasis streams state request
       | _ => pure (.unsupported s!"Macaulay2 does not support: {toJson request.type}")
   }
 

@@ -2,6 +2,7 @@ import MacauleanTest.Poly
 import MacauleanTest.MRDI
 import MacauleanTest.CASBackend
 import MacauleanTest.SymPyBackend
+import MacauleanTest.Groebner
 import MacauleanTest.Factorization
 import MacauleanTest.Benchmarks
 import MacauleanTest.IdealMembership
