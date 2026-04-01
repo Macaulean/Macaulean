@@ -211,7 +211,22 @@ function handle_perm_group_membership(params)
     pre = GAP.Globals.PreImagesRepresentative(hom, target_perm.X)
     word = Vector{Int}(GAP.Globals.LetterRepAssocWord(pre))
 
-    return Dict("inGroup" => true, "word" => word)
+    # Expand inverses: for each generator, compute its inverse as a product of generators
+    # For now, include explicit inverse permutations as additional generators
+    # and remap negative indices to positive ones.
+    # Convention: generators 1..k are original, k+1..2k are their inverses
+    n_gens = length(gen_perms)
+    expanded_word = Int[]
+    for letter in word
+        if letter > 0
+            push!(expanded_word, letter)
+        else
+            # Negative = inverse. Add n_gens to map to the inverse generator slot.
+            push!(expanded_word, abs(letter) + n_gens)
+        end
+    end
+
+    return Dict("inGroup" => true, "word" => expanded_word)
 end
 
 const METHODS = Dict(
