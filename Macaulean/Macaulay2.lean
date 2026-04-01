@@ -95,6 +95,32 @@ def handleFactorizationProblem (streams : CAS.BackendStreams) (state : M2Session
   pure (.ok (toMrdi result))
 
 -- ============================================================================
+-- Polynomial factorization
+-- ============================================================================
+
+structure M2PolyFactorRequest where
+  numVars : Nat
+  polynomial : MRDI.PolynomialData
+  deriving ToJson, FromJson
+
+structure M2PolyFactorResponse where
+  factors : Array MRDI.PolynomialData
+  deriving ToJson, FromJson
+
+def handlePolyFactorization (streams : CAS.BackendStreams) (state : M2SessionState)
+    (request : Mrdi) : IO CAS.BackendResult := do
+  let problem ← match fromJson? (α := PolyFactorizationProblem) request.data with
+    | .ok p => pure p
+    | .error e => return .unsupported s!"Failed to decode PolyFactorizationProblem: {e}"
+  let req : M2PolyFactorRequest := {
+    numVars := problem.ring.vars.size
+    polynomial := problem.polynomial
+  }
+  let resp ← sendM2Request streams state "polyFactorization" req (β := M2PolyFactorResponse)
+  let result : PolyFactorizationResult := { factors := resp.factors }
+  pure (.ok (toMrdi result))
+
+-- ============================================================================
 -- Radical membership
 -- ============================================================================
 
@@ -178,7 +204,8 @@ initialize do
       type == .string "reduction_problem" ||
       type == .string "factorization_problem" ||
       type == .string "groebner_basis_problem" ||
-      type == .string "radical_membership_problem"
+      type == .string "radical_membership_problem" ||
+      type == .string "poly_factorization_problem"
     handleRequest := fun streams request => do
       -- Lazy init of per-session state (request counter)
       let state ← match ← stateRef.get with
@@ -196,6 +223,8 @@ initialize do
           handleGroebnerBasis streams state request
       | .string "radical_membership_problem" =>
           handleRadicalMembership streams state request
+      | .string "poly_factorization_problem" =>
+          handlePolyFactorization streams state request
       | _ => pure (.unsupported s!"Macaulay2 does not support: {toJson request.type}")
   }
 

@@ -18,10 +18,10 @@ Used by all CAS strategies that deal with polynomial arithmetic.
 -- Reification: Lean Expr -> MRDI.Poly
 -- ============================================================================
 
-private structure PolyReifyState where
+structure PolyReifyState where
   vars : Array Lean.Expr := #[]
 
-private abbrev PolyReifyM := StateRefT PolyReifyState MetaM
+abbrev PolyReifyM := StateRefT PolyReifyState MetaM
 
 private def addVar (e : Lean.Expr) : PolyReifyM Nat := do
   let e ← instantiateMVars e.consumeMData
@@ -32,7 +32,7 @@ private def addVar (e : Lean.Expr) : PolyReifyM Nat := do
       modify fun state => { state with vars := state.vars.push e }
       pure state.vars.size
 
-private partial def reifyRingExpr (e : Lean.Expr) : PolyReifyM Lean.Grind.CommRing.Expr := do
+partial def reifyRingExpr (e : Lean.Expr) : PolyReifyM Lean.Grind.CommRing.Expr := do
   let e ← instantiateMVars e.consumeMData
   match_expr e with
   | HAdd.hAdd _ _ _ _ a b =>

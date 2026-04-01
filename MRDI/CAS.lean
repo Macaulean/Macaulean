@@ -81,6 +81,15 @@ structure RadicalMembershipResult where
   quotients : Array MRDI.PolynomialData
   deriving BEq, ToJson, FromJson
 
+structure PolyFactorizationProblem where
+  ring : PolyRing
+  polynomial : MRDI.PolynomialData
+  deriving BEq, ToJson, FromJson
+
+structure PolyFactorizationResult where
+  factors : Array MRDI.PolynomialData
+  deriving BEq, ToJson, FromJson
+
 structure GroebnerBasisProblem where
   ring : PolyRing
   generators : Array MRDI.PolynomialData
@@ -130,6 +139,14 @@ instance : MrdiType ReductionResult where
 instance : MrdiType FactorizationResult where
   mrdiType := .string "factorization_result"
   decode? := trivialDecode? (.string "factorization_result")
+
+instance : MrdiType PolyFactorizationProblem where
+  mrdiType := .string "poly_factorization_problem"
+  decode? := trivialDecode? (.string "poly_factorization_problem")
+
+instance : MrdiType PolyFactorizationResult where
+  mrdiType := .string "poly_factorization_result"
+  decode? := trivialDecode? (.string "poly_factorization_result")
 
 instance : MrdiType RadicalMembershipProblem where
   mrdiType := .string "radical_membership_problem"

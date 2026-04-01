@@ -194,6 +194,27 @@ radicalMembershipPolyData = (numVars, polyData, idealData) -> (
         }
     )
 
+polyFactorizationPolyData = (numVars, polynomial) -> (
+    R := mkZZRing numVars;
+    f := polyDataToRing(R, polynomial);
+    factorList := toList factor f;
+    -- factorList is a list of (Power => factor, exponent)
+    resultFactors := flatten apply(factorList, p -> (
+        fac := p#0;
+        exp := p#1;
+        apply(exp, i -> polyToLeanData fac)
+        ));
+    hashTable {
+        "factors" => resultFactors
+        }
+    )
+
+registerMethod(server, "polyFactorization", {"numVars", "polynomial"},
+    (numVars, polynomial) -> (
+        polyFactorizationPolyData(numVars, polynomial)
+    )
+)
+
 registerMethod(server, "radicalMembership", {"numVars", "polyData", "idealData"},
     (numVars, polyData, idealData) -> (
         radicalMembershipPolyData(numVars, polyData, idealData)

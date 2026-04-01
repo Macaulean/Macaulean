@@ -111,6 +111,33 @@ def handleSymPyGroebner (streams : CAS.BackendStreams) (state : SymPySessionStat
   pure (.ok (toMrdi result))
 
 -- ============================================================================
+-- Polynomial factorization
+-- ============================================================================
+
+structure SymPyPolyFactorRequest where
+  numVars : Nat
+  polynomial : MRDI.PolynomialData
+  deriving ToJson, FromJson
+
+structure SymPyPolyFactorResponse where
+  factors : Array MRDI.PolynomialData
+  deriving ToJson, FromJson
+
+def handleSymPyPolyFactorization (streams : CAS.BackendStreams) (state : SymPySessionState)
+    (request : Mrdi) : IO CAS.BackendResult := do
+  let problem ← match fromJson? (α := PolyFactorizationProblem) request.data with
+    | .ok p => pure p
+    | .error e => return .unsupported s!"Failed to decode PolyFactorizationProblem: {e}"
+  let req : SymPyPolyFactorRequest := {
+    numVars := problem.ring.vars.size
+    polynomial := problem.polynomial
+  }
+  let resp ← sendSymPyRequest streams state "polyFactorization" req
+    (β := SymPyPolyFactorResponse)
+  let result : PolyFactorizationResult := { factors := resp.factors }
+  pure (.ok (toMrdi result))
+
+-- ============================================================================
 -- Radical membership
 -- ============================================================================
 
@@ -162,7 +189,8 @@ initialize do
       type == .string "reduction_problem" ||
       type == .string "factorization_problem" ||
       type == .string "groebner_basis_problem" ||
-      type == .string "radical_membership_problem"
+      type == .string "radical_membership_problem" ||
+      type == .string "poly_factorization_problem"
     handleRequest := fun streams request => do
       let state ← match ← stateRef.get with
         | some s => pure s
@@ -179,6 +207,8 @@ initialize do
           handleSymPyGroebner streams state request
       | .string "radical_membership_problem" =>
           handleSymPyRadicalMembership streams state request
+      | .string "poly_factorization_problem" =>
+          handleSymPyPolyFactorization streams state request
       | _ => pure (.unsupported s!"SymPy does not support: {toJson request.type}")
   }
 

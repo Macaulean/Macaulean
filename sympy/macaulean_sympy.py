@@ -18,7 +18,11 @@ def make_ring(num_vars):
     """Create SymPy symbols x0, x1, ..., x_{n-1}."""
     if num_vars == 0:
         return []
-    return list(symbols(' '.join(f'x{i}' for i in range(num_vars))))
+    syms = symbols(' '.join(f'x{i}' for i in range(num_vars)))
+    # symbols() returns a single Symbol when num_vars==1, not a tuple
+    if num_vars == 1:
+        return [syms]
+    return list(syms)
 
 def poly_data_to_sympy(data, syms):
     """Convert Macaulean PolynomialData to a SymPy expression.
@@ -182,6 +186,36 @@ def handle_radical_membership(params):
 
     return {'inRadical': False, 'power': 0, 'quotients': []}
 
+def handle_poly_factorization(params):
+    """Factor a multivariate polynomial."""
+    num_vars = params['numVars']
+    poly_data = params['polynomial']
+
+    syms = make_ring(num_vars)
+    f = poly_data_to_sympy(poly_data, syms)
+
+    if not syms:
+        return {'factors': [poly_data]}
+
+    p = Poly(f, *syms, domain=ZZ)
+    factored = p.factor_list()
+    # factored = (content, [(factor, multiplicity), ...])
+    content, factor_list = factored
+
+    result_factors = []
+    # Include content as a factor if it's not 1
+    if content != 1:
+        result_factors.append(sympy_to_poly_data(int(content), syms))
+
+    for factor_poly, mult in factor_list:
+        # factor_poly is a Poly object; convert to expr first
+        expr = factor_poly.as_expr() if hasattr(factor_poly, 'as_expr') else factor_poly
+        factor_data = sympy_to_poly_data(expr, syms)
+        for _ in range(mult):
+            result_factors.append(factor_data)
+
+    return {'factors': result_factors}
+
 def handle_factor_int(params):
     """Factor a natural number."""
     n = params[0] if isinstance(params, list) else params
@@ -199,6 +233,7 @@ METHODS = {
     'quotientRemainderPolyData': handle_quotient_remainder,
     'groebnerBasis': handle_groebner_basis,
     'radicalMembership': handle_radical_membership,
+    'polyFactorization': handle_poly_factorization,
     'factorInt': handle_factor_int,
 }
 

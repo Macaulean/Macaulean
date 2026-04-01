@@ -32,4 +32,69 @@ example {R : Type} [CommRing R] (x : R) :
     Macaulean.InRadical x [x * x * x] := by
   cas
 
+-- ============================================================================
+-- Polynomial factorization tests (via CAS, not grind)
+-- ============================================================================
+
+open Macaulean.CAS MRDI.CAS
+
+def requireIO (cond : Bool) (msg : String) : IO Unit :=
+  unless cond do throw <| IO.userError msg
+
+-- Factor x^4 - y^4 via SymPy and verify the product
+#eval do
+  let descs ← getRegisteredBackends
+  let sympyDescs := descs.filter fun (b : CASBackendDesc) => b.name == `SymPy
+  let backends ← sympyDescs.mapM fun d => LiveBackend.new d
+  let cache ← IO.mkRef ({} : CASCache)
+  let ctx : CASContext := { backends, cache }
+  try
+    let ring : PolyRing := { coeff := .int, vars := #["x", "y"] }
+    -- x^4 - y^4
+    let polyData : MRDI.PolynomialData := #[⟨1, #[⟨0, 4⟩]⟩, ⟨-1, #[⟨1, 4⟩]⟩]
+    let problem : PolyFactorizationProblem := { ring, polynomial := polyData }
+    let response ← ctx.call (toMrdi problem)
+    let result ← match fromMrdi? (α := PolyFactorizationResult) response with
+      | .ok (r : PolyFactorizationResult) => pure r
+      | .error e => throw <| IO.userError s!"decode failed: {e}"
+    -- Should get 3 irreducible factors: (x-y), (x+y), (x²+y²)
+    requireIO (result.factors.size == 3)
+      s!"Expected 3 factors for x⁴-y⁴, got {result.factors.size}"
+    -- Verify: multiply factors in CommRing.Poly and check equals original
+    let origPoly := Lean.Grind.CommRing.PolynomialData.deserialize polyData
+    let factorPolys := result.factors.map Lean.Grind.CommRing.PolynomialData.deserialize
+    let product := factorPolys.foldl (init := Lean.Grind.CommRing.Poly.num 1)
+      fun acc p => Lean.Grind.CommRing.Poly.mul acc p
+    requireIO (origPoly == product)
+      "Product of factors should equal original polynomial"
+  finally
+    ctx.cleanup
+
+-- Factor x^2 - 1 via SymPy
+#eval do
+  let descs ← getRegisteredBackends
+  let sympyDescs := descs.filter fun (b : CASBackendDesc) => b.name == `SymPy
+  let backends ← sympyDescs.mapM fun d => LiveBackend.new d
+  let cache ← IO.mkRef ({} : CASCache)
+  let ctx : CASContext := { backends, cache }
+  try
+    let ring : PolyRing := { coeff := .int, vars := #["x"] }
+    -- x^2 - 1
+    let polyData : MRDI.PolynomialData := #[⟨1, #[⟨0, 2⟩]⟩, ⟨-1, #[]⟩]
+    let problem : PolyFactorizationProblem := { ring, polynomial := polyData }
+    let response ← ctx.call (toMrdi problem)
+    let result ← match fromMrdi? (α := PolyFactorizationResult) response with
+      | .ok (r : PolyFactorizationResult) => pure r
+      | .error e => throw <| IO.userError s!"decode failed: {e}"
+    requireIO (result.factors.size == 2)
+      s!"Expected 2 factors for x²-1, got {result.factors.size}"
+    let origPoly := Lean.Grind.CommRing.PolynomialData.deserialize polyData
+    let factorPolys := result.factors.map Lean.Grind.CommRing.PolynomialData.deserialize
+    let product := factorPolys.foldl (init := Lean.Grind.CommRing.Poly.num 1)
+      fun acc p => Lean.Grind.CommRing.Poly.mul acc p
+    requireIO (origPoly == product)
+      "Product of factors should equal x²-1"
+  finally
+    ctx.cleanup
+
 end MacauleanTest.Groebner

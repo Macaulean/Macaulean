@@ -155,6 +155,67 @@ initialize do
   }
 
 -- ============================================================================
+-- Polynomial Factorization Strategy
+-- ============================================================================
+
+/-- Match goals of the form `f = g₁ * g₂ * ... * gₖ` or more generally
+any equality between ring expressions where the LHS could be factored. -/
+private def executePolyFactorization (ctx : CAS.CASContext) (goal : MVarId) :
+    TacticM (List MVarId) := do
+  let target ← goal.getType
+  let some (_, lhs, _) := target.eq?
+    | throwTacticEx `cas goal "Expected an equality goal"
+  let type ← inferType lhs
+  -- Reify the LHS
+  let action : CAS.Reify.PolyReifyM Lean.Grind.CommRing.Expr := CAS.Reify.reifyRingExpr lhs
+  let (lhsExpr, state) ← action.run { vars := #[] }
+  let lhsPoly : MRDI.Poly := { data := lhsExpr.toPoly.serialize }
+  let ring : PolyRing := { coeff := .int, vars := (List.range state.vars.size).toArray.map (s!"x{·}") }
+  -- Ask CAS to factor it
+  let problem : PolyFactorizationProblem := { ring, polynomial := lhsPoly.data }
+  let response ← ctx.call (toMrdi problem)
+  let result ← match fromMrdi? (α := PolyFactorizationResult) response with
+    | .ok r => pure r
+    | .error e => throwTacticEx `cas goal s!"Failed to decode factorization result: {e}"
+  if result.factors.isEmpty then
+    throwTacticEx `cas goal "CAS returned empty factorization"
+  -- Build the product expression from factors
+  let factorExprs ← result.factors.toList.mapM fun factorData =>
+    CAS.Reify.mkPolyExpr type state.vars (PolynomialData.deserialize factorData)
+  let productExpr ← factorExprs.tail.foldlM (fun acc e => mkMul acc e) factorExprs.head!
+  -- Construct proof: lhs = product via ring
+  let eqGoal ← mkFreshExprMVar (← mkEq lhs productExpr)
+  let eqGoalId := eqGoal.mvarId!
+  -- Try to close lhs = product with ring
+  setGoals [eqGoalId]
+  try
+    evalTactic (← `(tactic| grind))
+  catch _ =>
+    throwTacticEx `cas goal "CAS factorization did not produce a valid factoring (ring failed)"
+  -- Now rewrite the original goal using this equality
+  let rewriteResult ← goal.rewrite target eqGoal
+  let newGoal ← goal.replaceTargetEq rewriteResult.eNew rewriteResult.eqProof
+  setGoals [newGoal]
+  -- The goal should now be product = rhs, try ring
+  try
+    evalTactic (← `(tactic| grind))
+    pure (← getGoals)
+  catch _ =>
+    pure (← getGoals)
+
+-- Register poly factorization strategy — matches equality goals involving ring expressions
+-- Lower priority than ideal membership / radical membership since it's more speculative
+initialize do
+  CAS.registerCASStrategy {
+    name := `polyFactorization
+    priority := 3000
+    match? := fun goal => do
+      let target ← goal.getType
+      pure (target.isAppOf ``Eq)
+    execute := executePolyFactorization
+  }
+
+-- ============================================================================
 -- Tactic syntax
 -- ============================================================================
 
