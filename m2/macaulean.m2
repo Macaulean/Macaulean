@@ -167,6 +167,39 @@ registerMethod(server, "groebnerBasis", {"numVars", "generators", "order"},
     )
 )
 
+radicalMembershipPolyData = (numVars, polyData, idealData) -> (
+    R := mkZZRing numVars;
+    f := polyDataToRing(R, polyData);
+    gensList := apply(idealData, g -> polyDataToRing(R, g));
+    I := ideal gensList;
+    -- Try successive powers of f
+    for n from 1 to 99 do (
+        fn := f^n;
+        (q, r) := quotientRemainder(matrix{{fn}}, gens I);
+        remainderEntries := flatten entries r;
+        remainder := if #remainderEntries == 0 then 0_R else first remainderEntries;
+        if remainder == 0 then (
+            quotients := flatten entries q;
+            return hashTable {
+                "inRadical" => true,
+                "power" => n,
+                "quotients" => apply(quotients, polyToLeanData)
+                }
+            )
+        );
+    hashTable {
+        "inRadical" => false,
+        "power" => 0,
+        "quotients" => {}
+        }
+    )
+
+registerMethod(server, "radicalMembership", {"numVars", "polyData", "idealData"},
+    (numVars, polyData, idealData) -> (
+        radicalMembershipPolyData(numVars, polyData, idealData)
+    )
+)
+
 macauleanMainLoop(server, stdio);
 -- inputJSON = fromJSONStream stdio;
 -- stdio << toExternalString sum inputJSON << endl;

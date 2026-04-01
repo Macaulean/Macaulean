@@ -95,6 +95,41 @@ def handleFactorizationProblem (streams : CAS.BackendStreams) (state : M2Session
   pure (.ok (toMrdi result))
 
 -- ============================================================================
+-- Radical membership
+-- ============================================================================
+
+structure M2RadicalRequest where
+  numVars : Nat
+  polyData : MRDI.PolynomialData
+  idealData : Array MRDI.PolynomialData
+  deriving ToJson, FromJson
+
+structure M2RadicalResponse where
+  inRadical : Bool
+  power : Nat
+  quotients : Array MRDI.PolynomialData
+  deriving ToJson, FromJson
+
+def handleRadicalMembership (streams : CAS.BackendStreams) (state : M2SessionState)
+    (request : Mrdi) : IO CAS.BackendResult := do
+  let problem ← match fromJson? (α := RadicalMembershipProblem) request.data with
+    | .ok p => pure p
+    | .error e => return .unsupported s!"Failed to decode RadicalMembershipProblem: {e}"
+  let req : M2RadicalRequest := {
+    numVars := problem.ideal.ring.vars.size
+    polyData := problem.element.data
+    idealData := problem.ideal.generators
+  }
+  let resp ← sendM2Request streams state "radicalMembership" req (β := M2RadicalResponse)
+  if !resp.inRadical then
+    return .failure "Element is not in the radical of the ideal"
+  let result : RadicalMembershipResult := {
+    power := resp.power
+    quotients := resp.quotients
+  }
+  pure (.ok (toMrdi result))
+
+-- ============================================================================
 -- Gröbner basis
 -- ============================================================================
 
@@ -142,7 +177,8 @@ initialize do
     supports := fun type =>
       type == .string "reduction_problem" ||
       type == .string "factorization_problem" ||
-      type == .string "groebner_basis_problem"
+      type == .string "groebner_basis_problem" ||
+      type == .string "radical_membership_problem"
     handleRequest := fun streams request => do
       -- Lazy init of per-session state (request counter)
       let state ← match ← stateRef.get with
@@ -158,6 +194,8 @@ initialize do
           handleFactorizationProblem streams state request
       | .string "groebner_basis_problem" =>
           handleGroebnerBasis streams state request
+      | .string "radical_membership_problem" =>
+          handleRadicalMembership streams state request
       | _ => pure (.unsupported s!"Macaulay2 does not support: {toJson request.type}")
   }
 

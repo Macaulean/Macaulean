@@ -99,7 +99,63 @@ initialize do
   }
 
 -- ============================================================================
--- Tactic syntax: gb_reduce as explicit entry point
+-- Radical Membership
+-- ============================================================================
+
+def InRadical [CommRing R] (f : R) (generators : List R) : Prop :=
+  ∃ n : Nat, InIdeal (f ^ n) generators
+
+private def executeRadicalMembership (ctx : CAS.CASContext) (goal : MVarId) :
+    TacticM (List MVarId) := do
+  let target ← goal.getType
+  let (targetFn, targetArgs) := target.getAppFnArgs
+  unless targetFn == ``Macaulean.InRadical && targetArgs.size == 4 do
+    throwTacticEx `cas goal "Expected a goal of the form `InRadical f [g₁, ..., gₙ]`"
+  let element := targetArgs[2]!
+  let generatorsExpr := targetArgs[3]!
+  let some generators ← getListLit? generatorsExpr
+    | throwTacticEx `cas goal "Expected an explicit list of generators"
+  let (vars, elementPoly, generatorPolys) ← CAS.Reify.reifyPolys element generators
+  let ring : PolyRing := { coeff := .int, vars := (List.range vars.size).toArray.map (s!"x{·}") }
+  -- Call CAS for radical membership
+  let problem : RadicalMembershipProblem := {
+    element := { ring, data := elementPoly.data }
+    ideal := { ring, generators := generatorPolys.map (·.data) }
+  }
+  let response ← ctx.call (toMrdi problem)
+  let result ← match fromMrdi? (α := RadicalMembershipResult) response with
+    | .ok r => pure r
+    | .error e => throwTacticEx `cas goal s!"Failed to decode radical membership result: {e}"
+  -- Introduce the power n as existential witness
+  let nExpr := mkNatLit result.power
+  let goalAfterN ← goal.existsIntro nExpr
+  -- Now goal is: InIdeal (f ^ n) [g₁, ..., gₖ]
+  -- Introduce quotients as existential witness
+  let type ← inferType element
+  let quotientExprs ← result.quotients.toList.mapM fun quotient =>
+    CAS.Reify.mkPolyExpr type vars (PolynomialData.deserialize quotient)
+  let quotientListExpr ← mkListLit type quotientExprs
+  let goalAfterQ ← goalAfterN.existsIntro quotientListExpr
+  -- Close the equality subgoal
+  setGoals [goalAfterQ]
+  evalTactic (← `(tactic| simp [Macaulean.linearCombination, Macaulean.InIdeal, Macaulean.InRadical]))
+  let remainingGoals ← getGoals
+  unless remainingGoals.isEmpty do
+    evalTactic (← `(tactic| grind))
+  pure (← getGoals)
+
+initialize do
+  CAS.registerCASStrategy {
+    name := `radicalMembership
+    priority := 1000
+    match? := fun goal => do
+      let target ← goal.getType
+      pure (target.isAppOf ``Macaulean.InRadical)
+    execute := executeRadicalMembership
+  }
+
+-- ============================================================================
+-- Tactic syntax
 -- ============================================================================
 
 syntax (name := gb_reduce_tactic) "gb_reduce" : tactic

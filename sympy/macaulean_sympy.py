@@ -127,6 +127,61 @@ def handle_groebner_basis(params):
     basis_data = [sympy_to_poly_data(p, syms) for p in gb.polys]
     return {'generators': basis_data}
 
+def handle_radical_membership(params):
+    """Radical membership via Rabinowich trick.
+
+    Check if f ∈ √I by checking if 1 ∈ ⟨g₁,...,gₖ, 1-t·f⟩ in R[x₁,...,xₙ,t].
+    If yes, find smallest n where f^n ∈ I and return quotients.
+    """
+    num_vars = params['numVars']
+    poly_data = params['polyData']
+    ideal_data = params['idealData']
+
+    syms = make_ring(num_vars)
+    f = poly_data_to_sympy(poly_data, syms)
+    gens = [poly_data_to_sympy(g, syms) for g in ideal_data]
+
+    if not syms:
+        return {'inRadical': False, 'power': 0, 'quotients': []}
+
+    # Rabinowich: introduce variable t, check 1 ∈ ⟨gens, 1 - t*f⟩
+    t = symbols('_t')
+    extended_syms = syms + [t]
+    extended_gens = gens + [1 - t * f]
+
+    gb = groebner(extended_gens, *extended_syms, order=grevlex, domain=ZZ)
+
+    # Check if 1 is in the ideal (GB contains a nonzero constant)
+    gb_polys = list(gb.polys)
+    has_one = any(p.is_number and p != 0 for p in gb_polys)
+
+    if not has_one:
+        # Also check if reduced(1, gb) == 0
+        one_poly = Poly(1, *extended_syms, domain=ZZ)
+        _, rem = reduced(one_poly, [Poly(g, *extended_syms, domain=ZZ) for g in gb_polys],
+                         *extended_syms, domain=ZZ)
+        has_one = rem.is_zero
+
+    if not has_one:
+        return {'inRadical': False, 'power': 0, 'quotients': []}
+
+    # Find smallest n where f^n ∈ I by trying successive powers
+    for n in range(1, 100):
+        fn = f ** n
+        fn_poly = Poly(fn, *syms, domain=ZZ)
+        gen_polys = [Poly(g, *syms, domain=ZZ) for g in gens]
+        quots, rem = reduced(fn_poly, gen_polys, *syms, domain=ZZ)
+
+        if rem.is_zero:
+            quotients_data = [sympy_to_poly_data(q.as_expr(), syms) for q in quots]
+            return {
+                'inRadical': True,
+                'power': n,
+                'quotients': quotients_data
+            }
+
+    return {'inRadical': False, 'power': 0, 'quotients': []}
+
 def handle_factor_int(params):
     """Factor a natural number."""
     n = params[0] if isinstance(params, list) else params
@@ -143,6 +198,7 @@ def handle_factor_int(params):
 METHODS = {
     'quotientRemainderPolyData': handle_quotient_remainder,
     'groebnerBasis': handle_groebner_basis,
+    'radicalMembership': handle_radical_membership,
     'factorInt': handle_factor_int,
 }
 

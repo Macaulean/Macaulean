@@ -111,6 +111,42 @@ def handleSymPyGroebner (streams : CAS.BackendStreams) (state : SymPySessionStat
   pure (.ok (toMrdi result))
 
 -- ============================================================================
+-- Radical membership
+-- ============================================================================
+
+structure SymPyRadicalRequest where
+  numVars : Nat
+  polyData : MRDI.PolynomialData
+  idealData : Array MRDI.PolynomialData
+  deriving ToJson, FromJson
+
+structure SymPyRadicalResponse where
+  inRadical : Bool
+  power : Nat
+  quotients : Array MRDI.PolynomialData
+  deriving ToJson, FromJson
+
+def handleSymPyRadicalMembership (streams : CAS.BackendStreams) (state : SymPySessionState)
+    (request : Mrdi) : IO CAS.BackendResult := do
+  let problem ← match fromJson? (α := RadicalMembershipProblem) request.data with
+    | .ok p => pure p
+    | .error e => return .unsupported s!"Failed to decode RadicalMembershipProblem: {e}"
+  let req : SymPyRadicalRequest := {
+    numVars := problem.ideal.ring.vars.size
+    polyData := problem.element.data
+    idealData := problem.ideal.generators
+  }
+  let resp ← sendSymPyRequest streams state "radicalMembership" req
+    (β := SymPyRadicalResponse)
+  if !resp.inRadical then
+    return .failure "Element is not in the radical of the ideal"
+  let result : RadicalMembershipResult := {
+    power := resp.power
+    quotients := resp.quotients
+  }
+  pure (.ok (toMrdi result))
+
+-- ============================================================================
 -- Backend Registration
 -- ============================================================================
 
@@ -125,7 +161,8 @@ initialize do
     supports := fun type =>
       type == .string "reduction_problem" ||
       type == .string "factorization_problem" ||
-      type == .string "groebner_basis_problem"
+      type == .string "groebner_basis_problem" ||
+      type == .string "radical_membership_problem"
     handleRequest := fun streams request => do
       let state ← match ← stateRef.get with
         | some s => pure s
@@ -140,6 +177,8 @@ initialize do
           handleSymPyFactorization streams state request
       | .string "groebner_basis_problem" =>
           handleSymPyGroebner streams state request
+      | .string "radical_membership_problem" =>
+          handleSymPyRadicalMembership streams state request
       | _ => pure (.unsupported s!"SymPy does not support: {toJson request.type}")
   }
 
