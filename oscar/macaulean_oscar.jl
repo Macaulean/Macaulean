@@ -187,12 +187,40 @@ end
 # JSON-RPC / LSP base protocol
 # ============================================================================
 
+function handle_perm_group_membership(params)
+    n = params["size"]  # permutation degree
+    generators = params["generators"]  # array of permutation images
+    target = params["target"]  # target permutation images
+
+    G = symmetric_group(n)
+
+    # Convert image arrays to Oscar permutations
+    gen_perms = [perm(G, Vector{Int}(g)) for g in generators]
+    target_perm = perm(G, Vector{Int}(target))
+
+    # Build the subgroup
+    H = sub(G, gen_perms)[1]
+
+    # Check membership
+    if !(target_perm in H)
+        return Dict("inGroup" => false, "word" => Int[])
+    end
+
+    # Get word decomposition via GAP
+    hom = GAP.Globals.EpimorphismFromFreeGroup(H.X)
+    pre = GAP.Globals.PreImagesRepresentative(hom, target_perm.X)
+    word = Vector{Int}(GAP.Globals.LetterRepAssocWord(pre))
+
+    return Dict("inGroup" => true, "word" => word)
+end
+
 const METHODS = Dict(
     "quotientRemainderPolyData" => handle_quotient_remainder,
     "groebnerBasis" => handle_groebner_basis,
     "polyFactorization" => handle_poly_factorization,
     "radicalMembership" => handle_radical_membership,
     "factorInt" => handle_factor_int,
+    "permGroupMembership" => handle_perm_group_membership,
 )
 
 function read_lsp_message(io)

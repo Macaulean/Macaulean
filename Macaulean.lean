@@ -7,3 +7,4 @@ import Macaulean.Oscar
 import Macaulean.Factorization
 import Macaulean.IdealMembership
 import Macaulean.Groebner
+import Macaulean.PermGroup

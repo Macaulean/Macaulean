@@ -164,4 +164,27 @@ instance : MrdiType GroebnerBasisResult where
   mrdiType := .string "groebner_basis_result"
   decode? := trivialDecode? (.string "groebner_basis_result")
 
+-- ============================================================================
+-- Permutation group types
+-- ============================================================================
+
+structure PermGroupMembershipProblem where
+  size : Nat                              -- degree of symmetric group
+  generators : Array (Array Nat)          -- each is an image array [σ(1), σ(2), ...]
+  target : Array Nat                      -- target permutation
+  deriving BEq, ToJson, FromJson
+
+structure PermGroupMembershipResult where
+  inGroup : Bool
+  word : Array Int                        -- generator indices: positive = gen, negative = gen inverse
+  deriving BEq, ToJson, FromJson
+
+instance : MrdiType PermGroupMembershipProblem where
+  mrdiType := .string "perm_group_membership_problem"
+  decode? := trivialDecode? (.string "perm_group_membership_problem")
+
+instance : MrdiType PermGroupMembershipResult where
+  mrdiType := .string "perm_group_membership_result"
+  decode? := trivialDecode? (.string "perm_group_membership_result")
+
 end MRDI.CAS

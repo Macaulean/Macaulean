@@ -143,6 +143,36 @@ def handleOscarRadical (streams : CAS.BackendStreams) (state : OscarSessionState
   pure (.ok (toMrdi ({ power := resp.power, quotients := resp.quotients } : RadicalMembershipResult)))
 
 -- ============================================================================
+-- Permutation group membership
+-- ============================================================================
+
+structure OscarPermRequest where
+  size : Nat
+  generators : Array (Array Nat)
+  target : Array Nat
+  deriving ToJson, FromJson
+
+structure OscarPermResponse where
+  inGroup : Bool
+  word : Array Int
+  deriving ToJson, FromJson
+
+def handleOscarPermGroupMembership (streams : CAS.BackendStreams) (state : OscarSessionState)
+    (request : Mrdi) : IO CAS.BackendResult := do
+  let problem ← match fromJson? (α := PermGroupMembershipProblem) request.data with
+    | .ok p => pure p
+    | .error e => return .unsupported s!"Failed to decode PermGroupMembershipProblem: {e}"
+  let req : OscarPermRequest := {
+    size := problem.size
+    generators := problem.generators
+    target := problem.target
+  }
+  let resp ← sendOscarRequest streams state "permGroupMembership" req (β := OscarPermResponse)
+  if !resp.inGroup then
+    return .failure "Permutation is not in the generated group"
+  pure (.ok (toMrdi ({ inGroup := resp.inGroup, word := resp.word } : PermGroupMembershipResult)))
+
+-- ============================================================================
 -- Backend Registration
 -- ============================================================================
 
@@ -159,7 +189,8 @@ initialize do
       type == .string "factorization_problem" ||
       type == .string "groebner_basis_problem" ||
       type == .string "radical_membership_problem" ||
-      type == .string "poly_factorization_problem"
+      type == .string "poly_factorization_problem" ||
+      type == .string "perm_group_membership_problem"
     handleRequest := fun streams request => do
       let state ← match ← stateRef.get with
         | some s => pure s
@@ -173,6 +204,7 @@ initialize do
       | .string "groebner_basis_problem" => handleOscarGroebner streams state request
       | .string "radical_membership_problem" => handleOscarRadical streams state request
       | .string "poly_factorization_problem" => handleOscarPolyFactor streams state request
+      | .string "perm_group_membership_problem" => handleOscarPermGroupMembership streams state request
       | _ => pure (.unsupported s!"Oscar does not support: {toJson request.type}")
   }
 
