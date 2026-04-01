@@ -3,6 +3,7 @@
 import Macaulean.Basic
 import Macaulean.Macaulay2
 import Macaulean.SymPy
+import Macaulean.Oscar
 import Macaulean.Factorization
 import Macaulean.IdealMembership
 import Macaulean.Groebner
