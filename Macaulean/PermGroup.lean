@@ -121,7 +121,7 @@ private def executePermGroupMembership (ctx : CAS.CASContext) (goal : MVarId) :
   let newGoal ← goal.existsIntro wordExpr
   -- Close: applyWord generators word = target, decidable on Fin n
   setGoals [newGoal]
-  evalTactic (← `(tactic| native_decide))
+  evalTactic (← `(tactic| decide))
   pure (← getGoals)
 
 initialize do

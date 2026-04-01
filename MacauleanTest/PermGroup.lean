@@ -58,18 +58,15 @@ def requireIO (cond : Bool) (msg : String) : IO Unit :=
     ctx.cleanup
 
 -- ============================================================================
--- Kernel-verified tests using native_decide
+-- Kernel-verified test: decide checks the composition, no axioms
 -- ============================================================================
 
--- Verify the Perm machinery works with native_decide
--- applyWord on known word should equal target
-def g1_3 : Perm 3 := ⟨#[1, 0, 2], by decide⟩  -- (0 1) = swap first two
-def g2_3 : Perm 3 := ⟨#[0, 2, 1], by decide⟩  -- (1 2) = swap last two
-def target_3 : Perm 3 := ⟨#[1, 2, 0], by decide⟩  -- (0 1 2) = 3-cycle
+def g1_3 : Perm 3 := ⟨#[1, 0, 2], by decide⟩  -- (0 1)
+def g2_3 : Perm 3 := ⟨#[0, 2, 1], by decide⟩  -- (1 2)
+def target_3 : Perm 3 := ⟨#[1, 2, 0], by decide⟩  -- (0 1 2)
 
--- Manual witness: (0 1 2) = (1 2) ∘ (0 1) = g2 * g1
--- In word format: [2, 1] means apply g1 then g2
+-- Manual witness: (0 1 2) = (1 2) ∘ (0 1)
 example : InPermGroup target_3 #[g1_3, g2_3] :=
-  ⟨#[2, 1], by native_decide⟩
+  ⟨#[2, 1], by decide⟩
 
 end MacauleanTest.PermGroup
