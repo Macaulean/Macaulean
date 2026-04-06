@@ -190,7 +190,7 @@ instance : FromJson Mrdi where
     | json@(.obj entries) => do
       -- The json schema seems to allow a file not to have a _ns parameter
       -- I don't know what we should do with that
-      let .some ns := entries.get? "_ns" | .error "MRDI objects without namespaces are unspported"
+      let .some ns := entries.get? "_ns" | .error "MRDI objects without namespaces are unsupported"
       let dataPart ← fromJson? json
       let refs : Std.TreeMap String MrdiData ←
         fromJson? <| entries.getD "_refs" (.obj .empty)

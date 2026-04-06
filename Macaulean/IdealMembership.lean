@@ -360,9 +360,9 @@ unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name
       tacticError "Expected an equality for the target"
   let zeroExpr ← natAsRingElem targetRing 0
   if not (← isDefEq targetRhs zeroExpr) then
-    tacticError "Expected an equaltiy of the form ...=0 for the target"
+    tacticError "Expected an equality of the form ...=0 for the target"
   let genPolys ← genProps.mapM (fun e => do
-    let (ring,lhs,rhs) := (e.eq?).get!
+    let .some (ring,lhs,rhs) := e.eq? | tacticError "Expected a list of equalities"
     if (← isDefEq targetRing ring) && (← isDefEq rhs zeroExpr)
     then pure <| lhs
     else tacticError "Expected equalities to zero over the same ring")
@@ -424,7 +424,7 @@ unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Nam
   where
     tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
 
-syntax (name := m2idealmem) "m2idealmem" optConfig optional("no_grind") notFollowedBy("|") (ppSpace colGt term:max)* : tactic
+syntax (name := m2idealmem) "m2idealmem" optConfig notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
 @[tactic m2idealmem]
 unsafe def m2IdealMemTactic : Tactic := fun stx => do

@@ -38,7 +38,7 @@ instance : FromJson Term where
     | .arr #[c, m] => do
       let cstr ← c.getStr?
       let mon ← fromJson? m
-      let some c := cstr.toInt? | throw s!"Expected a String representing a Int {cstr}"
+      let some c := cstr.toInt? | throw s!"Expected a String representing an Int {cstr}"
       pure ⟨c, mon⟩
     | _ => .error "Expected a pair of a coefficient and a monomial"
 
