@@ -19,6 +19,11 @@
 \usepackage{color}
 \renewcommand\UrlFont{\color{blue}\rmfamily}
 \urlstyle{rm}
+
+\usepackage{amssymb}
+\newcommand{\QQ}{\mathbb Q}
+\newcommand{\ZZ}{\mathbb Z}
+
 %
 \begin{document}
 %
@@ -48,7 +53,7 @@
   Piedmont University, Demorest GA 30535 \email{dtorrance@piedmont.edu} \and
   Vanderbilt University, Nashville TN 37235 \email{jay.k.yang@vanderbilt.edu}}
 %
-\maketitle              % typeset the header of the contribution
+\maketitle              % typeset the header of the contributioln
 %
 \begin{abstract}
 
@@ -69,8 +74,25 @@ This extend abstract discuss our approach and strategy along with current progre
 
 \section{Implementation}
 
-\cite{jsonrpc}
-\cite{mrdi}
+Due to its simplicity and ubiquity, it was decided that JSON (JavaScript Object Notation) would be used to facilitate communication between Macaulay2 and Lean.  In particular, the top-level communication is handled by the JSON-RPC protocol \cite{jsonrpc} and the mathematical objects are serialized using the MRDI file format \cite{mrdi}.
+
+The ``RPC'' in JSON-RPC stands for \textit{remote procedure call}.  It is a protocol that defines a set of JSON objects for clients to make requests and servers to send responses.  It is the foundation of the Language Server Protocol \cite{lsp} used by a wide variety of editors and which is fundamental to the user experience in Lean.  Since both Lean and Macaulay2 already support JSON-RPC, it was a natural choice upon which to build the interface.
+
+The MRDI file format is used for serializing mathematical objects in the OSCAR computer algebra system \cite{OSCAR-Book,OSCAR}, but it was designed with the idea that it could be used for the same purpose in other systems.  Each MRDI file contains a single JSON object with at least one key, \texttt{\_type}, for specifying the particular type of the object.  Additionally, it may have a \texttt{\_ns} key for specifying the namespace (such as the particular computer algebra system), a \texttt{data} key for information about the object.  Some of the values under the \texttt{\_type} and \texttt{data} keys may contain \textit{universally unique identifiers} (or UUID's) for additional objects, and further information about these objects is stored under the \texttt{\_refs} key.
+
+Consider, for example, the polynomial $3x^2 + \frac{1}{2}\in\QQ[x]$.  We store this as $3y_0^2 + y_1\in\ZZ[y_0,y_1]$ together with the map $y_1\mapsto\frac{1}{2}$.  See the example below.
+
+\begin{verbatim}
+{"_type": {"params": "Rat", "name": "ConcretePoly"},
+ "data": {"poly": "a8ea4eb2-4393-45b0-ba9a-0c91716a55d3",
+          "coefficients": [["1", ["1", "2"]]]},
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.26.0-rc1"]},
+ "_refs": {"a8ea4eb2-4393-45b0-ba9a-0c91716a55d3":
+            {"_type": "LeanGrindCommRingPoly",
+             "data": [["3", [["0", "2"]]], ["1", [["1", "1"]]]]}}}
+\end{verbatim}
+
+Putting these pieces together, if we want Lean to delegate a computation to Macaulay2, then we may serialize any associated mathematical objects using MRDI, pass these as arguments to an appropriate method and send the corresponding JSON-RPC request to a server running in Macaulay2, de-serialize the mathematical objects in Macaulay2, run the requested computation, serialize any mathematical objects produced by this computation, pass the result in a JSON-RPC response back to Lean, and finally de-serialize the result in Lean.
 
 \section{Future Directions}
 
