@@ -6,7 +6,8 @@ open Lean Grind Elab Parser Tactic Meta
 
 structure VariableState where
   varTable : FVarIdMap CommRing.Var
-  coefficientTable : Std.HashMap Lean.Expr CommRing.Var --equality of expressions is probably wrong
+  -- Equality of expressions is suboptimal but will work for now
+  coefficientTable : Std.HashMap Lean.Expr CommRing.Var
   nextVar : CommRing.Var
 
 def VariableState.mapVariable (state : VariableState) (var : FVarId) :
@@ -19,7 +20,6 @@ def VariableState.mapVariable (state : VariableState) (var : FVarId) :
         varTable := newTable
         nextVar := state.nextVar + 1})
 
---TODO this might need to be in MetaM eventually?
 def VariableState.mapCoefficient (state : VariableState) (x : Lean.Expr) :
   (CommRing.Var × VariableState) :=
   let (optVar, newTable) := state.coefficientTable.getThenInsertIfNew? x state.nextVar
@@ -273,8 +273,6 @@ coefficients such that the product with the generators in idealExprs gives polyE
 unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
   : MetaM (List Expr × Expr) := do
   dbg_trace "M2IdealMem Start"
-  --(← IO.getStdout).flush
-
   --parse a expression into a polynomial, checking that the ring matches using isDefEq
   let getPoly (expectedRing : Expr) (pExpr : Expr) : StateT VariableState MetaM ExprPoly := do
     let some poly ← toCommRingExpr? pExpr
@@ -291,7 +289,7 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
     vars.varTable.toList.map Prod.swap
 
   -- try to build the serializer and deserializer pair, if it fails
-  -- try to universalize to either ZZ or QQ
+  -- try to universalize to ZZ
   let intExpr := mkConst ``Int
   let (serializerExpr,universal) ←
     try
@@ -378,12 +376,15 @@ unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name
   dbg_trace "Vanishing Proven"
   let zeroProofType ← inferType zeroProof
   let some (_,expectedTarget,_) := zeroProofType.eq?
-    | tacticError "Impossible"
+    | tacticError m!"Vanishing Statement Unexpectedly not an equality {zeroProofType}"
   --rewrite the goal using the fact that the previous expression equals zero
   let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs expectedTarget)
-  goal.assign (← mkEqTrans eqGoalMVar zeroProof)
-  dbg_trace "New Goal Created"
-  setGoals [eqGoalMVar.mvarId!]
+  if ← goal.checkedAssign (← mkEqTrans eqGoalMVar zeroProof)
+  then
+    dbg_trace "New Goal Created"
+    pushGoals [eqGoalMVar.mvarId!]
+  else
+    tacticError "Failed to show vanishing"
   where
     tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
 
@@ -414,15 +415,12 @@ unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Nam
   let some (_,expectedTarget,_) := remainderProofType.eq?
     | tacticError "Impossible"
   let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs expectedTarget)
-  goal.assign (← mkEqTrans eqGoalMVar remainderProof)
-  -- let eqGoalId : MVarId :=
-  setGoals [eqGoalMVar.mvarId!]
-
-  --let (eqGoal',_) ← eqGoalId.tryClearMany' <| genHyps.map (Expr.fvarId!)
-  --pushGoal eqGoal'
-
---   let _ ← runTactic eqGoal' (← `(tactic|grind))
---   sorry
+  if ← goal.checkedAssign (← mkEqTrans eqGoalMVar remainderProof)
+  then
+    dbg_trace "New Goal Created"
+    pushGoals [eqGoalMVar.mvarId!]
+  else
+    tacticError "Failed to show remainder"
   where
     tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
 
