@@ -85,18 +85,9 @@ example {e11 e12 e13 e21 e22 e23 e31 e32 e33 : Rat}
     2*e12^2*e13*e21+2*e13^3*e21-2*e13*e21^3-2*e11*e12*e13*e22-2*e13*e21*e22^2-2*e11*e13^2*e23+2*e11*e21^2*e23+2*e12*e21*e22*e23-2*e13*e21*e31^2-2*e12*e23*e31*e32-2*e13*e21*e32^2+2*e11*e23*e32^2+2*e11*e21*e31*e33-2*e13*e23*e31*e33+4*e12*e21*e32*e33-2*e11*e22*e32*e33+2*e13*e21*e33^2 = 0 ∧
     2*e12^3*e21+2*e12*e13^2*e21-2*e12*e21^3-2*e11*e12^2*e22+2*e11*e21^2*e22-2*e11*e12*e13*e23+2*e13*e21*e22*e23-2*e12*e21*e23^2-2*e12*e21*e31^2+2*e11*e21*e31*e32-2*e12*e22*e31*e32+2*e12*e21*e32^2-2*e12*e23*e31*e33+2*e13*e21*e32*e33 = 0
     := by
-  apply And.intro
-
-  -- and_intros doesn't seem to like something about the first step, so do it manually
-  case left =>
+  and_intros
+  all_goals
     m2idealmem -grind [h1,h2,h3,h4,h5,h6,h7,h8,h9,h10]
     --clear the hypotheses so that grind doesn't use them
     clear h1 h2 h3 h4 h5 h6 h7 h8 h9 h10
     grind
-  case right =>
-    and_intros
-    all_goals
-      m2idealmem -grind [h1,h2,h3,h4,h5,h6,h7,h8,h9,h10]
-      --clear the hypotheses so that grind doesn't use them
-      clear h1 h2 h3 h4 h5 h6 h7 h8 h9 h10
-      grind
