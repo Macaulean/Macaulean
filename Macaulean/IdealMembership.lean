@@ -2,7 +2,7 @@ import Lean
 import MRDI.Basic
 import MRDI.Poly
 import Macaulean.Macaulay2
-open Lean Grind Elab Tactic Meta
+open Lean Grind Elab Parser Tactic Meta
 
 structure VariableState where
   varTable : FVarIdMap CommRing.Var
@@ -250,6 +250,18 @@ def m2QuotientRemainder
     let reply : Json ← server.sendRequest "quotientRemainder" (f, I)
     pure <| fromJson? reply
 
+namespace Macaulean.IdealMembership
+
+structure Config where
+  --whether to use grind to prove the final polynomial equalities
+  grind : Bool := false
+  deriving Inhabited, Repr
+
+declare_config_elab configElab Config
+
+end Macaulean.IdealMembership
+
+open Macaulean
 
 /--
 This function implements the core of the tactic, serializing and deserializing
@@ -344,7 +356,7 @@ theorem helper [CommRing R] (a b c d : R) (h1 : a = d) (h2 : b = 0) : a+c*b = d 
 
 -- factor out the core tactic to make the code a bit simpler
 -- this only reduces down the the polynomial equality step
-unsafe def m2IdealMemTacticRunner (tacName : Name) (goal : MVarId) (target : Expr) (genHyps : Array Expr) : TacticM Unit := do
+unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name) (goal : MVarId) (target : Expr) (genHyps : Array Expr) : TacticM Unit := do
   let genProps ←  genHyps.mapM (fun genH => inferType genH)
   let some (targetRing,targetLhs,targetRhs) := target.eq? |
       tacticError "Expected an equality for the target"
@@ -358,7 +370,7 @@ unsafe def m2IdealMemTacticRunner (tacName : Name) (goal : MVarId) (target : Exp
     else tacticError "Expected equalities to zero over the same ring")
   let (coeffs,_) ← m2QuotientRemainderImpl goal targetRing genPolys targetLhs
   dbg_trace "Coefficients Read"
-  let startingExpr ← mkAppM ``Eq.refl #[zeroExpr]
+  let startingExpr ← mkEqRefl zeroExpr
   let zeroProof ← (coeffs.zip genHyps.toList).foldlM
     (fun mvar (c,f) => do
       mkAppOptM ``helper #[targetRing, none, none, none, c, zeroExpr, mvar, f])
@@ -369,7 +381,7 @@ unsafe def m2IdealMemTacticRunner (tacName : Name) (goal : MVarId) (target : Exp
     | tacticError "Impossible"
   --rewrite the goal using the fact that the previous expression equals zero
   let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs expectedTarget)
-  goal.assign (← mkAppM ``Eq.trans #[eqGoalMVar,zeroProof])
+  goal.assign (← mkEqTrans eqGoalMVar zeroProof)
   dbg_trace "New Goal Created"
   setGoals [eqGoalMVar.mvarId!]
   where
@@ -381,7 +393,7 @@ unsafe def m2IdealMemTacticRunner (tacName : Name) (goal : MVarId) (target : Exp
   to reduce the lhs fully in grevlex order. then it creates a new goal of the form (remainder) = expr
   the expressions in genHyps should be theorems of the form `f = 0` for a polynoial expression f.
 -/
-unsafe def m2RemainderTacticRunner (tacName : Name) (goal : MVarId) (target : Expr) (genHyps : Array Expr) : TacticM Unit := do
+unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Name) (goal : MVarId) (target : Expr) (genHyps : Array Expr) : TacticM Unit := do
   let genProps ←  genHyps.mapM (fun genH => inferType genH)
   let some (targetRing,targetLhs,targetRhs) := target.eq? |
       tacticError "Expected an equality for the target"
@@ -393,7 +405,7 @@ unsafe def m2RemainderTacticRunner (tacName : Name) (goal : MVarId) (target : Ex
     else tacticError "Expected equalities to zero over the same ring")
   let (coeffs,_) ← m2QuotientRemainderImpl goal targetRing genPolys targetLhs
   dbg_trace "Coefficients Read"
-  let startingExpr ← mkAppM ``Eq.refl #[targetRhs]
+  let startingExpr ← mkEqRefl targetRhs
   let remainderProof ← (coeffs.zip genHyps.toList).foldlM
     (fun mvar (c,f) => do
       mkAppOptM ``helper #[targetRing, none, none, none, c, none, mvar, f])
@@ -402,7 +414,7 @@ unsafe def m2RemainderTacticRunner (tacName : Name) (goal : MVarId) (target : Ex
   let some (_,expectedTarget,_) := remainderProofType.eq?
     | tacticError "Impossible"
   let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs expectedTarget)
-  goal.assign (← mkAppM ``Eq.trans #[eqGoalMVar,remainderProof])
+  goal.assign (← mkEqTrans eqGoalMVar remainderProof)
   -- let eqGoalId : MVarId :=
   setGoals [eqGoalMVar.mvarId!]
 
@@ -414,49 +426,38 @@ unsafe def m2RemainderTacticRunner (tacName : Name) (goal : MVarId) (target : Ex
   where
     tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
 
-syntax (name := m2idealmem) "m2idealmem" optional("no_grind") notFollowedBy("|") (ppSpace colGt term:max)* : tactic
+syntax (name := m2idealmem) "m2idealmem" optConfig optional("no_grind") notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
 @[tactic m2idealmem]
 unsafe def m2IdealMemTactic : Tactic := fun stx => do
   match stx with
-  | `(tactic| m2idealmem no_grind [$args,*]) =>
+  | `(tactic| m2idealmem $optCfg [$args,*]) =>
+    let cfg ← IdealMembership.configElab optCfg
     let goal ← getMainGoal
     let target ← getMainTarget
     let genHyps ← args.getElems.mapM (elabTerm · none)
-    m2IdealMemTacticRunner `m2idealmem goal target genHyps
-    dbg_trace "m2idealmem finished"
-  | `(tactic| m2idealmem [$args,*]) =>
-    --TODO rewrite the goals/hypotheses so that they are of the form f = 0
-    let goal ← getMainGoal
-    let target ← getMainTarget
-    let genHyps ← args.getElems.mapM (elabTerm · none)
-    m2IdealMemTacticRunner `m2idealmem goal target genHyps
-    -- use grind to prove the equality
-    _ ← runTactic (← getMainGoal) (← `(tactic|grind))
-    dbg_trace "Equality Shown"
-    -- set the goal to the polynomial equality
+    m2IdealMemTacticRunner cfg `m2idealmem goal target genHyps
+    if cfg.grind
+    then
+      _ ← runTactic (← getMainGoal) (← `(tactic|grind))
+      dbg_trace "Equality Shown"
     dbg_trace "m2idealmem finished"
   | _ => throwTacticEx `m2idealmem (← getMainGoal) "Expect list of equalities for the ideal"
 
-syntax (name := m2remainder) "m2remainder" optional("no_grind") notFollowedBy("|") (ppSpace colGt term:max)* : tactic
+syntax (name := m2remainder) "m2remainder" optConfig notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
 @[tactic m2remainder]
 unsafe def m2RemainderTactic : Tactic := fun stx => do
   match stx with
-  | `(tactic| m2remainder no_grind [$args,*]) =>
+  | `(tactic| m2remainder $optCfg [$args,*]) =>
+    let cfg ← IdealMembership.configElab optCfg
     let goal ← getMainGoal
     let target ← getMainTarget
     let genHyps ← args.getElems.mapM (elabTerm · none)
-    m2RemainderTacticRunner `m2remainder goal target genHyps
-    dbg_trace "m2idealmem finished"
-  | `(tactic| m2remainder [$args,*]) =>
-    let goal ← getMainGoal
-    let target ← getMainTarget
-    let genHyps ← args.getElems.mapM (elabTerm · none)
-    m2RemainderTacticRunner `m2remainder goal target genHyps
-    -- use grind to prove the equality
-    _ ← runTactic (← getMainGoal) (← `(tactic|grind))
-    dbg_trace "Equality Shown"
-    -- set the goal to the polynomial equality
+    m2RemainderTacticRunner cfg `m2remainder goal target genHyps
+    if cfg.grind
+    then
+      _ ← runTactic (← getMainGoal) (← `(tactic|grind))
+      dbg_trace "Equality Shown"
     dbg_trace "m2idealmem finished"
   | _ => throwTacticEx `m2idealmem (← getMainGoal) "Expect list of equalities for the ideal"

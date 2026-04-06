@@ -38,18 +38,19 @@ info:  3   *   1  /  2   *   y   ^   2   +   1  /  2   *   x   ^   2
       pure <| Syntax.prettyPrint exprSyntax
 
 example {x y : Rat} (f : 1/2*x + 1/2*y = 0) (g : 1/2*x + 1/2*y = 0) : (x + y)^2 = 0 := by
-  m2idealmem [f]
+  m2idealmem +grind [f]
 
 
 example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
-  m2idealmem [f,g]
+  m2idealmem +grind [f,g]
 
 example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
-  m2idealmem no_grind [f,g]
+  m2idealmem -grind [f,g]
+  clear f g
   grind
 
 example {x y z : Rat} (f : 2*x= 0) (g : 3*y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
-  m2idealmem [f, g, h]
+  m2idealmem +grind [f, g, h]
 
 variable {R : Type} [CommRing R] [ToExpr R]
 instance : Std.Associative (α := R) (.*.) := ⟨Semiring.mul_assoc⟩
@@ -58,8 +59,30 @@ instance : Std.Commutative (α := R) (.*.) := ⟨CommRing.mul_comm⟩
 instance : Std.Associative (α := R) (.+.) := ⟨Semiring.add_assoc⟩
 instance : Std.Commutative (α := R) (.+.) := ⟨Semiring.add_comm⟩
 
-#check Semiring.pow_succ
-example {x y z : R} (f : 2*x= 0) (g : 3*y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
-  m2idealmem no_grind [f, g, h]
-  ac_nf
-  sorry
+/--
+error: Could not show equality
+R : Type
+inst✝¹ : CommRing R
+inst✝ : ToExpr R
+x y z : R
+f : 2 * x = 0
+g : y = 0
+h : y + z = 0
+⊢ (x + y + z) ^ 4 =
+    0 + 0 * (2 * x) +
+        (6 * x ^ 2 * y + 4 * x * y ^ 2 + y ^ 3 + 6 * x ^ 2 * z + 12 * x * y * z + 4 * y ^ 2 * z + 8 * x * z ^ 2 +
+              6 * y * z ^ 2 +
+            3 * z ^ 3) *
+          y +
+      (4 * x ^ 3 + 6 * x ^ 2 * z + 4 * x * z ^ 2 + z ^ 3) * (y + z)
+-/
+#guard_msgs in
+example {x y z : R} (f : 2*x = 0) (g : y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
+  m2idealmem -grind [f, g, h]
+  fail_if_success grind
+  fail "Could not show equality"
+
+example {x y z : Rat} (f : 2*x = 0) (g : y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
+  m2idealmem -grind [f, g, h]
+  clear f g h
+  grind
