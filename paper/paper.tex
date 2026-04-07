@@ -69,9 +69,31 @@ This extend abstract discuss our approach and strategy along with current progre
 %
 \section{Design}
 
-The basic design is for a Lean tactic that calls Macaulay2
 \cite{lean}
 \cite{M2}
+
+The basic design is for a Lean tactic that calls Macaulay2. Currently, we implement two main tactics \verb|m2idealmem| and \verb|m2remainder|, both of which arise from the same underlying Macaulay2 operation of quotients and remainders over polynomial rings.
+
+The first tactic is designed to solve an expression of the form \verb|f = 0| where \verb|f| is a ``polynomial expression''. In particular, it should be a polynomial over some free variables in the context of \verb|f|. As an example
+
+\begin{verbatim}
+example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
+  m2idealmem +grind [f,g]
+\end{verbatim}
+
+Then to show vanishing, it suffices to show that $(x+y)^4$ is in the ideal $\langle 2x, 3y\rangle\subseteq \mathbb{Q}[x,y]$.
+
+I our initial implementation, we simplify the code by requiring that the hypotheses
+
+Prior to serialization to Macaulay2, the e
+
+\subsection*{Types and Serialization}
+
+
+
+\subsection*{Universalization to $\mathbb{Z}$}
+
+Not every ring has an easy representation that allows serialization to Macaulay2. However, even over general rings, many problems are rephrasable in terms of problems for integers and many polynomials have coefficients over the integers. As such, instead of providing an error when encountering an unknown ring, we first attempt to rephrase the question over the integers.
 
 \section{Implementation}
 
@@ -99,10 +121,16 @@ Putting these pieces together, if we want Lean to delegate a computation to Maca
 
 \subsection*{Polynomial Representation}
 
-For convenience, our current efforst reuse significant parts of the infrastructure of the \verb|grind| tactic.
+For convenience, our current efforts reuse significant parts of the infrastructure of the \verb|grind| tactic. As such, polynomials are represented using the \verb|Lean.Grind.CommRing.Poly| type.
+However, as this type models polynomials with integer coefficients
 
 \section{Future Directions}
 
+\subsection*{Other Computations}
+
+TODO
+
+\subsection*{Stored Computations}
 One goal is to make it easier to separate the calls to Macaualy2 and the actual proof in Lean. While for interactive and smaller proofs, the disadvantages is the requirement that a copy of Macaulay2 has to be installed whenever the the proof is to be checked. For this reason, a future goal is to add the ability to store the result of a tactic call to a file as to allow the computational step to run once and be exported to be used.
 
 There are two key advantages to such a format
@@ -112,6 +140,10 @@ There are two key advantages to such a format
 \end{enumerate}
 
 Here the use of the MRDI format makes it easier to achive this objective as MRDI is a format already desgined for storage and export/import \cite{}.
+
+\subsection*{Polynomial Format}
+
+While the current polynomial format maximizes reuse of grind related code, it is not clear that it is optimal for the purposes of communication with Macaulay2. Other possibilities include ....
 
 \begin{credits}
 \subsubsection{\ackname} A bold run-in heading in small font size at the end of the paper is
