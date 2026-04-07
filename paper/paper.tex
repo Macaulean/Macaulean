@@ -69,10 +69,13 @@ This extend abstract discuss our approach and strategy along with current progre
 %
 \section{Design}
 
+The basic design is for a Lean tactic that calls Macaulay2
 \cite{lean}
 \cite{M2}
 
 \section{Implementation}
+
+\subsection*{Communication}
 
 Due to its simplicity and ubiquity, it was decided that JSON (JavaScript Object Notation) would be used to facilitate communication between Macaulay2 and Lean.  In particular, the top-level communication is handled by the JSON-RPC protocol \cite{jsonrpc} and the mathematical objects are serialized using the MRDI file format \cite{mrdi}.
 
@@ -94,8 +97,21 @@ Consider, for example, the polynomial $3x^2 + \frac{1}{2}\in\QQ[x]$.  We store t
 
 Putting these pieces together, if we want Lean to delegate a computation to Macaulay2, then we may serialize any associated mathematical objects using MRDI, pass these as arguments to an appropriate method and send the corresponding JSON-RPC request to a server running in Macaulay2, de-serialize the mathematical objects in Macaulay2, run the requested computation, serialize any mathematical objects produced by this computation, pass the result in a JSON-RPC response back to Lean, and finally de-serialize the result in Lean.
 
+\subsection*{Polynomial Representation}
+
+For convenience, our current efforst reuse significant parts of the infrastructure of the \verb|grind| tactic.
+
 \section{Future Directions}
 
+One goal is to make it easier to separate the calls to Macaualy2 and the actual proof in Lean. While for interactive and smaller proofs, the disadvantages is the requirement that a copy of Macaulay2 has to be installed whenever the the proof is to be checked. For this reason, a future goal is to add the ability to store the result of a tactic call to a file as to allow the computational step to run once and be exported to be used.
+
+There are two key advantages to such a format
+\begin{enumerate}
+\item Reproducibility: If the computation is done once and exported
+\item Scalability: (I don't actually like phrasing it as scallability, but the point is correct) For larger computations, it is highly plausible that the computation may require resources, in the form of time or memory, beyond what is reasonable for the computer running the lean code. In such circumstances, to be able to cleanly export the problem is useful for separating the computation and the proof.
+\end{enumerate}
+
+Here the use of the MRDI format makes it easier to achive this objective as MRDI is a format already desgined for storage and export/import \cite{}.
 
 \begin{credits}
 \subsubsection{\ackname} A bold run-in heading in small font size at the end of the paper is
