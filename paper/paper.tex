@@ -71,6 +71,8 @@ This extend abstract discuss our approach and strategy along with current progre
 
 \section{Introduction}
 
+\cite{lean}
+\cite{M2}
 
 \section{Design}
 
@@ -94,39 +96,61 @@ As a general matter of design, an interface with a computer algebra system inten
       \node[fill = blue,text width = 1in] (lean-sol) at (4,-2) {Lean Certificate};
       \node[fill = blue,text width = 1in] (lean-proof) at (0,-2) {Lean Proof};
     \end{scope}
-    \draw[->,thick] (prop) -- (lean-prob);
-    \draw[->,thick] (lean-prob) -- (m2-prob);
-    \draw[->,thick] (m2-prob) -- (m2-sol);
-    \draw[->,thick] (m2-sol) -- (lean-sol);
-    \draw[->,thick] (lean-sol) -- (lean-proof);
+    \draw[->,very thick] (prop) -- (lean-prob);
+    \draw[->,very thick] (lean-prob) -- (m2-prob);
+    \draw[->,very thick] (m2-prob) -- (m2-sol);
+    \draw[->,very thick] (m2-sol) -- (lean-sol);
+    \draw[->,very thick] (lean-sol) -- (lean-proof);
+
+    \draw[dashed, thick] (6,-3) -- (6,1);
   \end{tikzpicture}
   \caption{The general steps by which a Lean proposition can be proved using a certificate from Macaulay2}
   \label{fig:steps}
 \end{figure}
 
 
-We emphasize here that the problem is different than the proposition, and the certificate is distinct from the proof. The problem consists of the mathematical data needed to construct the certificate and the certificate consists of the mathematical data needed to 
+We emphasize here that the problem is different than the proposition, and the certificate is distinct from the proof. The problem consists of the mathematical data needed to construct the certificate and the certificate consists of the mathematical data needed to construct the proof. This separation of the problem and the proposition along with the certificate and the proof is important, because are instances where two different classes of proposition may be solvable using the same underlying problem and certificate. This decouples the proof goal from the computational goal.
 
-In the case of ideal membership, we focus on solving propositions of the form \verb|f = 0| subject to hypotheses of the form \verb|h_1=0|,\ldots,\verb|h_n=0| where $f$ and $h_1,\ldots,h_n$ are polynomial expressions.
+For each potential class of problem to be solved using a computer algebra system, the exact details of the the content of both the problem and the certificate need to be defined and potentially tailored to the relevant computer algebra system. However, there is a common task of serializing and deserializing mathematical expressions. While here again the exact format needs to be tailored to the computer algebra system in question, we discuss in Section~\ref{} our approach. Moreover, while it is not within the scope of our current work, a more general system may define mechanisms for the discovery of problems solvable by computer algebra systems.
 
+\subsection*{The Ideal Membership Tactic}
+This basic framework is the how the two primary tactics we currently implement, \verb|m2idealmem| and \verb|m2remainder|, work.
 
-\cite{lean}
-\cite{M2}
-
-The basic design is for a Lean tactic that calls Macaulay2. Currently, we implement two main tactics \verb|m2idealmem| and \verb|m2remainder|, both of which arise from the same underlying Macaulay2 operation of quotients and remainders over polynomial rings.
-
-The first tactic is designed to solve an expression of the form \verb|f = 0| where \verb|f| is a ``polynomial expression''. In particular, it should be a polynomial over some free variables in the context of \verb|f|. To demonstrate the working principles of this operation, we work a small example.
-
+Focusing specifically on \verb|m2idealmem|, it is designed to solve the vanishing of a polynomial subject to the vanishing of other polynomials. For example, the code will correspond to the following parts
 \begin{verbatim}
 example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
-  m2idealmem +grind [f,g]
+  m2idealmem [f,g]
 \end{verbatim}
+
+
+\begin{figure}
+  \begin{tikzpicture}
+    \begin{scope}[fill opacity = 0.5, text opacity = 1,rounded corners]
+      \node[fill = blue,text width = 1in] (prop) at (0,0) {Lean Proposition $(x+y)^4=0$ with $2x=0$ and $3y=0$};
+      \node[fill = blue,text width = 1in] (lean-prob) at (4,0) {Lean Representation of a problem $((x+y)^4,2x,3y)$};
+      \node[fill = green,text width = 1in] (m2-prob) at (8,0) {Macaulay2 representation of a problem $((x+y)^4,2x,3y)$};
+      \node[fill = green,text width = 1in] (m2-sol) at (8,-2) {Macaulay2 representation of a certificate $\cdots$};
+      \node[fill = blue,text width = 1in] (lean-sol) at (4,-2) {Lean Certificate $\cdots$};
+      \node[fill = blue,text width = 1in] (lean-proof) at (0,-2) {Lean Proof $\cdots$};
+    \end{scope}
+    \draw[->,very thick] (prop) -- (lean-prob);
+    \draw[->,very thick] (lean-prob) -- (m2-prob);
+    \draw[->,very thick] (m2-prob) -- (m2-sol);
+    \draw[->,very thick] (m2-sol) -- (lean-sol);
+    \draw[->,very thick] (lean-sol) -- (lean-proof);
+
+    \draw[dashed, thick] (6,-3) -- (6,1);
+  \end{tikzpicture}
+  \caption{The specific data in reference to Figure~\ref{fig:steps} in the case of one potential ideal membership problem}
+  \label{fig:steps-example}
+\end{figure}
+
 
 NOTE: we should have an example that illustrates the subtleties with representations of polynomials and the sizes of the terms that can be involved even for seemingly ``small'' problems. Possibly cite the big benchmark example and give some numbers on how big it is.
 
 Then to show vanishing, it suffices to show that $(x+y)^4$ is in the ideal $\langle 2x, 3y\rangle\subseteq \mathbb{Q}[x,y]$.
 
-We send the expanded polynomial $f(x,y) = x^4+4x^3y+6x^2y^2+4xy^3+y^4$ to Macaulay2 along with the ideal generators $2x and 3y$. Then Macaualy2 will compute polynoials $q_1,q_2,r\in \mathbb{Q}[x,y]$ such that $q_1(x,y)\cdot 2x + q_2(x,y)\cdot 3y=f(x,y) = r(x,y)$.
+We send the expanded polynomial $f(x,y) = x^4+4x^3y+6x^2y^2+4xy^3+y^4$ to Macaulay2 along with the ideal generators $2x$ and $3y$. Then Macaualy2 will compute polynoials $q_1,q_2,r\in \mathbb{Q}[x,y]$ such that $q_1(x,y)\cdot 2x + q_2(x,y)\cdot 3y=f(x,y) = r(x,y)$.
 The polynomials $q_1$ and $q_2$ are not unique, and so a topic of some relevance is choosing optimal polynomials. Macaulay2 may not return polynomials that are computationally optimal. In this case the polynoials returned are $q_1(x,y) = \cdots$, and $q_2(x,y)= \cdots$. TODO FILL IN
 
 In the case of ideal membership, if the equality is expected, we should get $r=0$. Note that failure of ideal membership does not provide a disproof of the equality statement at hand.
@@ -139,15 +163,9 @@ After this computation, we effectively have two polynomial equalities to prove.
   For now we have an optional step to use the grind tactic to prove this polynomial equality, or we leave it to the user of the tactic to prove the equality, via whatever methods are relevant to the specific problem. Giving an efficient implementation of this step is a key step in our future directions \ref{}. 
 \end{enumerate}
 
-\subsection*{Types and Serialization}
-
-
-\subsection*{Communication}
-
-Give a high level mathematical overview of the data sent back and forth
-
 \subsection*{Universalization to $\mathbb{Z}$}
 
+There is one final feature of our current work of note.
 Not every ring has an easy representation that allows serialization to Macaulay2. However, even over general rings, many problems are rephrasable in terms of problems for integers and many polynomials have coefficients over the integers. As such, instead of providing an error when encountering an unknown ring, we first attempt to rephrase the question over the integers.
 
 \section{Implementation}
