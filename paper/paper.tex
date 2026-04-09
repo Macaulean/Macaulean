@@ -74,22 +74,42 @@ This extend abstract discuss our approach and strategy along with current progre
 
 The basic design is for a Lean tactic that calls Macaulay2. Currently, we implement two main tactics \verb|m2idealmem| and \verb|m2remainder|, both of which arise from the same underlying Macaulay2 operation of quotients and remainders over polynomial rings.
 
-The first tactic is designed to solve an expression of the form \verb|f = 0| where \verb|f| is a ``polynomial expression''. In particular, it should be a polynomial over some free variables in the context of \verb|f|. As an example
+The first tactic is designed to solve an expression of the form \verb|f = 0| where \verb|f| is a ``polynomial expression''. In particular, it should be a polynomial over some free variables in the context of \verb|f|. To demonstrate the working principles of this operation, we work a small example.
 
 \begin{verbatim}
 example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
   m2idealmem +grind [f,g]
 \end{verbatim}
 
+NOTE: we should have an example that illustrates the subtleties with representations of polynomials and the sizes of the terms that can be involved even for seemingly ``small'' problems. Possibly cite the big benchmark example and give some numbers on how big it is.
+
 Then to show vanishing, it suffices to show that $(x+y)^4$ is in the ideal $\langle 2x, 3y\rangle\subseteq \mathbb{Q}[x,y]$.
 
-I our initial implementation, we simplify the code by requiring that the hypotheses
+We send the expanded polynomial $f(x,y) = x^4+4x^3y+6x^2y^2+4xy^3+y^4$ to Macaulay2 along with the ideal generators $2x and 3y$. Then Macaualy2 will compute polynoials $q_1,q_2,r\in \mathbb{Q}[x,y]$ such that $q_1(x,y)\cdot 2x + q_2(x,y)\cdot 3y=f(x,y) = r(x,y)$.
+The polynomials $q_1$ and $q_2$ are not unique, and so a topic of some relevance is choosing optimal polynomials. Macaulay2 may not return polynomials that are computationally optimal. In this case the polynoials returned are $q_1(x,y) = \cdots$, and $q_2(x,y)= \cdots$. TODO FILL IN
 
-Prior to serialization to Macaulay2, the e
+In the case of ideal membership, if the equality is expected, we should get $r=0$. Note that failure of ideal membership does not provide a disproof of the equality statement at hand.
+
+After this computation, we effectively have two polynoial equalities to prove.
+
+\begin{enumerate}
+\item We want to show that subject to the constraints $2x=0$ and $3y=0$, that $q_1\cdot 2x + q_2\cdot 3y = 0$. This is proved by simply rewriting the expression using the equalities provided, and we do this directly.
+\item We want to show that the polynomials $q_1\cdot 2x + q_2 \cdot 3y =  x^4+4x^3y+6x^2y^2+4xy^3+y^4$. In theory this is simply a repeated application of the distributive, commutative, and associative laws. However, these expressions can be quite large, and so a significant difficulty which we do not yet address is the efficient proof of this equality.
+  For now we have an optional step to use the grind tactic to prove this polynomial equality, or we leave it to the user of the tactic to prove the equality, via whatever methods are relevant to the specific problem. Giving an efficient implementation of this step is a key step in our future directions \ref{}. 
+\end{enumerate}
+
+
+
+
+
+%Prior to serialization to Macaulay2, the e
 
 \subsection*{Types and Serialization}
 
 
+\subsection*{Communication}
+
+Give a high level mathematical overview of the data sent back and forth
 
 \subsection*{Universalization to $\mathbb{Z}$}
 
@@ -122,7 +142,7 @@ Putting these pieces together, if we want Lean to delegate a computation to Maca
 \subsection*{Polynomial Representation}
 
 For convenience, our current efforts reuse significant parts of the infrastructure of the \verb|grind| tactic. As such, polynomials are represented using the \verb|Lean.Grind.CommRing.Poly| type.
-However, as this type models polynomials with integer coefficients
+However, as this type models polynomials with integer coefficients, there are significant constraints to this 
 
 \section{Future Directions}
 
@@ -143,7 +163,12 @@ Here the use of the MRDI format makes it easier to achive this objective as MRDI
 
 \subsection*{Polynomial Format}
 
-While the current polynomial format maximizes reuse of grind related code, it is not clear that it is optimal for the purposes of communication with Macaulay2. Other possibilities include ....
+While the current polynomial format maximizes reuse of grind related code, it is not clear that it is optimal for our purposes. Other possibilities include ....
+
+The two major issues that need to be solved are the scale of the polynomials and the ease of communication with Macaulay2.
+
+Even when the problems are relatively small, either the Groebner basis or the coefficients used can be quite large. As an example of the potential scale of computations, The ideal membership problem for the question from ... is esentially immediate in Macaulay2. However equality of the resulting expressions is difficult to prove in lean using current tools due to the size of the expressions involved. Naive attempts at direct expansion using distributive, associative, and commutative laws tend to create very large proof terms.
+
 
 \begin{credits}
 \subsubsection{\ackname} A bold run-in heading in small font size at the end of the paper is
