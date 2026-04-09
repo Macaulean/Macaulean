@@ -10,6 +10,7 @@
 % Other font encondings may result in incorrect characters.
 %
 \usepackage{graphicx}
+\usepackage{tikz}
 % Used for displaying a sample figure. If possible, figure files should
 % be included in EPS format.
 %
@@ -67,7 +68,47 @@ This extend abstract discuss our approach and strategy along with current progre
 %
 %
 %
+
+\section{Introduction}
+
+
 \section{Design}
+
+As a general matter of design, an interface with a computer algebra system intended to prove statements in Lean must contain the following steps described in Figure\ref{fig:steps}:
+\begin{enumerate}
+\item Start with a proposition and hypotheses for a statement provable using the CAS
+\item Extract a computational problem from the proposition and hypotheses.
+\item Send the data to the CAS, including serialization and deserialization by Lean and Macaualy2 respectively.
+\item Solve the problem using the CAS, Resulting in a solution and a certificate in the form of some mathematical data
+\item Send the solution and the certificate to Lean, including again serialization and deserialization.
+\item Convert the solution and certificate to a proof of the original proposition.
+\end{enumerate}
+
+\begin{figure}
+  \begin{tikzpicture}
+    \begin{scope}[fill opacity = 0.5, text opacity = 1,rounded corners]
+      \node[fill = blue,text width = 1in] (prop) at (0,0) {Lean Proposition};
+      \node[fill = blue,text width = 1in] (lean-prob) at (4,0) {Lean Representation of a problem};
+      \node[fill = green,text width = 1in] (m2-prob) at (8,0) {Macaulay2 representation of a problem};
+      \node[fill = green,text width = 1in] (m2-sol) at (8,-2) {Macaulay2 representation of a certificate};
+      \node[fill = blue,text width = 1in] (lean-sol) at (4,-2) {Lean Certificate};
+      \node[fill = blue,text width = 1in] (lean-proof) at (0,-2) {Lean Proof};
+    \end{scope}
+    \draw[->,thick] (prop) -- (lean-prob);
+    \draw[->,thick] (lean-prob) -- (m2-prob);
+    \draw[->,thick] (m2-prob) -- (m2-sol);
+    \draw[->,thick] (m2-sol) -- (lean-sol);
+    \draw[->,thick] (lean-sol) -- (lean-proof);
+  \end{tikzpicture}
+  \caption{The general steps by which a Lean proposition can be proved using a certificate from Macaulay2}
+  \label{fig:steps}
+\end{figure}
+
+
+We emphasize here that the problem is different than the proposition, and the certificate is distinct from the proof. The problem consists of the mathematical data needed to construct the certificate and the certificate consists of the mathematical data needed to 
+
+In the case of ideal membership, we focus on solving propositions of the form \verb|f = 0| subject to hypotheses of the form \verb|h_1=0|,\ldots,\verb|h_n=0| where $f$ and $h_1,\ldots,h_n$ are polynomial expressions.
+
 
 \cite{lean}
 \cite{M2}
@@ -90,19 +131,13 @@ The polynomials $q_1$ and $q_2$ are not unique, and so a topic of some relevance
 
 In the case of ideal membership, if the equality is expected, we should get $r=0$. Note that failure of ideal membership does not provide a disproof of the equality statement at hand.
 
-After this computation, we effectively have two polynoial equalities to prove.
+After this computation, we effectively have two polynomial equalities to prove.
 
 \begin{enumerate}
 \item We want to show that subject to the constraints $2x=0$ and $3y=0$, that $q_1\cdot 2x + q_2\cdot 3y = 0$. This is proved by simply rewriting the expression using the equalities provided, and we do this directly.
 \item We want to show that the polynomials $q_1\cdot 2x + q_2 \cdot 3y =  x^4+4x^3y+6x^2y^2+4xy^3+y^4$. In theory this is simply a repeated application of the distributive, commutative, and associative laws. However, these expressions can be quite large, and so a significant difficulty which we do not yet address is the efficient proof of this equality.
   For now we have an optional step to use the grind tactic to prove this polynomial equality, or we leave it to the user of the tactic to prove the equality, via whatever methods are relevant to the specific problem. Giving an efficient implementation of this step is a key step in our future directions \ref{}. 
 \end{enumerate}
-
-
-
-
-
-%Prior to serialization to Macaulay2, the e
 
 \subsection*{Types and Serialization}
 
@@ -144,7 +179,9 @@ Putting these pieces together, if we want Lean to delegate a computation to Maca
 For convenience, our current efforts reuse significant parts of the infrastructure of the \verb|grind| tactic. As such, polynomials are represented using the \verb|Lean.Grind.CommRing.Poly| type.
 However, as this type models polynomials with integer coefficients, there are significant constraints to this 
 
-\section{Future Directions}
+\section{Future Goals}
+
+As this is a project in progress, there is significant work that still needs to be done.
 
 \subsection*{Other Computations}
 
