@@ -116,3 +116,13 @@ Communication in the M2-to-Lean direction: get proof certificates of computation
 Is it different/harder to verify that the algorithms that M2 uses to multiply polynomials are correct?
 
 ---
+
+## 2026-04-14 Tue - Term 2, Week 14
+
+Discussion about abstract for ICMS 2026.
+Plans for visits at the M2 conference in Warwick and at ICMS.
+
+Thinking about performance.
+Should we mimick closely the internal representation that Macaulay2 uses, prove that the operations are correct and get performant data-structures with step-by-step information available from Macaulay2 to guide proofs?
+
+---
