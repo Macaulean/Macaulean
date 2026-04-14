@@ -71,8 +71,10 @@ This extend abstract discuss our approach and strategy along with current progre
 
 \section{Introduction}
 
-\cite{lean}
-\cite{M2}
+With the goal of easing the use of computer algebra systems in proving statements in Lean\cite{lean}, we have built a system that translates specific problems to Macaulay2\cite{M2} and then their solutions along with the data of a certificate back to Lean. The work represented in this extended abstract is on going work, however, this paper presents the current state of the implementation as well as future goals. Of particular note is that our system does not rely on \verb|native_decide| and does not treat Macaulay2 as an oracle.
+
+Our communications protocol is built on well developed interfaces including a variation of the protocol used by LSP\cite{}, and the use of the MRDI format\cite{} to store seriaized mathematical objects. Our current implementation is built for ease of implementation and so reuses significant components of the grind tactic infrastructure. However, as we move towards a more mature implementation, we are reimplementing those parts for which optimizations specific to our goals add value.
+
 
 \section{Design}
 
@@ -201,10 +203,6 @@ However, as this type models polynomials with integer coefficients, there are si
 
 As this is a project in progress, there is significant work that still needs to be done.
 
-\subsection*{Other Computations}
-
-TODO
-
 \subsection*{Stored Computations}
 One goal is to make it easier to separate the calls to Macaualy2 and the actual proof in Lean. While for interactive and smaller proofs, the disadvantages is the requirement that a copy of Macaulay2 has to be installed whenever the the proof is to be checked. For this reason, a future goal is to add the ability to store the result of a tactic call to a file as to allow the computational step to run once and be exported to be used.
 
@@ -223,6 +221,10 @@ While the current polynomial format maximizes reuse of grind related code, it is
 The two major issues that need to be solved are the scale of the polynomials and the ease of communication with Macaulay2.
 
 Even when the problems are relatively small, either the Groebner basis or the coefficients used can be quite large. As an example of the potential scale of computations, The ideal membership problem for the question from ... is esentially immediate in Macaulay2. However equality of the resulting expressions is difficult to prove in lean using current tools due to the size of the expressions involved. Naive attempts at direct expansion using distributive, associative, and commutative laws tend to create very large proof terms.
+
+\subsection*{Other Computations}
+
+
 
 
 \begin{credits}
