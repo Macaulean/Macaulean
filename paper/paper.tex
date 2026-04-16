@@ -59,7 +59,7 @@
 \begin{abstract}
 
   Our project aims to build tools that ease the use of Macaulay2 and potentially other computer algebra systems with Lean.
-Our current work focuses on using Macaulay2 to prove statements over commutative rings by using Macaulay2 to construct certificates. This includes in particular work with ideal membership and Groebner bases.
+Our current work focuses on using Macaulay2 to prove statements over commutative rings by using Macaulay2 to construct certificates. This includes in particular work with ideal membership and Gr\"{o}bner bases.
 This extend abstract discuss our approach and strategy along with current progress and future goals.
 %This is work with Matthew Ballard, Anton Leykin, Damiano Testa, and Doug Torrance as part of the ``Bridging Proof and Computation'' project sponsered by Renaissance Philanthropy.
 
@@ -71,10 +71,13 @@ This extend abstract discuss our approach and strategy along with current progre
 
 \section{Introduction}
 
-With the goal of easing the use of computer algebra systems in proving statements in Lean\cite{lean}, we have built a system that translates specific problems to Macaulay2\cite{M2} and then their solutions along with the data of a certificate back to Lean. The work represented in this extended abstract is on going work, however, this paper presents the current state of the implementation as well as future goals. Of particular note is that our system does not rely on \verb|native_decide| and does not treat Macaulay2 as an oracle.
+There have been many efforts to build bridges between computer algebra systems and theorem provers \cites{}
+
+With the goal of easing the use of computer algebra systems in proving statements in Lean\cite{lean}, we have built a system that translates specific problems to Macaulay2\cite{M2} and then their solutions along with the data of a certificate back to Lean. The work represented in this extended abstract is on going work, however, this paper presents the current state of the implementation as well as future goals. Our approach 
+
+Of particular note is that our system does not rely on \verb|native_decide| and does not treat Macaulay2 as an oracle.
 
 Our communications protocol is built on well developed interfaces including a variation of the protocol used by LSP\cite{}, and the use of the MRDI format\cite{} to store serialized mathematical objects. Our current implementation is built for ease of implementation and so reuses significant components of the grind tactic infrastructure. However, as we move towards a more mature implementation, we are re-implementing those parts for which optimizations specific to our goals add value.
-
 
 \section{Design}
 
@@ -116,9 +119,9 @@ We emphasize here that the problem is different than the proposition, and the ce
 For each potential class of problem to be solved using a computer algebra system, the exact details of the content of both the problem and the certificate need to be defined and potentially tailored to the relevant computer algebra system. However, there is a common task of serializing and deserializing mathematical expressions. While here again the exact format needs to be tailored to the computer algebra system in question, we discuss in Section~\ref{} our approach. Moreover, while it is not within the scope of our current work, a more general system may define mechanisms for the discovery of problems solvable by computer algebra systems.
 
 \subsection*{The Ideal Membership Tactic}
-This basic framework is the how the two primary tactics we currently implement, \verb|m2idealmem| and \verb|m2remainder|, work.
+We currently implement two tactics, \verb|m2idealmem| and \verb|m2remainder|, both of which are based on the \verb|quotientRemainder| operation in Macaulay2. The Macaulay2 operation computes the quotient and remainder of a polynomial relative to an ideal. As both tactics share most of the underlying code, we focus here on the \verb|m2idealmem| tactic.
 
-Focusing specifically on \verb|m2idealmem|, it is designed to solve the vanishing of a polynomial subject to the vanishing of other polynomials. For example, the code will correspond to the following parts
+THe \verb|m2idealmem| tactic is designed to solve the vanishing of a polynomial subject to the vanishing of other polynomials, such as in the following example.
 \begin{verbatim}
 example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
   m2idealmem [f,g]
@@ -168,7 +171,14 @@ After this computation, we effectively have two polynomial equalities to prove.
 \subsection*{Universalization to $\mathbb{Z}$}
 
 There is one final feature of our current work of note.
-Not every ring has an easy representation that allows serialization to Macaulay2. However, even over general rings, many problems are rephrasable in terms of problems for integers and many polynomials have coefficients over the integers. As such, instead of providing an error when encountering an unknown ring, we first attempt to rephrase the question over the integers.
+Not every ring has an easy representation that allows serialization to Macaulay2. However, even over general rings, many problems are rephrasable in terms of problems for integers and many polynomials have coefficients over the integers. As such, instead of providing an error when encountering an unknown ring, we first attempt to rephrase the question over the integers. As an example, the following 
+\begin{verbatim}
+example [CommRing R] {x y z : R} (f : x = 0) (g : y = 0) (h : y+z=0)
+  : (x + y + z)^4 = 0 := by
+  m2idealmem -grind [f, g, h]
+  clear f g h
+  grind
+\end{verbatim}
 
 \section{Implementation}
 
