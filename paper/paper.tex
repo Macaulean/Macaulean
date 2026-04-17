@@ -7,7 +7,7 @@
 \usepackage[T1]{fontenc}
 % T1 fonts will be used to generate the final print and online PDFs,
 % so please use T1 fonts in your manuscript whenever possible.
-% Other font encondings may result in incorrect characters.
+% Other font encodings may result in incorrect characters.
 %
 \usepackage{graphicx}
 \usepackage{tikz}
@@ -61,8 +61,8 @@
 %
 \begin{abstract}
 
-  Our project aims to build tools that ease the use of Macaulay2 and potentially other computer algebra systems with Lean.
-Our current work focuses on proving statements over commutative rings by using Macaulay2 to construct certificates. This includes in particular work with ideal membership and Gr\"{o}bner bases.
+  Our project aims to build tools that ease the use of Macaulay2, and potentially other computer algebra systems, with Lean.
+Our current work focuses on proving statements over commutative rings by using Macaulay2 to construct certificates. This includes, in particular, work with ideal membership and Gr\"{o}bner bases.
 This extended abstract discusses our approach and strategy along with current progress and future goals.
 %This is work with Matthew Ballard, Anton Leykin, Damiano Testa, and Doug Torrance as part of the ``Bridging Proof and Computation'' project sponsered by Renaissance Philanthropy.
 
@@ -74,7 +74,7 @@ This extended abstract discusses our approach and strategy along with current pr
 
 \section{Introduction}
 
-There has been a long history of efforts to build bridges between computer algebra systems and theorem provers. This work has included many different theorem provers and computer algebra systems \cite{harrison-thery,DelahayeMayero2006}. Additionally, there have been attempts to build frameworks for specifying interfaces between computer algebra systems and theorem provers \cite{BertoliP.G.2006Saio}. Attempts specific to Lean include the now defunct \texttt{polyrith} tactic\cite{polyrith}, as well as more recent efforts in \cite{DSLean}. We also point out previous work in formalizing Gr\"{o}bner bases in Isabelle/HOL\cite{MaletzkyImmler2018}
+There has been a long history of efforts to build bridges between computer algebra systems and theorem provers. This work has included many different theorem provers and computer algebra systems \cite{harrison-thery,DelahayeMayero2006}. Additionally, there have been attempts to build frameworks for specifying interfaces between computer algebra systems and theorem provers \cite{BertoliP.G.2006Saio}. Attempts specific to Lean include the now-defunct \texttt{polyrith} tactic\cite{polyrith}, as well as more recent efforts in \cite{DSLean}. We also point out previous work in formalizing Gr\"{o}bner bases in Isabelle/HOL\cite{MaletzkyImmler2018}.
 
 Inspired by such connections and the increasing relevance of automated theorem proving, we aim to build a bridge between Macaulay2\cite{M2} and Lean\cite{lean} with a particular emphasis on reasoning about algebraic expressions via polynomial computations. The work represented in this extended abstract is ongoing.  However, this paper presents the current state of the implementation as well as future goals.
 
@@ -101,8 +101,8 @@ Given a problem like that of Example~\ref{ex:simple-example}, we must broadly sp
 
 \begin{enumerate}
 \item Extract a computational problem from the proposition and hypotheses.
-\item Send the problem to Macaulay2, including serialization and deserialization by Lean and Macaualy2 respectively.
-\item Solve the problem using the Macaulay2.
+\item Send the problem to Macaulay2, including serialization and deserialization by Lean and Macaulay2 respectively.
+\item Solve the problem using Macaulay2.
 \item Send the solution and the certificate to Lean, including again serialization and deserialization.
 \item Convert the solution and certificate to a proof of the original proposition.
 \end{enumerate}
@@ -130,7 +130,7 @@ Given a problem like that of Example~\ref{ex:simple-example}, we must broadly sp
 \end{figure}
 
 
-We emphasize here that the underlying computational problem is distinct from the proposition to be proven and the certificate is distinct from the proof. The problem consists of the mathematical data needed to construct the certificate and the certificate consists of the mathematical data needed to construct the proof. This separation of the problem and the proposition along with the certificate and the proof is important, because are instances where two different classes of proposition may be solvable using the same underlying problem and certificate. This decouples the proof goal from the computational goal.
+We emphasize here that the underlying computational problem is distinct from the proposition to be proven and the certificate is distinct from the proof. The problem consists of the mathematical data needed to construct the certificate and the certificate consists of the mathematical data needed to construct the proof. This separation of the problem and the proposition along with the certificate and the proof is important, because there are instances where two different classes of proposition may be solvable using the same underlying problem and certificate. This decouples the proof goal from the computational goal.
 
 %% For each potential class of problem to be solved using a computer algebra system, the exact details of the content of both the problem and the certificate need to be defined and potentially tailored to the relevant computer algebra system. However, there is a common task of serializing and deserializing mathematical expressions. While here again the exact format needs to be tailored to the computer algebra system in question, we discuss in Section~\ref{} our approach. Moreover, while it is not within the scope of our current work, a more general system may define mechanisms for the discovery of problems solvable by computer algebra systems.
 
@@ -157,7 +157,7 @@ The core tactic is \texttt{m2idealmem}. Here it takes as parameters the two prop
 which we use \texttt{grind} to show. The call to \texttt{clear} simply removes the two hypotheses from the context so that grind cannot use them.
 \end{example}
 
-Of particular note in this example are that the polynomials returned from Macaulay2, in this case $\frac{1}{2}x^3+2x^2y+3xy^2+2y^3$ and $\frac{1}{3}y^3$, are highly non-unique, and different choices will have performance implications. Second, while the implementation of quotient and remainder in Macaulay2 is via Gr\"{o}bner bases, we do not return the Gr\"{o}bner bases to Lean at any phase of this computation.
+Of particular note in this example is that the polynomials returned from Macaulay2, in this case $\frac{1}{2}x^3+2x^2y+3xy^2+2y^3$ and $\frac{1}{3}y^3$, are highly non-unique, and different choices will have performance implications. Second, while the implementation of quotient and remainder in Macaulay2 uses Gr\"{o}bner bases, we do not return the Gr\"{o}bner bases to Lean at any phase of this computation.
 
 Finally, while we currently outsource the final polynomial equality step to \texttt{grind}, ongoing work is to give a more efficient implementation of this step, tailored towards the polynomial equality statements that we require. For more on this ongoing work see Section~\ref{sec:future}.
 
@@ -188,8 +188,8 @@ Finally, while we currently outsource the final polynomial equality step to \tex
 
 \subsection*{Universalization to $\mathbb{Z}$}
 
-There is one final feature of our current work of note.
-Not every ring has an easy representation that allows serialization to Macaulay2. However, even over general rings, many problems can be lifted to the integers especially if the relevant expressions have coefficients over the integers. As such, instead of providing an error when encountering an unknown ring, we first attempt to rephrase the question over the integers. We can see this in the following example
+There is one final feature of our current work worth noting.
+Not every ring has an easy representation that allows serialization to Macaulay2. However, even over general rings, many problems can be lifted to the integers especially if the relevant expressions have coefficients over the integers. As such, instead of providing an error when encountering an unknown ring, we first attempt to rephrase the question over the integers. We can see this in the following example:
 \begin{verbatim}
 example [CommRing R] {x y z : R} (f : x = 0) (g : y = 0) (h : y+z=0)
   : (x + y + z)^4 = 0 := by
@@ -201,13 +201,13 @@ example [CommRing R] {x y z : R} (f : x = 0) (g : y = 0) (h : y+z=0)
 \section{Implementation}
 \label{sec:implementation}
 
-In the discussion in Section~\ref{sec:design}, we have ignored the details of the representation of the mathematical objects on both sides as well as the details of the communication protocal between them. Our current efforts attempt to maximize reuse of existing code for this by employing standard formats and protocols.
+In the discussion in Section~\ref{sec:design}, we have ignored the details of the representation of the mathematical objects on both sides as well as the details of the communication protocol between them. Our current efforts attempt to maximize reuse of existing code for this by employing standard formats and protocols.
 
 \subsection*{Communication}
 
 Due to its simplicity and ubiquity, it was decided that JSON (JavaScript Object Notation) would be used to facilitate communication between Macaulay2 and Lean.  In particular, the top-level communication is handled by the JSON-RPC protocol \cite{jsonrpc} and the mathematical objects are serialized using the MRDI file format \cite{mrdi}.
 
-The ``RPC'' in JSON-RPC stands for \textit{remote procedure call}.  It is a protocol that defines a set of JSON objects for clients to make requests and servers to send responses.  It is the foundation of the Language Server Protocol \cite{lsp} used by a wide variety of editors and which is fundamental to the user experience in Lean.  Since both Lean and Macaulay2 already support JSON-RPC, it was a natural choice upon which to build the interface.
+The ``RPC'' in JSON-RPC stands for \textit{remote procedure call}.  It is a protocol that defines a set of JSON objects for clients to make requests and servers to send responses.  It is the foundation of the Language Server Protocol \cite{lsp}, used by a wide variety of editors, and which is fundamental to the user experience in Lean.  Since both Lean and Macaulay2 already support JSON-RPC, it was a natural choice upon which to build the interface.
 
 The MRDI file format is used for serializing mathematical objects in the OSCAR computer algebra system \cite{OSCAR-Book,OSCAR}, but it was designed with the idea that it could be used for the same purpose in other systems.  Each MRDI file contains a single JSON object with at least one key, \texttt{\_type}, for specifying the particular type of the object.  Additionally, it may have a \texttt{\_ns} key for specifying the namespace (such as the particular computer algebra system), a \texttt{data} key for information about the object.  Some of the values under the \texttt{\_type} and \texttt{data} keys may contain \textit{universally unique identifiers} (or UUID's) for additional objects, and further information about these objects is stored under the \texttt{\_refs} key.
 
@@ -241,11 +241,11 @@ Here the use of the MRDI format makes it easier to achieve this objective as MRD
 
 \subsection*{Polynomial Format}
 
-While the current polynomial format maximizes reuse of \texttt{grind}-related code, it is not clear that it is optimal for our purposes. The challenge of this polynomial format is that it should have be simple to deserialize and serialize and have a performant polynomial equality in the kernel. It is comparatively easy to achive the first objective with a variety of different methods, but to carefully structure the underlying operations to be performant in the kernel requires care.
+While the current polynomial format maximizes reuse of \texttt{grind}-related code, it is not clear that it is optimal for our purposes. The challenge of this polynomial format is that it should be simple to deserialize and serialize and have a performant polynomial equality in the kernel. It is comparatively easy to achieve the first objective with a variety of different methods, but to carefully structure the underlying operations to be performant in the kernel requires care.
 
 As an example of the potential scale of computations and why our current approach does not suffice, consider the example from \url{https://github.com/leanprover/lean4/issues/11861}, reproduced in the appendix as Example~\ref{ex:big-example}. The computation of the quotient and remainder step is essentially immediate in Macaulay2, completing in a few seconds on a desktop computer. However, the computation results in large polynomials for the quotient, with the largest of them being 16024 terms. While the serialization and deserialization of the terms proceeds without difficulty, the size of the term means that we are unable to prove the required polynomial equality using our current approach. In particular the resulting Lean expression is so large as to cause difficulties even when the polynomial equality step is replaced by a call to \texttt{sorry}.
 
-Our aim for the new polynomial format is by passing to polynomials in the proof rather than directly manipulating the expressions over the underlying ring, the proof terms will be considerably more managable.
+Our aim for the new polynomial format is by passing to polynomials in the proof rather than directly manipulating the expressions over the underlying ring, the proof terms will be considerably more manageable.
 
 
 However equality of the resulting expressions is difficult to prove in Lean using current tools due to the size of the expressions involved. Na\"ive attempts at direct expansion using distributive, associative, and commutative laws tend to create very large proof terms.
