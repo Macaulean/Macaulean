@@ -62,8 +62,8 @@
 \begin{abstract}
 
   Our project aims to build tools that ease the use of Macaulay2 and potentially other computer algebra systems with Lean.
-Our current work focuses on using Macaulay2 to prove statements over commutative rings by using Macaulay2 to construct certificates. This includes in particular work with ideal membership and Gr\"{o}bner bases.
-This extend abstract discuss our approach and strategy along with current progress and future goals.
+Our current work focuses on proving statements over commutative rings by using Macaulay2 to construct certificates. This includes in particular work with ideal membership and Gr\"{o}bner bases.
+This extended abstract discusses our approach and strategy along with current progress and future goals.
 %This is work with Matthew Ballard, Anton Leykin, Damiano Testa, and Doug Torrance as part of the ``Bridging Proof and Computation'' project sponsered by Renaissance Philanthropy.
 
 \keywords{First keyword  \and Second keyword \and Another keyword.}
@@ -74,16 +74,16 @@ This extend abstract discuss our approach and strategy along with current progre
 
 \section{Introduction}
 
-There has been a long history of efforts to build bridges between computer algbera systems and theorem provers. This includes with many different theorem provers and computer algebra systems \cite{harrison-thery,DelahayeMayero2006}. Additionally, there have been attempts to build frameworks for specifying interfaces between computer algbera systems and theorem provers \cite{BertoliP.G.2006Saio}. Specific to lean includes the now defunct \texttt{polyrith} tactic\cite{polyrith}, as well as more recent efforts in \cite{DSLean}. We also point out previous work in formalizing Gr\"{o}bner bases in Isabelle/HOL\cite{MaletzkyImmler2018}
+There has been a long history of efforts to build bridges between computer algebra systems and theorem provers. This work has included many different theorem provers and computer algebra systems \cite{harrison-thery,DelahayeMayero2006}. Additionally, there have been attempts to build frameworks for specifying interfaces between computer algebra systems and theorem provers \cite{BertoliP.G.2006Saio}. Attempts specific to Lean include the now defunct \texttt{polyrith} tactic\cite{polyrith}, as well as more recent efforts in \cite{DSLean}. We also point out previous work in formalizing Gr\"{o}bner bases in Isabelle/HOL\cite{MaletzkyImmler2018}
 
-Inspired by such connections and the increasing relevance of automated theorem proving, we aim to build a bridge between Macaulay2\cite{M2} and Lean\cite{lean} with a particular emphasis on reasoning about algebraic expressions via polynomial computations. The work represented in this extended abstract is on going work, however, this paper presents the current state of the implementation as well as future goals.
+Inspired by such connections and the increasing relevance of automated theorem proving, we aim to build a bridge between Macaulay2\cite{M2} and Lean\cite{lean} with a particular emphasis on reasoning about algebraic expressions via polynomial computations. The work represented in this extended abstract is ongoing.  However, this paper presents the current state of the implementation as well as future goals.
 
-Our communications protocol is built on well developed interfaces including a variation of the protocol used by LSP\cite{lsp}, and the use of the MRDI format\cite{mrdi} to store serialized mathematical objects. Our current implementation is built for ease of implementation and so reuses significant components of the grind tactic infrastructure. However, as we move towards a more mature implementation, we are re-implementing those parts for which optimizations specific to our goals are required.
+Our communications protocol is built on well developed interfaces including a variation of the protocol used by LSP\cite{lsp}, and the use of the MRDI format\cite{mrdi} to store serialized mathematical objects. Our current implementation is built for ease of implementation and so reuses significant components of the \texttt{grind} tactic infrastructure. However, as we move towards a more mature implementation, we are re-implementing those parts for which optimizations specific to our goals are required.
 
 \section{Design}
 \label{sec:design}
 
-As compared to the recent work in \cite{DSLean}, our goal is not to represent the full Macaulay2 language in Lean, rather to build an interface and framework to allow passing specific computational problems and certificates to and from Macaulay2. Moreover, as we serailize and deserialize problems rather than Macaulay2 expressions, we do not need to carefully specify either the Macaulay2 language in lean or vice-versa. Instead the serialization and deserialization steps handle the interface between the languages. While our interface requires each individual computational problem of interest to be specified, there are advantages in the relative robustness of the interface between the languages to changes on either side.
+As compared to the recent work in \cite{DSLean}, our goal is not to represent the full Macaulay2 language in Lean, but rather to build an interface and framework to allow passing specific computational problems and certificates to and from Macaulay2. Moreover, as we serialize and deserialize problems rather than Macaulay2 expressions, we do not need to carefully specify either the Macaulay2 language in Lean or vice-versa. Instead, the serialization and deserialization steps handle the interface between the languages. While our interface requires each individual computational problem of interest to be specified, there are advantages in the relative robustness of the interface between the languages to changes on either side.
 
 The types of expressions that we aim to consider are what we will call ``polynomial expressions''. In this case this means expressions in Lean that are a combination of addition, multiplication, and positive integer exponents over a commutative ring. Equivalently, each of the expressions we consider should be polynomials over some set of variables in the context of the expression. Phrasing in terms of polynomial expressions means that we do not require the user to manually convert their expressions to polynomials for processing.
 
@@ -136,7 +136,7 @@ We emphasize here that the underlying computational problem is distinct from the
 
 \subsection*{The Ideal Membership Tactic}
 
-The user visible interface for our code is primarily in the form of Lean tactics to allow us to easily read and modify the proof state.
+The user-visible interface for our code is primarily in the form of Lean tactics to allow us to easily read and modify the proof state.
 We currently implement two tactics, \verb|m2idealmem| and \verb|m2remainder|, both of which are based on the \verb|quotientRemainder| operation in Macaulay2. The Macaulay2 operation computes the quotient and remainder of a polynomial relative to an ideal. As both tactics share most of the underlying code, we focus here on the \verb|m2idealmem| tactic.
 
 
@@ -150,16 +150,16 @@ example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
   grind
 \end{verbatim}
 
-The core tactic is \texttt{m2idealmem}. Here it takes as parameters the two propositions \texttt{f} and \texttt{g}, each of which represents the vanishing of a polynomial over $x$ and $y$. Here the addition of \texttt{-grind} supresses the step where we use grind the prove a polynomial equality. After sending the polynomial $(x+y)^4$ and the ideal generators $2x$ and $3y$ to Macualay2, the result of the \verb|m2idealmem| tactic then is a goal of the form
+The core tactic is \texttt{m2idealmem}. Here it takes as parameters the two propositions \texttt{f} and \texttt{g}, each of which represents the vanishing of a polynomial over $x$ and $y$. Here the addition of \texttt{-grind} supresses the step where we use grind the prove a polynomial equality. After sending the polynomial $(x+y)^4$ and the ideal generators $2x$ and $3y$ to Macaulay2, the result of the \verb|m2idealmem| tactic then is a goal of the form
 \begin{verbatim}
 (x+y)^4 = ((1/2)*x^3+2*x^2*y+3*x*y^2+2*y^3)*(2 * x) + ((1/3)*y^3)*(3*y)
 \end{verbatim}
-Which we use \texttt{grind} to show. The call to \texttt{clear} simply removes the two hypotheses from the context so that grind cannot use them.
+which we use \texttt{grind} to show. The call to \texttt{clear} simply removes the two hypotheses from the context so that grind cannot use them.
 \end{example}
 
-Of particular note in this example are that the polynomials returned from Macaulay2, in this case $\frac{1}{2}x^3+2x^2y+3xy^2+2y^3$ and $\frac{1}{3}y^3$ are highly non-unique, and different choices will have performance implications. Second, while the implementation of quotient and remainder in Macaulay2 is via Gr\"{o}bner bases, we do not return the Gr\"{o}bner bases to Lean at any phase of this computation.
+Of particular note in this example are that the polynomials returned from Macaulay2, in this case $\frac{1}{2}x^3+2x^2y+3xy^2+2y^3$ and $\frac{1}{3}y^3$, are highly non-unique, and different choices will have performance implications. Second, while the implementation of quotient and remainder in Macaulay2 is via Gr\"{o}bner bases, we do not return the Gr\"{o}bner bases to Lean at any phase of this computation.
 
-Finally, while we currently outsource the final polynomial equality step to grind, ongoing work is to give a more efficient implementation of this step, tailored towards the polynomial equality statements that we require. For more on this ongoing work see Section~\ref{sec:future}.
+Finally, while we currently outsource the final polynomial equality step to \texttt{grind}, ongoing work is to give a more efficient implementation of this step, tailored towards the polynomial equality statements that we require. For more on this ongoing work see Section~\ref{sec:future}.
 
 %% \begin{figure}
 %%   \begin{tikzpicture}
@@ -235,20 +235,20 @@ For convenience, our current efforts reuse significant parts of the infrastructu
 As this is a project in progress, there are some key points where the implementation is still progressing.
 
 \subsection*{Stored Computations}
-One goal is to make it easier to separate the calls to Macaualy2 and the actual proof in Lean. While the current structure is very useful for interactive work or smaller proofs, there are a few disadvantages with requiring this approach. First is the requirement that a copy of Macaulay2 has to be installed whenever the proof is to be checked. But more significantly, for problems where the computation may require non-trivial resources, the ability to load solutions from a file allows for the separation of the proof stage and the computational stage.
+One goal is to make it easier to separate the calls to Macaulay2 and the actual proof in Lean. While the current structure is very useful for interactive work or smaller proofs, there are a few disadvantages with requiring this approach. First is the requirement that a copy of Macaulay2 has to be installed whenever the proof is to be checked. But more significantly, for problems where the computation may require non-trivial resources, the ability to load solutions from a file allows for the separation of the proof stage and the computational stage.
 
-Here the use of the MRDI format makes it easier to achieve this objective as MRDI is a format already designed with storage and export/import in mind. In particular its UUID based design allows for an implementation where the deserialization of the data is not dependent on the particular state of the computation from when it was serialized.
+Here the use of the MRDI format makes it easier to achieve this objective as MRDI is a format already designed with storage and export/import in mind. In particular its UUID-based design allows for an implementation where the deserialization of the data is not dependent on the particular state of the computation from when it was serialized.
 
 \subsection*{Polynomial Format}
 
-While the current polynomial format maximizes reuse of grind related code, it is not clear that it is optimal for our purposes. The challenge of this polynomial format is that it should have be simple to deserialize and serialize and have a performant polynomial equality in the kernel. It is comparatively easy to achive the first objective with a variety of different methods, but to carefully structure the underlying operations to be performant in the kernel requires care.
+While the current polynomial format maximizes reuse of \texttt{grind}-related code, it is not clear that it is optimal for our purposes. The challenge of this polynomial format is that it should have be simple to deserialize and serialize and have a performant polynomial equality in the kernel. It is comparatively easy to achive the first objective with a variety of different methods, but to carefully structure the underlying operations to be performant in the kernel requires care.
 
 As an example of the potential scale of computations and why our current approach does not suffice, consider the example from \url{https://github.com/leanprover/lean4/issues/11861}, reproduced in the appendix as Example~\ref{ex:big-example}. The computation of the quotient and remainder step is essentially immediate in Macaulay2, completing in a few seconds on a desktop computer. However, the computation results in large polynomials for the quotient, with the largest of them being 16024 terms. While the serialization and deserialization of the terms proceeds without difficulty, the size of the term means that we are unable to prove the required polynomial equality using our current approach. In particular the resulting Lean expression is so large as to cause difficulties even when the polynomial equality step is replaced by a call to \texttt{sorry}.
 
 Our aim for the new polynomial format is by passing to polynomials in the proof rather than directly manipulating the expressions over the underlying ring, the proof terms will be considerably more managable.
 
 
-However equality of the resulting expressions is difficult to prove in Lean using current tools due to the size of the expressions involved. Naive attempts at direct expansion using distributive, associative, and commutative laws tend to create very large proof terms.
+However equality of the resulting expressions is difficult to prove in Lean using current tools due to the size of the expressions involved. Na\"ive attempts at direct expansion using distributive, associative, and commutative laws tend to create very large proof terms.
 
 
 
