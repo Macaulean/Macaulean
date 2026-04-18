@@ -66,7 +66,7 @@ Our current work focuses on proving statements over commutative rings by using M
 This extended abstract discusses our approach and strategy along with current progress and future goals.
 %This is work with Matthew Ballard, Anton Leykin, Damiano Testa, and Doug Torrance as part of the ``Bridging Proof and Computation'' project sponsered by Renaissance Philanthropy.
 
-\keywords{First keyword  \and Second keyword \and Another keyword.}
+\keywords{Lean  \and Macaulay2 \and Commutative Algebra \and Computer Algebra System.}
 \end{abstract}
 %
 %
@@ -89,11 +89,11 @@ The types of expressions that we aim to consider are what we will call ``polynom
 
 \begin{example}
   \label{ex:simple-example}
-  As a simple example of the types of statements we aim to prove, consider the following Lean example:
+  As a simple example of the types of statements we aim to prove, consider the following Lean proposition:
 \begin{verbatim}
   example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0
 \end{verbatim}
-This example represents the mathematical statement that for variables $x,y\in \mathbb{Q}$, if $2*x = 0$ and $3*y = 0$ then $(x+y)^4=0$. While this problem is simple, it is a good example of the format of proposition that our current code aims to prove.
+This example represents the mathematical statement that for variables $x,y\in \mathbb{Q}$, if $2x = 0$ and $3y = 0$ then $(x+y)^4=0$. While this problem is simple, it is a good example of the format of proposition that our current code aims to prove.
 \end{example}
 
 %% As a general matter of design, our interface takes a lean proposition to be proven, along with a list of hypotheses of the form $f = 0$ where $f$ is a polynomial expression
@@ -110,12 +110,12 @@ Given a problem like that of Example~\ref{ex:simple-example}, we must broadly sp
 \begin{figure}
   \begin{tikzpicture}
     \begin{scope}[fill opacity = 0.5, text opacity = 1,rounded corners]
-      \node[fill = blue,text width = 1in] (prop) at (0,0) {Lean Proposition};
-      \node[fill = blue,text width = 1in] (lean-prob) at (4,0) {Lean Representation of a problem};
-      \node[fill = green,text width = 1in] (m2-prob) at (8,0) {Macaulay2 representation of a problem};
-      \node[fill = green,text width = 1in] (m2-sol) at (8,-2) {Macaulay2 representation of a certificate};
-      \node[fill = blue,text width = 1in] (lean-sol) at (4,-2) {Lean Certificate};
-      \node[fill = blue,text width = 1in] (lean-proof) at (0,-2) {Lean Proof};
+      \node[fill = green,minimum width = 1in, align=center] (prop) at (0,0) {Lean Proposition};
+      \node[fill = green,minimum width = 1in] (lean-prob) at (4,0) {Lean Problem};
+      \node[fill = blue,minimum width = 1in,align=center] (m2-prob) at (8,0) {Macaulay2\\ Problem};
+      \node[fill = blue,minimum width = 1in,align=center] (m2-sol) at (8,-2) {Macaulay2\\ Certificate};
+      \node[fill = green,minimum width = 1in] (lean-sol) at (4,-2) {Lean Certificate};
+      \node[fill = green,minimum width = 1in] (lean-proof) at (0,-2) {Lean Proof};
     \end{scope}
     \draw[->,very thick] (prop) -- (lean-prob) node[midway,above] {1};
     \draw[->,very thick] (lean-prob) -- (m2-prob) node[midway,above] {2};
@@ -150,14 +150,14 @@ example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
   grind
 \end{verbatim}
 
-The core tactic is \texttt{m2idealmem}. Here it takes as parameters the two propositions \texttt{f} and \texttt{g}, each of which represents the vanishing of a polynomial over $x$ and $y$. Here the addition of \texttt{-grind} supresses the step where we use grind the prove a polynomial equality. After sending the polynomial $(x+y)^4$ and the ideal generators $2x$ and $3y$ to Macaulay2, the result of the \verb|m2idealmem| tactic then is a goal of the form
+The tactic we implement is \texttt{m2idealmem}. Here it takes as parameters the two propositions \texttt{f} and \texttt{g}, each of which represents the vanishing of a polynomial over $x$ and $y$. Here the addition of \texttt{-grind} supresses the step where we use grind the prove a polynomial equality. After sending the polynomial $(x+y)^4$ and the ideal generators $2x$ and $3y$ to Macaulay2, the result of the \verb|m2idealmem| tactic then is a goal of the form
 \begin{verbatim}
-(x+y)^4 = ((1/2)*x^3+2*x^2*y+3*x*y^2+2*y^3)*(2 * x) + ((1/3)*y^3)*(3*y)
+(x+y)^4=((1/2)*x^3+2*x^2*y+3*x*y^2+2*y^3)*(2 * x)+((1/3)*y^3)*(3*y)
 \end{verbatim}
 which we use \texttt{grind} to show. The call to \texttt{clear} simply removes the two hypotheses from the context so that grind cannot use them.
 \end{example}
 
-Of particular note in this example is that the polynomials returned from Macaulay2, in this case $\frac{1}{2}x^3+2x^2y+3xy^2+2y^3$ and $\frac{1}{3}y^3$, are highly non-unique, and different choices will have performance implications. Second, while the implementation of quotient and remainder in Macaulay2 uses Gr\"{o}bner bases, we do not return the Gr\"{o}bner bases to Lean at any phase of this computation.
+We remark that the polynomials used as coefficients, in this case $\frac{1}{2}x^3+2x^2y+3xy^2+2y^3$ and $\frac{1}{3}y^3$, are highly non-unique, and different choices will have performance implications. Second, while the implementation of quotient and remainder in Macaulay2 uses Gr\"{o}bner bases, we do not return the Gr\"{o}bner bases to Lean at any phase of this computation.
 
 Finally, while we currently outsource the final polynomial equality step to \texttt{grind}, ongoing work is to give a more efficient implementation of this step, tailored towards the polynomial equality statements that we require. For more on this ongoing work see Section~\ref{sec:future}.
 
@@ -227,7 +227,7 @@ Putting these pieces together, if we want Lean to delegate a computation to Maca
 
 \subsection*{Polynomial Representation}
 
-For convenience, our current efforts reuse significant parts of the infrastructure of the \verb|grind| tactic. As such, polynomials are represented using the \verb|Lean.Grind.CommRing.Poly| type. Implicitly, this models polynomials with integer coefficients, so as discussed above to translate polynomials with non-integer coefficients, we add auxiliary variables to the polynomial which are then assigned the individual non-integer coefficients.
+For convenience, our current efforts reuse significant parts of the infrastructure of the \verb|grind| tactic. As such, polynomials are represented using the type \texttt{Lean.Grind.CommRing.Poly}. Implicitly, this models polynomials with integer coefficients, so as discussed above to translate polynomials with non-integer coefficients, we add auxiliary variables to the polynomial which are then assigned the individual non-integer coefficients.
 
 \section{Ongoing Work and Future Directions}
 \label{sec:future}
@@ -237,21 +237,15 @@ As this is a project in progress, there are some key points where the implementa
 \subsection*{Stored Computations}
 One goal is to make it easier to separate the calls to Macaulay2 and the actual proof in Lean. While the current structure is very useful for interactive work or smaller proofs, there are a few disadvantages with requiring this approach. First is the requirement that a copy of Macaulay2 has to be installed whenever the proof is to be checked. But more significantly, for problems where the computation may require non-trivial resources, the ability to load solutions from a file allows for the separation of the proof stage and the computational stage.
 
-Here the use of the MRDI format makes it easier to achieve this objective as MRDI is a format already designed with storage and export/import in mind. In particular its UUID-based design allows for an implementation where the deserialization of the data is not dependent on the particular state of the computation from when it was serialized.
+Our use of the MRDI format makes it easier to achieve this objective as MRDI is a format already designed with storage and export/import in mind. In particular its UUID-based design allows for an implementation where the deserialization of the data is not dependent on the particular state of the computation from when it was serialized.
 
 \subsection*{Polynomial Format}
 
 While the current polynomial format maximizes reuse of \texttt{grind}-related code, it is not clear that it is optimal for our purposes. The challenge of this polynomial format is that it should be simple to deserialize and serialize and have a performant polynomial equality in the kernel. It is comparatively easy to achieve the first objective with a variety of different methods, but to carefully structure the underlying operations to be performant in the kernel requires care.
 
-As an example of the potential scale of computations and why our current approach does not suffice, consider the example from \url{https://github.com/leanprover/lean4/issues/11861}, reproduced in the appendix as Example~\ref{ex:big-example}. The computation of the quotient and remainder step is essentially immediate in Macaulay2, completing in a few seconds on a desktop computer. However, the computation results in large polynomials for the quotient, with the largest of them being 16024 terms. While the serialization and deserialization of the terms proceeds without difficulty, the size of the term means that we are unable to prove the required polynomial equality using our current approach. In particular the resulting Lean expression is so large as to cause difficulties even when the polynomial equality step is replaced by a call to \texttt{sorry}.
+As an example of the potential scale of computations and why our current approach does not suffice, consider the example from \url{https://github.com/leanprover/lean4/issues/11861}, reproduced in the appendix as Example~\ref{ex:big-example}. The computation of the quotient and remainder step is essentially immediate in Macaulay2, completing in a few seconds on a desktop computer. However, the computation results in large polynomials for the quotient, with the largest of them having 16024 terms. While the serialization and deserialization of the terms proceeds without difficulty, the size of the term means that we are unable to prove the required polynomial equality using our current approach. The resulting Lean expression is so large as to cause difficulties even when the polynomial equality step is replaced by a call to \texttt{sorry}.
 
 Our aim for the new polynomial format is by passing to polynomials in the proof rather than directly manipulating the expressions over the underlying ring, the proof terms will be considerably more manageable.
-
-
-However equality of the resulting expressions is difficult to prove in Lean using current tools due to the size of the expressions involved. Na\"ive attempts at direct expansion using distributive, associative, and commutative laws tend to create very large proof terms.
-
-
-
 
 \begin{credits}
   \subsubsection{\ackname} The work in this paper was funded by the Renaissance Philanthropy AI for Math Grant ``Bridging Proof and Computation''.
