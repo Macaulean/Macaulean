@@ -126,3 +126,12 @@ Thinking about performance.
 Should we mimick closely the internal representation that Macaulay2 uses, prove that the operations are correct and get performant data-structures with step-by-step information available from Macaulay2 to guide proofs?
 
 ---
+
+## 2026-04-21 Tue - Term 3, Week 0
+
+Discussed improvements to serialisation of MRDI files, to minimise repetitions.
+Using quotient types for finite sets or explicit sorting of lists to find representatives of monomials with given orders.
+
+Efficiency and implementation of polynomial operations. What operations M2 does on polynomials and are they traceable? Try to follow what M2 does for verification.
+
+---
