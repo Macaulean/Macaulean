@@ -1,0 +1,324 @@
+% This is samplepaper.tex, a sample chapter demonstrating the
+% LLNCS macro package for Springer Computer Science proceedings;
+% Version 2.21 of 2022/01/12
+%
+\documentclass[runningheads]{llncs}
+%
+\usepackage[T1]{fontenc}
+% T1 fonts will be used to generate the final print and online PDFs,
+% so please use T1 fonts in your manuscript whenever possible.
+% Other font encodings may result in incorrect characters.
+%
+\usepackage{graphicx}
+\usepackage{tikz}
+% Used for displaying a sample figure. If possible, figure files should
+% be included in EPS format.
+%
+\usepackage{hyperref}
+% If you use the hyperref package, please uncomment the following two lines
+% to display URLs in blue roman font according to Springer's eBook style:
+\usepackage{color}
+\renewcommand\UrlFont{\color{blue}\rmfamily}
+\urlstyle{rm}
+
+\usepackage{listings}
+\usepackage{fancyvrb}
+
+\usepackage{amssymb}
+\newcommand{\QQ}{\mathbb Q}
+\newcommand{\ZZ}{\mathbb Z}
+
+%
+\begin{document}
+%
+\title{A Macaulay2-Lean interface for proofs in Lean}
+%
+%\titlerunning{Abbreviated paper title}
+% If the paper title is too long for the running head, you can set
+% an abbreviated paper title here
+%
+\author{
+  Matthew Ballard\inst{1}\orcidID{0000-0001-5819-0159} \and
+  Anton Leykin\inst{2}\orcidID{0000-0002-9216-3514} \and
+  Michael E. Stillman\inst{3}\orcidID{0000-0003-0078-3116} \and
+  Damiano Testa\inst{4}\orcidID{0009-0004-5949-6861} \and
+  Douglas A. Torrance\inst{5}\orcidID{0000-0003-3999-4973} \and
+  Jay Yang\inst{6}\orcidID{0000-0001-8366-423X}
+  }
+%
+\authorrunning{M. Ballard et al.}
+% First names are abbreviated in the running head.
+% If there are more than two authors, 'et al.' is used.
+%
+\institute{University of South Carolina, Columbia SC 29208, USA \email{ballard@math.sc.edu} \and
+  Georgia Institute of Technology, Atlanta GA 30332, USA \email{leykin@math.gatech.edu} \and
+  Cornell University, Ithaca NY 14850, USA \email{mes15@cornell.edu}\and
+  University of Warwick, Coventry CV4 7AL, UK \email{D.Testa@warwick.ac.uk} \and
+  Piedmont University, Demorest GA 30535 \email{dtorrance@piedmont.edu} \and
+  Vanderbilt University, Nashville TN 37235 \email{jay.k.yang@vanderbilt.edu}}
+%
+\maketitle              % typeset the header of the contribution
+%
+\begin{abstract}
+
+  Our project aims to build tools that ease the use of Macaulay2, and potentially other computer algebra systems, with Lean.
+  Our current work focuses on proving statements over commutative rings by using Macaulay2 to construct certificates.
+  This initial work focus on proving vanishing of polynomial expressions using ideal membership computations in Macaulay2.
+  This extended abstract discusses our approach and strategy along with current progress and future goals.
+  %This is work with Matthew Ballard, Anton Leykin, Damiano Testa, and Doug Torrance as part of the ``Bridging Proof and Computation'' project sponsered by Renaissance Philanthropy.
+
+\keywords{Lean  \and Macaulay2 \and Commutative Algebra \and Computer Algebra System.}
+\end{abstract}
+%
+%
+%
+
+\section{Introduction}
+
+There has been a long history of efforts to build bridges between computer algebra systems and theorem provers. This work has included many different theorem provers and computer algebra systems \cite{harrison-thery,DelahayeMayero2006}. Additionally, there have been attempts to build frameworks for specifying interfaces between computer algebra systems and theorem provers \cite{BertoliP.G.2006Saio}. Attempts specific to Lean include the now-defunct \texttt{polyrith} tactic\cite{polyrith}, as well as more recent efforts in \cite{DSLean}. We also point out previous work in formalizing Gr\"{o}bner bases in Isabelle/HOL\cite{MaletzkyImmler2018}.
+
+Inspired by such connections and the increasing relevance of automated theorem proving, we aim to build a bridge between Macaulay2\cite{M2} and Lean\cite{lean} with a particular emphasis on reasoning about algebraic expressions via polynomial computations. The work represented in this extended abstract is ongoing.  However, this paper presents the current state of the implementation as well as future goals.
+
+Our communications protocol is built on well developed interfaces including a variation of the protocol used by LSP\cite{lsp}, and the use of the MRDI format\cite{mrdi} to store serialized mathematical objects. Our current implementation is built for ease of implementation and so reuses significant components of the \texttt{grind} tactic infrastructure. However, as we move towards a more mature implementation, we are re-implementing those parts for which optimizations specific to our goals are required.
+
+\section{Design}
+\label{sec:design}
+
+As compared to the recent work in \cite{DSLean}, our goal is not to represent the full Macaulay2 language in Lean, but rather to build an interface and framework to allow passing specific computational problems and certificates to and from Macaulay2. Moreover, as we serialize and de-serialize problems rather than Macaulay2 expressions, we do not need to carefully specify either the Macaulay2 language in Lean or vice-versa. Instead, the serialization and de-serialization steps handle the interface between the languages. While our interface requires each individual computational problem of interest to be specified, there are advantages in the relative robustness of the interface between the languages to changes on either side.
+
+The types of expressions that we aim to consider are what we will call ``polynomial expressions''. In this case this means expressions in Lean that are a combination of addition, multiplication, and positive integer exponents over a commutative ring. Equivalently, each of the expressions we consider should be polynomials over some set of variables in the context of the expression. Phrasing in terms of polynomial expressions means that we do not require the user to manually convert their expressions to polynomials for processing.
+
+\begin{example}
+  \label{ex:simple-example}
+  As a simple example of the types of statements we aim to prove, consider the following Lean proposition:
+\begin{verbatim}
+  example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0
+\end{verbatim}
+This example represents the mathematical statement that for variables $x,y\in \mathbb{Q}$, if $2x = 0$ and $3y = 0$ then $(x+y)^4=0$. While this problem is simple, it is a good example of the format of proposition that our current code aims to prove.
+\end{example}
+
+%% As a general matter of design, our interface takes a lean proposition to be proven, along with a list of hypotheses of the form $f = 0$ where $f$ is a polynomial expression
+Given a problem like that of Example~\ref{ex:simple-example}, we must broadly speaking do the following steps, which we illustrate in Figure~\ref{fig:steps}:
+
+\begin{enumerate}
+\item Extract a computational problem from the proposition and hypotheses.
+\item Send the problem to Macaulay2, including serialization and de-serialization by Lean and Macaulay2 respectively.
+\item Solve the problem using Macaulay2.
+\item Send the solution and the certificate to Lean, including again serialization and de-serialization.
+\item Convert the solution and certificate to a proof of the original proposition.
+\end{enumerate}
+
+\begin{figure}
+  \begin{tikzpicture}
+    \begin{scope}[fill opacity = 0.5, text opacity = 1,rounded corners]
+      \node[fill = green,minimum width = 1in, align=center] (prop) at (0,0) {Lean Proposition};
+      \node[fill = green,minimum width = 1in] (lean-prob) at (4,0) {Lean Problem};
+      \node[fill = blue,minimum width = 1in,align=center] (m2-prob) at (8,0) {Macaulay2\\ Problem};
+      \node[fill = blue,minimum width = 1in,align=center] (m2-sol) at (8,-2) {Macaulay2\\ Certificate};
+      \node[fill = green,minimum width = 1in] (lean-sol) at (4,-2) {Lean Certificate};
+      \node[fill = green,minimum width = 1in] (lean-proof) at (0,-2) {Lean Proof};
+    \end{scope}
+    \draw[->,very thick] (prop) -- (lean-prob) node[midway,above] {1};
+    \draw[->,very thick] (lean-prob) -- (m2-prob) node[midway,above] {2};
+    \draw[->,very thick] (m2-prob) -- (m2-sol) node[midway,right] {3};
+    \draw[->,very thick] (m2-sol) -- (lean-sol) node[midway,above] {4};
+    \draw[->,very thick] (lean-sol) -- (lean-proof) node[midway,above] {5};
+
+    \draw[dashed, thick] (5.7,-3) -- (5.7,1);
+  \end{tikzpicture}
+  \caption{The general steps by which a Lean proposition is translated to a computation in Macaulay2 and then returned to construct a proof in Lean}
+  \label{fig:steps}
+\end{figure}
+
+
+We emphasize here that the underlying computational problem is distinct from the proposition to be proven and the certificate is distinct from the proof. The problem consists of the mathematical data needed to construct the certificate and the certificate consists of the mathematical data needed to construct the proof. This separation of the problem and the proposition along with the certificate and the proof is important, because there are instances where two different classes of proposition may be solvable using the same underlying problem and certificate. This decouples the proof goal from the computational goal.
+
+%% For each potential class of problem to be solved using a computer algebra system, the exact details of the content of both the problem and the certificate need to be defined and potentially tailored to the relevant computer algebra system. However, there is a common task of serializing and deserializing mathematical expressions. While here again the exact format needs to be tailored to the computer algebra system in question, we discuss in Section~\ref{} our approach. Moreover, while it is not within the scope of our current work, a more general system may define mechanisms for the discovery of problems solvable by computer algebra systems.
+
+\subsection*{The Ideal Membership Tactic}
+
+The user-visible interface for our code is primarily in the form of Lean tactics to allow us to easily read and modify the proof state.
+We currently implement two tactics, \verb|m2idealmem| and \verb|m2remainder|, both of which are based on the \verb|quotientRemainder| operation in Macaulay2. The Macaulay2 operation computes the quotient and remainder of a polynomial relative to an ideal. As both tactics share most of the underlying code, we focus here on the \verb|m2idealmem| tactic.
+
+
+
+\begin{example}
+Given the example in Example~\ref{ex:simple-example}, seen above, our tactic can solve it using Macaulay2
+\begin{verbatim}
+example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
+  m2idealmem -grind [f,g]
+  clear f g
+  grind
+\end{verbatim}
+
+The tactic we implement is \texttt{m2idealmem}. Here it takes as parameters the two propositions \texttt{f} and \texttt{g}, each of which represents the vanishing of a polynomial over $x$ and $y$. Here the addition of \texttt{-grind} supresses the step where we use grind the prove a polynomial equality. After sending the polynomial $(x+y)^4$ and the ideal generators $2x$ and $3y$ to Macaulay2, the result of the \verb|m2idealmem| tactic then is a goal of the form
+\begin{verbatim}
+(x+y)^4=((1/2)*x^3+2*x^2*y+3*x*y^2+2*y^3)*(2 * x)+((1/3)*y^3)*(3*y)
+\end{verbatim}
+which we use \texttt{grind} to show. The call to \texttt{clear} simply removes the two hypotheses from the context so that grind cannot use them.
+\end{example}
+
+We remark that the polynomials used as coefficients, in this case $\frac{1}{2}x^3+2x^2y+3xy^2+2y^3$ and $\frac{1}{3}y^3$, are highly non-unique, and different choices will have performance implications. Second, while the implementation of quotient and remainder in Macaulay2 uses Gr\"{o}bner bases, we do not return the Gr\"{o}bner bases to Lean at any phase of this computation.
+
+Finally, we currently outsource the final polynomial equality step to \texttt{grind}, however ongoing work is to give a more efficient implementation of this step, tailored towards the polynomial equality statements that we require. For more on this ongoing work see Section~\ref{sec:future}.
+
+%% \begin{figure}
+%%   \begin{tikzpicture}
+%%     \begin{scope}[fill opacity = 0.5, text opacity = 1,rounded corners, scale = 1.1]
+%%       \node[fill = blue,text width = 1.1in] (prop) at (0,0) {Lean Proposition $(x+y)^4=0$ with $2x=0$ and $3y=0$};
+%%       \node[fill = blue,text width = 1.1in] (lean-prob) at (4,0) {Lean Representation of a problem $((x+y)^4,2x,3y)$};
+%%       \node[fill = green,text width = 1.1in] (m2-prob) at (8,0) {Macaulay2 representation of a problem $((x+y)^4,2x,3y)$};
+%%       \node[fill = green,text width = 1.1in] (m2-sol) at (8,-2) {Macaulay2 representation of a certificate $\cdots$};
+%%       \node[fill = blue,text width = 1.1in] (lean-sol) at (4,-2) {Lean Certificate $\cdots$};
+%%       \node[fill = blue,text width = 1.1in] (lean-proof) at (0,-2) {Lean Proof $\cdots$};
+%%       \draw[dashed, thick] (6,-3) -- (6,1);
+%%     \end{scope}
+%%     \draw[->,very thick] (prop) -- (lean-prob);
+%%     \draw[->,very thick] (lean-prob) -- (m2-prob);
+%%     \draw[->,very thick] (m2-prob) -- (m2-sol);
+%%     \draw[->,very thick] (m2-sol) -- (lean-sol);
+%%     \draw[->,very thick] (lean-sol) -- (lean-proof);
+
+%%   \end{tikzpicture}
+%%   \caption{The specific data in reference to Figure~\ref{fig:steps} in the case of one potential ideal membership problem}
+%%   \label{fig:steps-example}
+%% \end{figure}
+
+
+%NOTE: we should have an example that illustrates the subtleties with representations of polynomials and the sizes of the terms that can be involved even for seemingly ``small'' problems. Possibly cite the big benchmark example and give some numbers on how big it is.
+
+\subsection*{Universalization to $\mathbb{Z}$}
+
+There is one final feature of our current work worth noting.
+Not every ring has an easy representation that allows serialization to Macaulay2. However, even over general rings, many problems can be lifted to the integers especially if the relevant expressions have coefficients over the integers. As such, instead of providing an error when encountering an unknown ring, we first attempt to rephrase the question over the integers. We can see this in the following example:
+\begin{verbatim}
+example [CommRing R] {x y z : R} (f : x = 0) (g : y = 0) (h : y+z=0)
+  : (x + y + z)^4 = 0 := by
+  m2idealmem -grind [f, g, h]
+  clear f g h
+  grind
+\end{verbatim}
+
+\section{Implementation}
+\label{sec:implementation}
+
+In the discussion in Section~\ref{sec:design}, we have ignored the details of the representation of the mathematical objects on both sides as well as the details of the communication protocol between them. Our current efforts attempt to maximize reuse of existing code for this by employing standard formats and protocols.
+
+\subsection*{Communication}
+
+Due to its simplicity and ubiquity, it was decided that JSON (JavaScript Object Notation) would be used to facilitate communication between Macaulay2 and Lean.  In particular, the top-level communication is handled by the JSON-RPC protocol \cite{jsonrpc} and the mathematical objects are serialized using the MRDI file format \cite{mrdi}.
+
+The ``RPC'' in JSON-RPC stands for \textit{remote procedure call}.  It is a protocol that defines a set of JSON objects for clients to make requests and servers to send responses.  It is the foundation of the Language Server Protocol \cite{lsp}, used by a wide variety of editors, and which is fundamental to the user experience in Lean.  Since both Lean and Macaulay2 already support JSON-RPC, it was a natural choice upon which to build the interface.
+
+The MRDI file format is used for serializing mathematical objects in the OSCAR computer algebra system \cite{OSCAR-Book,OSCAR}, but it was designed with the idea that it could be used for the same purpose in other systems.  Each MRDI file contains a single JSON object with at least one key, \texttt{\_type}, for specifying the particular type of the object.  Additionally, it may have a \texttt{\_ns} key for specifying the namespace (such as the particular computer algebra system), a \texttt{data} key for information about the object.  Some of the values under the \texttt{\_type} and \texttt{data} keys may contain \textit{universally unique identifiers} (or UUID's) for additional objects, and further information about these objects is stored under the \texttt{\_refs} key.
+
+Consider, for example, the polynomial $3x^2 + \frac{1}{2}\in\QQ[x]$.  We store this as $3y_0^2 + y_1\in\ZZ[y_0,y_1]$ together with the map $y_1\mapsto\frac{1}{2}$.  See the example below.
+
+\begin{verbatim}
+{"_type": {"params": "Rat", "name": "ConcretePoly"},
+ "data": {"poly": "a8ea4eb2-4393-45b0-ba9a-0c91716a55d3",
+          "coefficients": [["1", ["1", "2"]]]},
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.26.0-rc1"]},
+ "_refs": {"a8ea4eb2-4393-45b0-ba9a-0c91716a55d3":
+            {"_type": "LeanGrindCommRingPoly",
+             "data": [["3", [["0", "2"]]], ["1", [["1", "1"]]]]}}}
+\end{verbatim}
+
+Putting these pieces together, when we delagate a computation from Lean to Macaulay2, then we may serialize any associated mathematical objects using MRDI, pass these as arguments to an appropriate method and send the corresponding JSON-RPC request to a server running in Macaulay2, de-serialize the mathematical objects in Macaulay2, run the requested computation, serialize any mathematical objects produced by this computation, pass the result in a JSON-RPC response back to Lean, and finally de-serialize the result in Lean.
+
+\subsection*{Polynomial Representation}
+
+For convenience, our current efforts reuse parts of the infrastructure of the \verb|grind| tactic. One such reuse is our polynomial representation. We use the \texttt{Lean.Grind.CommRing.Poly} type for this purpose. The limitation of this type is that the it is designed to model polynomials with integer coefficients. To handle non-integer coefficients,  we add auxiliary variables to the polynomial which are then assigned the individual non-integer coefficients.
+
+\section{Ongoing Work and Future Directions}
+\label{sec:future}
+
+As this is a project in progress, there are some key points where the implementation is still progressing.
+
+\subsection*{Stored Computations}
+One goal is to make it easier to separate the calls to Macaulay2 and the actual proof in Lean. While the current structure is very useful for interactive work or smaller proofs, there are a few disadvantages with requiring this approach. First is the requirement that a copy of Macaulay2 has to be installed whenever the proof is to be checked. But more significantly, for problems where the computation may require non-trivial resources, the ability to load solutions from a file allows for the separation of the proof stage and the computational stage.
+
+Our use of the MRDI format makes it easier to achieve this objective as MRDI is a format already designed with storage and export/import in mind. In particular its UUID-based design allows for an implementation where the de-serialization of the data is not dependent on the particular state of the computation from when it was serialized.
+
+\subsection*{Polynomial Format}
+
+While the current polynomial representation maximizes reuse of \texttt{grind}-related code, it is not clear that it is optimal for our purposes. The challenge of this polynomial format is that it should be simple to de-serialize and serialize and have a performant polynomial equality in the kernel. It is comparatively easy to achieve the first objective with a variety of different methods, but to carefully structure the underlying operations to be performant in the kernel requires care.
+
+As an example of the potential scale of computations and why our current approach does not suffice, consider the example from \url{https://github.com/leanprover/lean4/issues/11861}, reproduced in the appendix as Example~\ref{ex:big-example}. The computation of the quotient and remainder step is essentially immediate in Macaulay2, completing in a few seconds on a desktop computer. However, the computation results in large polynomials for the quotient, with the largest of them having 16024 terms. While the serialization and de-serialization of the terms proceeds without difficulty, the size of the term means that we are unable to prove the required polynomial equality using our current approach. The resulting Lean expression is so large as to cause difficulties even when the polynomial equality step is replaced by a call to \texttt{sorry}.
+
+Our aim for the new polynomial format is by passing to polynomials in the proof rather than directly manipulating the expressions over the underlying ring, the proof terms will be considerably more manageable.
+
+\begin{credits}
+  \subsubsection{\ackname} The work in this paper was funded by the Renaissance Philanthropy AI for Math Grant ``Bridging Proof and Computation''.
+
+  %A bold run-in heading in small font size at the end of the paper is
+%used for general acknowledgments, for example: This study was funded
+%by X (grant number Y).
+
+\subsubsection{\discintname}
+The authors have no competing interests to declare that are
+relevant to the content of this article.
+\end{credits}
+%
+% ---- Bibliography ----
+%
+% BibTeX users should specify bibliography style 'splncs04'.
+% References will then be sorted and formatted in the correct style.
+%
+\bibliographystyle{splncs04}
+\bibliography{mybibliography}
+\newpage
+\section*{Appendix}
+\begin{example}
+  \label{ex:big-example}
+  \, \\
+  \begin{small}
+\begin{verbatim}
+example
+  (u r k x y z a b c : Rat)
+  (ho : (x - u * z) ^ 2 + y ^ 2 - r ^ 2 * z ^ 2 = 0)
+  (hi : a ^ 2 + b ^ 2 - c ^ 2 = 0)
+  (hpq : x * a + y * b - z * c = 0)
+  (hk : k ^ 2 - (u + r) ^ 2 + 1 = 0) :
+  (r *
+            ((k * x + ((u + r) ^ 2 - 1) * y) * c ^ 2 +
+              (2 * u * k * a ^ 2 + u * ((u + r) ^ 2 - 2) * a * b +
+                      (r * (u + r) - 2) * k * a * c +
+                    (2 - (u + r) * (u + 2 * r)) * b * c -
+                  u * k * c ^ 2) *
+                z) +
+          r * ((u + r) * a - c) * ((u + r) * b + k * c) * z * u) ^
+        4 *
+      y ^ 2 -
+    r ^ 2 * 2 ^ 2 * k ^ 2 * z ^ 2 *
+      (r ^ 2 *
+            (((k * x + ((u + r) ^ 2 - 1) * y) * c ^ 2 +
+                  (2 * u * k * a ^ 2 + u * ((u + r) ^ 2 - 2) * a * b +
+                          (r * (u + r) - 2) * k * a * c +
+                        (2 - (u + r) * (u + 2 * r)) * b * c -
+                      u * k * c ^ 2) *
+                    z) ^
+                3 *
+              (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z)) +
+          (1 - u ^ 2 - r ^ 2) *
+            (((k * x + ((u + r) ^ 2 - 1) * y) * c ^ 2 +
+                  (2 * u * k * a ^ 2 + u * ((u + r) ^ 2 - 2) * a * b +
+                          (r * (u + r) - 2) * k * a * c +
+                        (2 - (u + r) * (u + 2 * r)) * b * c -
+                      u * k * c ^ 2) *
+                    z) ^
+                2 *
+              (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 2) +
+        u ^ 2 *
+            ((k * x + ((u + r) ^ 2 - 1) * y) * c ^ 2 +
+              (2 * u * k * a ^ 2 + u * ((u + r) ^ 2 - 2) * a * b +
+                      (r * (u + r) - 2) * k * a * c +
+                    (2 - (u + r) * (u + 2 * r)) * b * c -
+                  u * k * c ^ 2) *
+                z) *
+          (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 3) = 0
+\end{verbatim}
+  \end{small}
+\end{example}
+
+\end{document}
