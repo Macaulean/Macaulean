@@ -5,6 +5,7 @@
   Vector Nat n for monomials.
 -/
 import Lean
+import MRDI
 open Lean Grind CommRing
 namespace Macaulean
 
@@ -32,6 +33,9 @@ inductive Expr (R : Type) (n : Nat) where
   | product (factors : List (Expr R n))
   | pow (p : Expr R n) (n : Nat)
   | term (term : PolyTerm R n)
+
+instance [MrdiType R] : MrdiType (Polynomial R n) := sorry
+instance [MrdiType R] : MrdiType (Polynomial.Expr R n) := sorry
 
 end Polynomial
 
@@ -179,6 +183,12 @@ def isSorted : List (PolyTerm R n) → Bool
   | [_] => true
   | t₁ :: t₂ :: ts => t₁.monomial.grevlex t₂.monomial == .gt && isSorted (t₂ :: ts)
 
+def removeZeros [Zero R] [BEq R] (p : List (PolyTerm R n)) : List (PolyTerm R n) :=
+  p.filter (fun ⟨c, _⟩ => c != 0)
+
+abbrev Normalized [Semiring R] (p : Polynomial R n) : Prop :=
+  Sorted p.terms ∧ (∀ t ∈ p.terms, t.coefficient ≠ 0)
+
 def denoteTerms [Grind.CommRing R] (ctx : Context R) : List (PolyTerm R n) → R
   | [] => 0
   | t :: ts => t.coefficient * t.monomial.denote ctx + denoteTerms ctx ts
@@ -207,12 +217,12 @@ def insertTerm [Grind.CommRing R]
 /-
 Addition helpers
 -/
-def addTerm [Grind.CommRing R] [DecidableEq R]
+def addTerm [Grind.CommRing R]
     (p : Polynomial R n) (c : R) (m : Mon n) : Polynomial R n :=
   ⟨insertTerm c m p.terms⟩
 
 @[reducible]
-def mergeTerms [Grind.CommRing R] [BEq R]
+def mergeTerms [Grind.CommRing R]
     (xs ys : List (PolyTerm R n))
  : List (PolyTerm R n) :=
   match xs, ys with
@@ -235,10 +245,10 @@ def mergeTerms [Grind.CommRing R] [BEq R]
           ⟨c, x.monomial⟩ :: tailFunc ts'
         | .lt => t :: (takeTillGE x ts' tailFunc)
 
-def add [Grind.CommRing R] [DecidableEq R] (p q : Polynomial R n) : Polynomial R n :=
-  ⟨mergeTerms p.terms q.terms⟩
+def add [Grind.CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
+  ⟨removeZeros <| mergeTerms p.terms q.terms⟩
 
-instance [Grind.CommRing R] [DecidableEq R] : Add (Polynomial R n) := ⟨add⟩
+instance [Grind.CommRing R] [BEq R] : Add (Polynomial R n) := ⟨add⟩
 
 /-
 Negation and subtraction
@@ -248,10 +258,10 @@ def neg [Neg R] (p : Polynomial R n) : Polynomial R n :=
 
 instance [Neg R] : Neg (Polynomial R n) := ⟨neg⟩
 
-def sub [Grind.CommRing R] [DecidableEq R] (p q : Polynomial R n) : Polynomial R n :=
+def sub [Grind.CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
   add p (neg q)
 
-instance [Grind.CommRing R] [DecidableEq R] : Sub (Polynomial R n) := ⟨sub⟩
+instance [Grind.CommRing R] [BEq R] : Sub (Polynomial R n) := ⟨sub⟩
 
 /-
   Multiplication implementation
@@ -267,7 +277,7 @@ def mulMonTerms [Grind.CommRing R] (c : R) (m : Mon n) (p : List (PolyTerm R n))
   p.map fun ⟨c',m'⟩ => ⟨c * c', m.mul m'⟩
 
 @[reducible]
-def mulTerms [Grind.CommRing R] [DecidableEq R]
+def mulTerms [Grind.CommRing R]
     (xs ys : List (PolyTerm R n)) : List (PolyTerm R n) :=
   match xs with
   | [] => []
@@ -280,10 +290,10 @@ def mulTerms [Grind.CommRing R] [DecidableEq R]
       ⟨c * c', m.mul m'⟩ ::
       mergeTerms (mulMonTerms c m ys') (mulTerms xs' ys)
 
-def mul [Grind.CommRing R] [DecidableEq R] (p q : Polynomial R n) : Polynomial R n :=
-  ⟨mulTerms p.terms q.terms⟩
+def mul [Grind.CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
+  ⟨removeZeros <| mulTerms p.terms q.terms⟩
 
-instance [Grind.CommRing R] [DecidableEq R] : Mul (Polynomial R n) := ⟨mul⟩
+instance [Grind.CommRing R] [BEq R] : Mul (Polynomial R n) := ⟨mul⟩
 
 /--
   Get the lead term of the polynomial,
