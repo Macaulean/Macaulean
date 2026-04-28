@@ -146,7 +146,7 @@ theorem mergeTerms_nil_right [CommRing R] [BEq R] (xs : List (PolyTerm R n)) : m
 /-! ## Denotation theorems -/
 
 section Theorems
-variable {R : Type} [inst : Grind.CommRing R] [deceq : DecidableEq R] [leq : LawfulBEq R]
+variable {R : Type} [inst : Grind.CommRing R] [deceq : DecidableEq R] [lawfuleq : LawfulBEq R]
 open Grind.Semiring Grind.Ring Grind.CommSemiring
 attribute [local instance] Grind.Semiring.natCast Grind.Ring.intCast
 
@@ -217,13 +217,25 @@ instance : Std.Commutative (α := R) (.*.) := ⟨CommRing.mul_comm⟩
 instance : Std.Associative (α := R) (.+.) := ⟨add_assoc⟩
 instance : Std.Commutative (α := R) (.+.) := ⟨add_comm⟩
 
+theorem denoteTerms_removeZeros (ctx : Context R) (terms : List (PolyTerm R n)) :
+  denoteTerms ctx (removeZeros terms) = denoteTerms ctx terms := by
+  unfold removeZeros
+  fun_induction List.filter
+  case case1 => trivial
+  case case2 ih =>
+    simp [ih]
+  case case3 coeffh ih =>
+    simp at coeffh
+    simp [ih, coeffh, Semiring.zero_mul, zero_add']
+
 theorem denoteTerms_mergeTerms (ctx : Context R) (xs ys : List (PolyTerm R n)) :
     denoteTerms ctx (mergeTerms xs ys) = denoteTerms ctx xs + denoteTerms ctx ys := by
   sorry
 
 theorem denote_add (ctx : Context R) (p q : Polynomial R n) :
-    denote ctx (add p q) = denote ctx p + denote ctx q :=
-  denoteTerms_mergeTerms ctx p.terms q.terms
+    denote ctx (add p q) = denote ctx p + denote ctx q := by
+  unfold Polynomial.add denote
+  simp [denoteTerms_removeZeros, denoteTerms_mergeTerms]
 
 omit deceq in
 theorem denoteTerms_map_smul (ctx : Context R) (c : R) (ts : List (PolyTerm R n)) :
@@ -254,19 +266,18 @@ theorem denote_mulMonTerms (ctx : Context R) (c : R) (m : Mon n) (p : List (Poly
     denoteTerms ctx (mulMonTerms c m p) = c * m.denote ctx * denoteTerms ctx p := by
   simp [mulMonTerms, denoteTerms_map_mulMon]
 
-theorem denote_mulTerms2 (ctx : Context R) (xs ys : List (PolyTerm R n)) :
+theorem denote_mulTerms (ctx : Context R) (xs ys : List (PolyTerm R n)) :
     denoteTerms ctx (mulTerms xs ys) = denoteTerms ctx xs * denoteTerms ctx ys := by
   induction xs with
   | nil => simp [mulTerms, zero_mul]
   | cons t ts ih =>
-    stop
-    simp only [mulTerms2, denoteTerms_mergeTerms, denote_mulMonTerms, denoteTerms_cons, ih]
-    rw [right_distrib, mul_assoc]
+    sorry
 
 
 theorem denote_mul (ctx : Context R) (p q : Polynomial R n) :
-    denote ctx (mul p q) = denote ctx p * denote ctx q :=
-    denote_mulTerms2 ctx p.terms q.terms
+    denote ctx (mul p q) = denote ctx p * denote ctx q := by
+    unfold denote Polynomial.mul
+    simp [denote_mulTerms, denoteTerms_removeZeros]
 
 omit deceq in
 theorem denote_singleton (ctx : Context R) (i : Fin n)
@@ -438,8 +449,6 @@ theorem mergeTerms_monomials {xs ys : List (PolyTerm R n)}
   : (mergeTerms xs ys).map (PolyTerm.monomial) ⊆ (xs.map PolyTerm.monomial) ++ (ys.map PolyTerm.monomial) := by
   sorry
 
-#check mergeTerms.induct
-
 theorem sorted_mergeTerms (xs ys : List (PolyTerm R n)) (hx : Sorted xs) (hy : Sorted ys) :
     Sorted (mergeTerms xs ys) := by
   -- stop
@@ -489,8 +498,25 @@ theorem sorted_mergeTerms (xs ys : List (PolyTerm R n)) (hx : Sorted xs) (hy : S
             simp at hy
             apply hy.2
 
+
+theorem sorted_removeZeros (terms : List (PolyTerm R n)) : Sorted terms → Sorted (removeZeros terms) := by
+  unfold removeZeros
+  intro h
+  fun_induction List.filter
+  case case1 => trivial
+  all_goals
+    simp [List.pairwise_cons] at h
+  case case2 coeffh ih =>
+    simp at coeffh
+    simp [ih, h]
+    intros
+    apply h.1
+    trivial
+  case case3 coeffh ih =>
+    simp [ih, h]
+
 theorem sorted_add (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.terms) :
-    Sorted (add p q).terms := sorted_mergeTerms p.terms q.terms hp hq
+    Sorted (add p q).terms := sorted_removeZeros _ <| sorted_mergeTerms p.terms q.terms hp hq
 
 theorem sorted_mul (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.terms) :
     Sorted (mul p q).terms := by
