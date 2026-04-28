@@ -91,9 +91,6 @@ instance : @DecidableRel (Mon n) (Mon n) Grevlex :=
   | .eq => .isFalse (by simp [Grevlex, h])
   | .lt => .isFalse (by simp [Grevlex, h])
 
-#check (inferInstance : DecidableEq (Vector Nat 5))
-
-#check congr
 /--
   Equality is decidable for monomials
 -/
