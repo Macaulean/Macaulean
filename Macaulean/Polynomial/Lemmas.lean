@@ -230,7 +230,32 @@ theorem denoteTerms_removeZeros (ctx : Context R) (terms : List (PolyTerm R n)) 
 
 theorem denoteTerms_mergeTerms (ctx : Context R) (xs ys : List (PolyTerm R n)) :
     denoteTerms ctx (mergeTerms xs ys) = denoteTerms ctx xs + denoteTerms ctx ys := by
-  sorry
+  induction xs generalizing ys
+  case nil => simp [zero_add']
+  case cons head tail ih1 =>
+    unfold mergeTerms
+    split
+    case h_1 => contradiction
+    case h_2 => simp [Semiring.add_zero]
+    case h_3 heq ysNonEmpty =>
+      simp at heq
+      rw [← heq.1, ← heq.2]
+      clear ysNonEmpty
+      fun_induction mergeTerms.takeTillGE
+      case case1 => simp [Semiring.add_zero]
+      case case2 =>
+        simp [ih1]
+        ac_nf
+      case case3 monEqH c =>
+        simp at monEqH
+        simp [ih1, c, monEqH]
+        ac_nf
+        congr 2
+        simp [Semiring.left_distrib]
+        ac_nf
+      case case4 ih2=>
+        simp [ih2]
+        ac_nf
 
 theorem denote_add (ctx : Context R) (p q : Polynomial R n) :
     denote ctx (add p q) = denote ctx p + denote ctx q := by
