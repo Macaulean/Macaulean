@@ -11,25 +11,7 @@ open Lean Grind CommRing
 
 namespace Macaulean
 
-
-
--- theorem denote_mul [CommRing R] (ctx : Context R)
-
 namespace Polynomial
-
-
-/-! ## Denotation theorems -/
-
-section Theorems
-variable {R : Type} [inst : Grind.CommRing R] [deceq : DecidableEq R] [leq : LawfulBEq R]
-open Grind.Semiring Grind.Ring Grind.CommSemiring
-attribute [local instance] Grind.Semiring.natCast Grind.Ring.intCast
-
-
-
-
-
-end Theorems
 
 /-! ## fromGrindPoly correctness -/
 
