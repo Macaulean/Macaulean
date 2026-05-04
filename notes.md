@@ -135,3 +135,10 @@ Using quotient types for finite sets or explicit sorting of lists to find repres
 Efficiency and implementation of polynomial operations. What operations M2 does on polynomials and are they traceable? Try to follow what M2 does for verification.
 
 ---
+
+## 2026-04-28 Tue - Term 3, Week 1
+
+Representations of polynomials that are better suited for proving.
+Straight line programs, low rank representations, subalgebras,
+
+---
