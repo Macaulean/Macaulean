@@ -34,8 +34,6 @@ inductive Expr (R : Type) (n : Nat) where
   | pow (p : Expr R n) (n : Nat)
   | term (term : PolyTerm R n)
 
-instance [MrdiType R] : MrdiType (Polynomial R n) := sorry
-instance [MrdiType R] : MrdiType (Polynomial.Expr R n) := sorry
 
 end Polynomial
 
@@ -84,8 +82,6 @@ def grevlex (m1 m2 : Mon n) : Ordering :=
 
 def Grevlex (m1 m2 : Mon n) : Prop :=
   m1.degree > m2.degree ∨ (m1.degree = m2.degree ∧ m1.powers < m2.powers)
-
-#check List.lex_lt
 
 theorem grevlex_iff_grevlex_gt : Grevlex m1 m2 ↔ grevlex m1 m2 = .gt := by
   sorry

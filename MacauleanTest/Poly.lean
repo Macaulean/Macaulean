@@ -2,6 +2,7 @@
 import MRDI
 import Lean
 import Macaulean.IdealMembership
+import Macaulean.Polynomial
 
 open Lean.Grind.CommRing
 open Lean.Grind
@@ -94,8 +95,21 @@ info: {"data":
   let mrdi ← (toMrdi test2)
   pure <| Lean.toJson mrdi).run' .empty
 
+/-- info: Except.ok true -/
+#guard_msgs in
 #eval (do
   let mrdi ← (toMrdi test2)
   let .ok mrdiJson := Lean.fromJson? <| Lean.toJson mrdi | return .error "Invalid JSON"
   let .ok val ← fromMrdi? (m := Id) (α := ConcretePoly Rat) mrdiJson | return .error "Failed to decode"
   pure <| Except.ok (val == test2)).run' .empty
+
+
+/--
+info: {"data": [[["1", "1"], [1, 0, 2]]],
+ "_type": {"params": "Rat", "name": "Polynomial"},
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.29.1"]}}
+-/
+#guard_msgs in
+#eval runMrdiIO (m := IO) <| do
+  let mrdiData ← toMrdi <| Macaulean.Polynomial.mk [⟨(1 : Rat), Macaulean.Mon.ofPowers [1,0,2]⟩]
+  pure <| Lean.toJson mrdiData
