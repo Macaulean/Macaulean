@@ -57,7 +57,7 @@ def test : Poly :=
 /--
 info: {"data": [["3", []], ["5", [["2", "3"]]], ["0", []]],
  "_type": "Lean.Grind.CommRing.Poly",
- "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.26.0-rc1"]}}
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.29.1"]}}
 -/
 #guard_msgs in
 #eval (Lean.toJson <$> toMrdi (m := Id) test).run' .empty
@@ -87,7 +87,7 @@ info: {"data":
     ["1", [["0", "1"], ["1", "2"]]],
     ["1", []]],
    "_type": "Lean.Grind.CommRing.Poly"}},
- "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.26.0-rc1"]}}
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.29.1"]}}
 -/
 #guard_msgs in
 #eval (do
