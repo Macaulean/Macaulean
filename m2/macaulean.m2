@@ -64,7 +64,41 @@ value ConcretePoly := f -> (
 -- MRDI serialization & deserialization --
 ------------------------------------------
 
-addNamespace("Lean", "https://github.com/leanprover/lean4", "4.26.0-rc1")
+addNamespace("Lean", "https://github.com/leanprover/lean4", "4.29.1")
+
+addSaveMethod(RingElement,
+    f -> leanRings#(coefficientRing R),
+    f -> apply(listForm f, (m, c) -> {toLean c, m}),
+    Name => "Polynomial",
+    Namespace => "Lean")
+
+-- eventually replace fromLean w/ this
+fromLean2 = method(Dispatch => Type)
+fromLean2 QQ := R -> x -> value x#0 / value x#1
+
+addLoadMethod("Polynomial",
+    (params, data) -> (
+	if #data == 0 then return 0;
+	kk := M2Rings#params;
+	R := kk[vars(0..<#last first data)];
+	sum(data, cm -> (fromLean2 kk) cm#0 * product(#cm#1,
+		i -> R_i^(value cm#1#i)))),
+    Namespace => "Lean")
+
+-* test code:
+
+R = QQ[x,y,z]
+f = x*z^2
+g = loadMRDI saveMRDI(f, Namespace => "Lean")
+S = ring g
+assert(f == (map(R, S, {x, y, z})) g)
+h = loadMRDI  ///{"data": [[["1", "1"], ["1", "0", "2"]]],
+ "_type": {"params": "Rat", "name": "Polynomial"},
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.29.1"]}}///
+T = ring h
+assert(f == (map(R, T, {x, y, z})) h)
+
+*-
 
 addSaveMethod(LeanGrindCommRingPoly,
     toList,
