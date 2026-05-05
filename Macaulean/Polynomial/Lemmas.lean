@@ -33,7 +33,7 @@ theorem grevlex_trans {m1 m2 m3 : Mon n} (h1 : m1.grevlex m2 = .gt) (h2 : m2.gre
       trivial
     case inr heq2 =>
       simp [heq2.1]
-      exact Trans.trans heq.2 heq2.2
+      exact Std.TransCmp.lt_trans heq.2 heq2.2
 
 theorem grevlex_swap (m₁ m₂ : Mon n) :
     (Mon.grevlex m₁ m₂).swap = Mon.grevlex m₂ m₁ :=
@@ -63,34 +63,30 @@ private theorem degree_mul {m1 m2 : Mon n} : (m1.mul m2).degree = m1.degree + m2
       simp [ih, lengthHyp]
       ac_nf
 
-/-- Monotonicity of grevlex under monomial multiplication -- requires structural induction. -/
+/-- Monotonicity of grevlex under monomial multiplication -/
 private theorem grevlex_mul_mono {m₁ m₂ m : Mon n}
-    (h : m₁.grevlex m₂ = .gt) : (m.mul m₁).grevlex (m.mul m₂) = .gt := by
-  simp [Mon.grevlex, degree_mul, Ordering.then_eq_gt] at *
+    (h : m₁.Grevlex m₂) : (m.mul m₁).Grevlex (m.mul m₂) := by
+  simp [Mon.Grevlex, degree_mul] at *
   cases h
   case inl hdeg =>
-    replace hdeg := Nat.compare_eq_gt.mp hdeg
-    simp [Nat.compare_eq_gt]
     left
     trivial
   case inr hNext =>
     right
     have ⟨hdeg, hlex⟩ := hNext
     refine ⟨ hdeg, ?_⟩
-    apply List.lt_iff_exists.mpr
-    replace hlex := List.lt_iff_exists.mp hlex
-    --find the i where the powers differ
-    rcases hlex with ⟨i, ltn⟩
     sorry
-    sorry
-
 
 /-! ## Denotational Lemmas for monomials -/
 theorem degree_unit_iff (m : Mon n) : m.degree = 0 ↔ m = unit := by
   constructor
   case mp =>
-    intro
-    sorry
+    simp [degree,List.sum_eq_zero_iff_forall_eq_nat]
+    intro elemHyp
+    suffices h : m.powers = List.replicate m.powers.length 0 by
+      rw [m.powers_length] at h
+      simp [unit,← h]
+    apply List.eq_replicate_of_mem elemHyp
   case mpr =>
     intro h
     simp [h,unit,degree]
@@ -99,7 +95,6 @@ variable {R : Type} [CommRing R]
 
 theorem denote_unit (ctx : Context R) : unit.denote (n := n) ctx = 1 := by
   simp only [denote]
-
   suffices h : (List.mapIdx (fun i k => ctx.get i ^ k) (unit.powers (n := n))) = List.replicate n (1 : R)
     by
       simp [h]
@@ -287,22 +282,25 @@ theorem denoteTerms_map_mulMon (ctx : Context R) (c : R) (m : Mon n) (ts : List 
     apply Macaulean.Mon.denote_mul
 
 omit deceq in
-theorem denote_mulMonTerms (ctx : Context R) (c : R) (m : Mon n) (p : List (PolyTerm R n)) :
+theorem denoteTerms_mulMonTerms (ctx : Context R) (c : R) (m : Mon n) (p : List (PolyTerm R n)) :
     denoteTerms ctx (mulMonTerms c m p) = c * m.denote ctx * denoteTerms ctx p := by
   simp [mulMonTerms, denoteTerms_map_mulMon]
 
-theorem denote_mulTerms (ctx : Context R) (xs ys : List (PolyTerm R n)) :
+theorem denoteTerms_mulTerms (ctx : Context R) (xs ys : List (PolyTerm R n)) :
     denoteTerms ctx (mulTerms xs ys) = denoteTerms ctx xs * denoteTerms ctx ys := by
-  induction xs with
-  | nil => simp [mulTerms, zero_mul]
-  | cons t ts ih =>
-    sorry
-
+  fun_induction mulTerms
+  case case1 => simp [Semiring.zero_mul]
+  case case2 ysEmpty => simp [ysEmpty,denoteTerms_nil,Semiring.mul_zero]
+  case case3 xs' _ _ ys' ysCons ih =>
+    simp [denoteTerms_mergeTerms, denoteTerms_mulMonTerms, Mon.denote_mul]
+    simp [ih,← ysCons,Semiring.right_distrib]
+    simp [ysCons,Semiring.left_distrib]
+    ac_nf
 
 theorem denote_mul (ctx : Context R) (p q : Polynomial R n) :
     denote ctx (mul p q) = denote ctx p * denote ctx q := by
     unfold denote Polynomial.mul
-    simp [denote_mulTerms, denoteTerms_removeZeros]
+    simp [denoteTerms_mulTerms, denoteTerms_removeZeros]
 
 omit deceq in
 theorem denote_singleton (ctx : Context R) (i : Fin n)
@@ -327,15 +325,14 @@ theorem denote_singleton_no_constant (ctx : Context R) (x : R) (i : Fin n) (h2 :
 
 theorem denote_plus_const (ctx : Context R) (c : R) (p : Polynomial R n) :
   denote ctx (addTerm p c Mon.unit) = denote ctx p + c := by
-  sorry
+  simp [addTerm,denote,denoteTerms_insertTerm,Mon.denote_unit,Semiring.mul_one]
+  ac_nf
 
 omit deceq in
 theorem denote_const (ctx : Context R) (c : R) :
   denote (n := n) ctx ⟨[⟨c,Mon.unit⟩]⟩ = c := by
   simp [denote, denoteTerms, Mon.denote_unit]
   grind
-
-
 
 omit deceq in
 @[simp] theorem denoteTerms_empty (ctx : Context R) :
@@ -376,9 +373,9 @@ private theorem Sorted_tail {t : PolyTerm R n} {ts : List (PolyTerm R n)}
     (h : Sorted (t :: ts)) : Sorted ts := (List.pairwise_cons.mp h).2
 
 omit inst deceq in
-private theorem Sorted_head_gt_all :
+private theorem Sorted_head_grevlex_all :
     ∀ (ts : List (PolyTerm R n)) (t : PolyTerm R n),
-    Sorted (t :: ts) → ∀ t' ∈ ts, t.monomial.grevlex t'.monomial = .gt := by
+    Sorted (t :: ts) → ∀ t' ∈ ts, t.monomial.Grevlex t'.monomial := by
   intro ts t h t2 h2
   have h' := (List.pairwise_cons.mp h).1 t2
   apply h'
@@ -423,52 +420,54 @@ private theorem pairwise_cons_trans {R : α → α → Prop} [Trans R R R] {a b 
   intro h1 h2 h3 a1 a1Hyp
   exact Trans.trans h3 (h1 a1 a1Hyp)
 
+omit inst deceq lawfuleq in
+theorem sorted_cons {m : Mon n} :
+    Sorted (⟨c,m⟩::xs) ↔ (∀ (x : PolyTerm R n) , (x ∈ xs) → m.Grevlex x.monomial) ∧ Sorted xs := by
+  simp [Sorted,List.pairwise_cons]
+
+theorem sorted_cons_with_trans {m : Mon n} :
+    Sorted (⟨c,m⟩::xs) ↔ (∀ (h : _) (t : _), (xs = h::t) → m.Grevlex h.monomial) ∧ Sorted xs := by
+  simp [sorted_cons]
+  intro sortedHyp
+  constructor
+  case mp =>
+    intro ordHyp h _ xsConsHyp
+    have headElemHyp : h ∈ xs := by
+      simp [List.mem_cons, xsConsHyp]
+    simp [ordHyp, headElemHyp]
+  case mpr =>
+    induction xs
+    case nil => simp
+    case cons head tail ih =>
+      simp
+      intro ordHyp
+      simp [ordHyp]
+      intro a aMemHyp
+      calc
+        m.Grevlex head.monomial := ordHyp
+        head.monomial.Grevlex a.monomial := by
+          exact Sorted_head_grevlex_all _ _ sortedHyp _ aMemHyp
 
 theorem sorted_insertTerm (c : R) (m : Mon n) (ts : List (PolyTerm R n)) (hs : Sorted ts) :
     Sorted (insertTerm c m ts) := by
-  induction ts with
-  | nil =>
-    simp only [insertTerm]
-    unfold Sorted
-    simp
-  | cons t rest ih =>
-    have hs_rest := Sorted_tail hs
-    simp only [insertTerm]
-    let rel : PolyTerm R n → PolyTerm R n → Prop :=
-      fun t₁ t₂ => t₁.monomial.grevlex t₂.monomial = .gt
-    have trans : Trans rel rel rel := ⟨Mon.grevlex_trans⟩
-    split
-    · -- m.grevlex t.monomial = .gt
-      next hgt =>
-        apply pairwise_cons_trans.mpr
-        exact ⟨hgt, hs⟩
-    · -- m.grevlex t.monomial = .eq
-      next heq =>
-      have hm_eq : m = t.monomial := Mon.eq_of_grevlex heq
-      subst hm_eq
-      clear heq
-      cases rest with
-      | nil => apply List.pairwise_singleton
-      | cons t' rest' =>
-          apply pairwise_cons_trans.mpr
-          constructor
-          · exact (pairwise_cons_trans.mp hs).1
-          · exact hs_rest
-    · -- m.grevlex t.monomial = .lt
-      next hlt =>
-      have hgt := Mon.grevlex_flip hlt
-      have ih_result := ih hs_rest
-
-      cases h : insertTerm c m rest with
-      | nil => apply List.pairwise_singleton
-      | cons r rest' =>
-        rw [h] at ih_result
-        apply pairwise_cons_trans.mpr
-        apply And.intro ?_ ih_result
-        have rContHyp : r ∈ insertTerm c m rest := by simp [h]
-        apply insertTerm_head_grevlex _ _ _ _ hgt hs_rest _ r rContHyp
-        intro t'
-        exact List.rel_of_pairwise_cons hs
+  fun_induction insertTerm
+  case case1 =>
+    simp [Sorted]
+  case case2 t ts ordHyp =>
+    simp [← Mon.grevlex_iff_grevlex_gt] at ordHyp
+    apply sorted_cons_with_trans.mpr
+    simp [hs]
+    trivial
+  case case3 eqMonHyp coeff =>
+    apply sorted_cons.mpr
+    rewrite [sorted_cons] at hs
+    simp at eqMonHyp
+    simp [eqMonHyp]
+    trivial
+  case case4 ih =>
+    apply sorted_cons.mpr
+    simp [ih, Sorted_tail hs]
+    sorry
 
 theorem mergeTerms_monomials {xs ys : List (PolyTerm R n)}
   : (mergeTerms xs ys).map (PolyTerm.monomial) ⊆ (xs.map PolyTerm.monomial) ++ (ys.map PolyTerm.monomial) := by
@@ -477,6 +476,7 @@ theorem mergeTerms_monomials {xs ys : List (PolyTerm R n)}
 theorem sorted_mergeTerms (xs ys : List (PolyTerm R n)) (hx : Sorted xs) (hy : Sorted ys) :
     Sorted (mergeTerms xs ys) := by
   -- stop
+--  unfold Sorted
   induction xs generalizing ys
   case nil => trivial
   case cons =>
@@ -487,65 +487,75 @@ theorem sorted_mergeTerms (xs ys : List (PolyTerm R n)) (hx : Sorted xs) (hy : S
     case h_3 ih _ _ _ x xs' heq ysNonEmpty =>
       injection heq with heq1 heq2
       rw [heq2] at ih
-      unfold Sorted at hx
       simp [heq1, heq2] at hx
-      let ⟨hx1, hx2⟩ := hx
+      let ⟨hx1, hx2⟩ := sorted_cons.mp hx
       simp [hx2] at ih
       fun_induction mergeTerms.takeTillGE
       case case1 => trivial
       case case2 =>
-        unfold Sorted
+        --unfold Sorted
         refine List.pairwise_cons.mpr ?_
         and_intros
         case refine_1 => sorry
         case refine_2 =>
           apply ih
           apply hy
-      case case3 x c =>
-        simp
+      case case3 xOrdering1 c =>
+        rw [sorted_cons]
         and_intros
         case refine_1 => sorry
         case refine_2 =>
           apply ih
-          simp at hy
+          simp [Sorted] at hy
           apply hy.2
       case case4 ih1 =>
-        simp
+        rw [sorted_cons]
         and_intros
         case refine_1 => sorry
-        case refine_2 ts x =>
-          by_cases h : ts = []
-          case pos =>
-            simp [h]
-            trivial
-          case neg =>
-            apply ih1 h _
-            simp at hy
-            apply hy.2
+        case refine_2 ts xOrdering2 =>
+          cases tsH : ts
+          case nil =>
+            sorry
+          case cons head tail =>
+            simp [tsH] at ih1
+            apply ih1 _
+            simp [Sorted_tail hy, ← tsH]
 
+theorem sorted_mulMonTerms (xs : List (PolyTerm R n)) (hx : Sorted xs) :
+    Sorted (mulMonTerms c m xs) := by
+  sorry
+
+theorem sorted_mulTerms (xs ys : List (PolyTerm R n)) (hx : Sorted xs) (hy : Sorted ys) :
+    Sorted (mulTerms xs ys) := by
+  fun_induction mulTerms
+  case case1 => trivial
+  case case2 => simp [Sorted]
+  case case3 ih =>
+    sorry
 
 theorem sorted_removeZeros (terms : List (PolyTerm R n)) : Sorted terms → Sorted (removeZeros terms) := by
   unfold removeZeros
   intro h
   fun_induction List.filter
   case case1 => trivial
-  all_goals
-    simp [List.pairwise_cons] at h
   case case2 coeffh ih =>
+    rw [sorted_cons] at h
+    apply sorted_cons.mpr
     simp at coeffh
-    simp [ih, h]
+    simp [h.2] at ih
+    simp [ih]
     intros
     apply h.1
     trivial
   case case3 coeffh ih =>
+    rw [sorted_cons] at h
     simp [ih, h]
 
 theorem sorted_add (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.terms) :
     Sorted (add p q).terms := sorted_removeZeros _ <| sorted_mergeTerms p.terms q.terms hp hq
 
 theorem sorted_mul (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.terms) :
-    Sorted (mul p q).terms := by
-  sorry
+    Sorted (mul p q).terms := sorted_removeZeros _ <| sorted_mulTerms p.terms q.terms hp hq
 
 end Theorems
 end Polynomial
