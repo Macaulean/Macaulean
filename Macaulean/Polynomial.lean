@@ -7,6 +7,7 @@
 import Lean
 import Macaulean.Polynomial.Basic
 import Macaulean.Polynomial.Lemmas
+import Macaulean.Polynomial.MRDI
 open Lean Grind CommRing
 
 namespace Macaulean
