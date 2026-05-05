@@ -142,3 +142,15 @@ Representations of polynomials that are better suited for proving.
 Straight line programs, low rank representations, subalgebras,
 
 ---
+
+## 2026-05-05 Tue - Term 3, Week 2
+
+Implementation of addition and multiplication dependent on grevlex order.
+Possibly, make the implementation take a type-class input relying on the order.
+
+Several proofs are already present, some are still missing.
+Rely less on unfolding and more on definitional lemmas.
+
+Examine Joaquim Breitner's post on fast computation of Bernoulli numbers and, more generally about kernel reduction.
+
+---
