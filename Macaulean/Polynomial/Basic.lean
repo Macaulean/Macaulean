@@ -80,20 +80,24 @@ def grevlex (m1 m2 : Mon n) : Ordering :=
   let d1 := m1.degree
   let d2 := m2.degree
   (compare d1 d2).then (
-    -- we `compareOfLessAndEq` this so that we can use < on lists, which has
-    -- more theorems proven about it
-    (compareOfLessAndEq m1.powers m2.powers).swap)
+    (compare m1.powers m2.powers).swap)
 
-def Grevlex (m1 m2 : Mon n) : Prop := m1.grevlex m2 = .gt
+def Grevlex (m1 m2 : Mon n) : Prop :=
+  m1.degree > m2.degree ∨ (m1.degree = m2.degree ∧ m1.powers < m2.powers)
+
+#check List.lex_lt
+
+theorem grevlex_iff_grevlex_gt : Grevlex m1 m2 ↔ grevlex m1 m2 = .gt := by
+  sorry
 
 /--
   Grevlex is decidable
 -/
 instance : @DecidableRel (Mon n) (Mon n) Grevlex :=
   fun m1 m2 => match h : grevlex m1 m2 with
-  | .gt => .isTrue h
-  | .eq => .isFalse (by simp [Grevlex, h])
-  | .lt => .isFalse (by simp [Grevlex, h])
+  | .gt => .isTrue (by simp [h, grevlex_iff_grevlex_gt])
+  | .eq => .isFalse (by simp [h, grevlex_iff_grevlex_gt])
+  | .lt => .isFalse (by simp [h, grevlex_iff_grevlex_gt])
 
 /--
   Equality is decidable for monomials
@@ -111,21 +115,40 @@ instance {n : Nat} : Std.OrientedCmp (grevlex (n := n)) := by
   intro a b
   simp only [Mon.grevlex, Ordering.swap_then,
     ← Std.OrientedCmp.eq_swap]
-  congr
-  apply compareOfLessAndEq_eq_swap
-  · exact List.le_antisymm
-  · exact List.le_total
-  · exact List.not_le
 
 instance : Std.LawfulEqCmp (grevlex (n := n)) := by
   constructor
   intro ⟨a,_⟩ ⟨b,_⟩
-  have h := (compareOfLessAndEq_eq_eq (List.le_refl) (by simp) (x := a) (y := b))
   simp [
     Mon.grevlex,
-    h,
     Ordering.then_eq_eq,
     Ordering.swap_eq_eq]
+
+instance : @Trans (Mon n) _ _ Grevlex Grevlex Grevlex := by
+  constructor
+  intro a b c hab hbc
+  simp [Grevlex] at *
+  cases hab
+  case trans.inl h1 =>
+    cases hbc
+    case inl h2 =>
+      left
+      apply Trans.trans h2 h1
+    case inr h2 =>
+      left
+      simp [h2.1] at h1
+      trivial
+  case trans.inr h1 =>
+    simp [h1.1] at ⊢ hbc
+    cases hbc
+    case inl =>
+      left
+      trivial
+    case inr h2 =>
+      right
+      constructor
+      · apply h2.1
+      · apply Trans.trans h1.2 h2.2
 
 /--
   Denotation for monomials, `ctx` provides the substitutions for the variables
@@ -174,8 +197,8 @@ def ofTerm (t : PolyTerm R n) : Polynomial R n := ⟨[t]⟩
 
 def ofVar [One R] (i : Fin n) : Polynomial R n := ofTerm ⟨1, Mon.fromVar i⟩
 
-abbrev Sorted {R} (l : List (PolyTerm R n)) : Prop :=
-  l.Pairwise fun m₁ m₂ => m₁.monomial.grevlex m₂.monomial = .gt
+def Sorted {R} (l : List (PolyTerm R n)) : Prop :=
+  l.Pairwise fun m₁ m₂ => m₁.monomial.Grevlex m₂.monomial
 
 --TODO prove equivalence with the Prop
 def isSorted : List (PolyTerm R n) → Bool
@@ -276,7 +299,6 @@ def mulMonTerms [Grind.CommRing R] (c : R) (m : Mon n) (p : List (PolyTerm R n))
   : List (PolyTerm R n) :=
   p.map fun ⟨c',m'⟩ => ⟨c * c', m.mul m'⟩
 
-@[reducible]
 def mulTerms [Grind.CommRing R]
     (xs ys : List (PolyTerm R n)) : List (PolyTerm R n) :=
   match xs with
