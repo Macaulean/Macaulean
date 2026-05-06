@@ -130,13 +130,33 @@ end Mon
 namespace Polynomial
 
 @[simp]
-theorem mergeTerms_nil_left [CommRing R] [BEq R] (xs : List (PolyTerm R n)) : mergeTerms [] xs = xs := by simp
+theorem mergeTerms_nil_left [CommRing R] (xs : List (PolyTerm R n)) :
+    mergeTerms [] xs = xs := by trivial
 
 @[simp]
-theorem mergeTerms_nil_right [CommRing R] [BEq R] (xs : List (PolyTerm R n)) : mergeTerms xs [] = xs := by
+theorem mergeTerms_nil_right [CommRing R] (xs : List (PolyTerm R n)) :
+    mergeTerms xs [] = xs := by
   unfold mergeTerms
   split
   all_goals trivial
+
+@[simp]
+theorem mergeTerms_singleton_left [CommRing R] (x : PolyTerm R n) (ys : List (PolyTerm R n)) :
+    mergeTerms [x] ys = insertTerm x.coefficient x.monomial ys := by
+  induction ys
+  case nil =>
+    trivial
+  case cons head tail ih =>
+    unfold mergeTerms insertTerm
+    simp [mergeTerms.takeTillGE]
+    congr
+    funext
+    congr
+    cases tail
+    case nil => trivial
+    case cons =>
+      unfold mergeTerms at ih
+      exact ih
 
 /-! ## Denotation theorems -/
 
@@ -556,6 +576,26 @@ theorem sorted_add (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.t
 
 theorem sorted_mul (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.terms) :
     Sorted (mul p q).terms := sorted_removeZeros _ <| sorted_mulTerms p.terms q.terms hp hq
+
+theorem mergeTerms_nil_iff_nil [CommRing R] (xs ys : List (PolyTerm R n)) :
+  mergeTerms xs ys = [] ↔ xs = [] ∧ ys = [] := by sorry
+
+@[simp]
+theorem mergeTerms_cons_left [CommRing R] (x : PolyTerm R n) (xs ys : List (PolyTerm R n))
+  (sortp : Sorted (x :: xs))
+  : mergeTerms (x :: xs) ys = insertTerm x.coefficient x.monomial (mergeTerms xs ys) := by
+  sorry
+
+@[simp]
+theorem mulTerms_cons_left [CommRing R] (x : PolyTerm R n) (xs ys : List (PolyTerm R n))
+  (xsorted : Sorted (x :: xs)) (ysorted : Sorted ys)
+  : mulTerms (x :: xs) ys = mergeTerms (mulMonTerms x.coefficient x.monomial ys) (mulTerms xs ys) := by
+  sorry
+
+@[simp]
+theorem mulTerms_cons_right [CommRing R] (y : PolyTerm R n) (xs ys : List (PolyTerm R n))
+  (xsorted : Sorted xs) (ysorted : Sorted (y :: ys))
+  : mulTerms xs (y :: ys) = mergeTerms (mulMonTerms y.coefficient y.monomial xs) (mulTerms xs ys) := by sorry
 
 end Theorems
 end Polynomial

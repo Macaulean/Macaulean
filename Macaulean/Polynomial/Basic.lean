@@ -240,7 +240,6 @@ def addTerm [Grind.CommRing R]
     (p : Polynomial R n) (c : R) (m : Mon n) : Polynomial R n :=
   ⟨insertTerm c m p.terms⟩
 
-@[reducible]
 def mergeTerms [Grind.CommRing R]
     (xs ys : List (PolyTerm R n))
  : List (PolyTerm R n) :=
@@ -250,7 +249,6 @@ def mergeTerms [Grind.CommRing R]
   | x :: xs', _ =>
     takeTillGE x ys (mergeTerms xs')
   where
-    @[reducible]
     takeTillGE (x : PolyTerm R n) (ts : List (PolyTerm R n))
       (tailFunc : List (PolyTerm R n) → List (PolyTerm R n))
       : (List (PolyTerm R n)) :=
