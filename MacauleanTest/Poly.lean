@@ -105,11 +105,35 @@ info: {"data":
 
 
 /--
-info: {"data": [[["1", "1"], [1, 0, 2]]],
+info: {"data":
+ [[["2", "1"], [2, 0, 4]],
+  [["1", "1"], [1, 1, 5]],
+  [["2", "1"], [2, 1, 2]],
+  [["1", "1"], [1, 2, 3]]],
  "_type": {"params": "Rat", "name": "Polynomial"},
  "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.29.1"]}}
 -/
 #guard_msgs in
 #eval runMrdiIO (m := IO) <| do
-  let mrdiData ← toMrdi <| Macaulean.Polynomial.mk [⟨(1 : Rat), Macaulean.Mon.ofPowers [1,0,2]⟩]
+  let mrdiData ← toMrdi <|
+    (Macaulean.Polynomial.mk [
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,2]⟩,
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,1,0]⟩]) *
+    (Macaulean.Polynomial.mk [
+      ⟨(1 : Rat), Macaulean.Mon.ofPowers [1,0,2]⟩,
+      ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,1,3]⟩])
   pure <| Lean.toJson mrdiData
+
+example : (Macaulean.Polynomial.mk [
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,2]⟩,
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,1,0]⟩]) *
+    (Macaulean.Polynomial.mk [
+      ⟨(1 : Rat), Macaulean.Mon.ofPowers [1,0,2]⟩,
+      ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,1,3]⟩]) =
+    (Macaulean.Polynomial.mk [
+      ⟨2, .ofPowers [1,0,2]⟩,
+      ⟨1, .ofPowers [1,1,5]⟩,
+      ⟨2, .ofPowers [2,1,2]⟩,
+      ⟨1, .ofPowers [1,2,3]⟩]) := by
+  simp +decide
+  sorry
