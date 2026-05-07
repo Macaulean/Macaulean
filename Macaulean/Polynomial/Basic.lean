@@ -83,8 +83,38 @@ def grevlex (m1 m2 : Mon n) : Ordering :=
 def Grevlex (m1 m2 : Mon n) : Prop :=
   m1.degree > m2.degree ∨ (m1.degree = m2.degree ∧ m1.powers < m2.powers)
 
+@[simp]
+theorem powers_eq_iff_eq (m1 m2 : Mon n) : m1.powers = m2.powers ↔ m1 = m2 := by
+  have ⟨p1,_⟩ := m1
+  have ⟨p2,_⟩ := m2
+  simp
+
+-- seems like this should be a theorem in List
+private theorem list_nat_lt_iff_compare  (l1 l2 : List Nat) : (compare l1 l2) = .lt ↔ (l1 < l2) := by
+  induction l1 generalizing l2
+  case nil =>
+    cases l2
+    case nil => simp
+    case cons => simp
+  case cons ih =>
+    cases l2
+    case nil => simp
+    case cons l2head l2tail =>
+      simp [Ordering.then_eq_lt, Nat.compare_eq_lt, List.cons_lt_cons_iff]
+      simp [ih l2tail]
+
 theorem grevlex_iff_grevlex_gt : Grevlex m1 m2 ↔ grevlex m1 m2 = .gt := by
-  sorry
+  simp [Grevlex,grevlex, Ordering.then_eq_gt, Nat.compare_eq_gt, list_nat_lt_iff_compare]
+
+theorem grevlex_or_eq_iff_grevlex_ge : (Grevlex m1 m2 ∨ m1 = m2) ↔ (grevlex m1 m2).isGE = true := by
+  simp [Grevlex, grevlex, ← Ordering.isLE_swap, Ordering.swap_then, Ordering.isLE_then_iff_or]
+  simp [Ordering.isLE_iff_eq_lt_or_eq_eq, Nat.compare_eq_gt, list_nat_lt_iff_compare]
+  simp [_root_.or_assoc]
+  rw [iff_eq,and_or_right]
+  congr 3
+  simp
+  intro h
+  simp [h]
 
 /--
   Grevlex is decidable
@@ -202,6 +232,22 @@ def isSorted : List (PolyTerm R n) → Bool
   | [_] => true
   | t₁ :: t₂ :: ts => t₁.monomial.grevlex t₂.monomial == .gt && isSorted (t₂ :: ts)
 
+def sortTerms : List (PolyTerm R n) → List (PolyTerm R n) :=
+  List.mergeSort (le := fun a b => (a.monomial.grevlex b.monomial).isGE)
+
+def coalesceTerms [CommRing R] (terms : List (PolyTerm R n)) : List (PolyTerm R n) :=
+  match terms with
+  | [] => []
+  | t :: ts => step t ts
+  where
+    step currTerm terms :=
+      match terms with
+      | [] => [currTerm]
+      | t :: ts =>
+        if currTerm.monomial = t.monomial
+        then step ⟨currTerm.coefficient + t.coefficient, currTerm.monomial⟩ ts
+        else currTerm :: step t ts
+
 def removeZeros [Zero R] [BEq R] (p : List (PolyTerm R n)) : List (PolyTerm R n) :=
   p.filter (fun ⟨c, _⟩ => c != 0)
 
@@ -221,33 +267,59 @@ def Expr.denote [CommRing R] (ctx : Context R) : Polynomial.Expr R n → R
   | .pow a n => (a.denote ctx) ^ n
   | .term ⟨c,m⟩ => c * m.denote ctx
 
+def termsSupport : List (PolyTerm R n) → List (Mon n) := List.map PolyTerm.monomial
+
+def support (p : Polynomial R n) : List (Mon n) := termsSupport p.terms
+
 def insertTerm [Grind.CommRing R]
-    (c : R) (m : Mon n) (ts : List (PolyTerm R n)) : List (PolyTerm R n) :=
+    (term : PolyTerm R n) (ts : List (PolyTerm R n)) : List (PolyTerm R n) :=
   match ts with
-  | [] => [⟨c, m⟩]
+  | [] => [term]
   | t :: rest =>
-    match m.grevlex t.monomial with
-    | .gt => ⟨c, m⟩ :: ts
+    match term.monomial.grevlex t.monomial with
+    | .gt => term :: ts
     | .eq =>
-      let c' := c + t.coefficient
-      ⟨c', m⟩ :: rest
-    | .lt => t :: insertTerm c m rest
+      let c' := term.coefficient + t.coefficient
+      ⟨c', term.monomial⟩ :: rest
+    | .lt => t :: insertTerm term rest
 
 /-
 Addition helpers
 -/
 def addTerm [Grind.CommRing R]
-    (p : Polynomial R n) (c : R) (m : Mon n) : Polynomial R n :=
-  ⟨insertTerm c m p.terms⟩
+   (q : PolyTerm R n) (p : Polynomial R n) : Polynomial R n :=
+  ⟨insertTerm q p.terms⟩
 
 def mergeTerms [Grind.CommRing R]
     (xs ys : List (PolyTerm R n))
  : List (PolyTerm R n) :=
-  match xs, ys with
-  | [], _ => ys
-  | _, [] => xs
-  | x :: xs', _ =>
-    takeTillGE x ys (mergeTerms xs')
+  match xs with
+  | [] => ys
+  | x :: xs' =>
+    takeTillGE x xs' ys
+  where
+    takeTillGE (x : PolyTerm R n) (xs ys: List (PolyTerm R n))
+      : (List (PolyTerm R n)) :=
+      match ys with
+      | [] => x :: mergeTerms xs []
+      | t :: ts' =>
+        match x.monomial.grevlex t.monomial with
+        | .gt => x :: mergeTerms xs ys
+        | .eq =>
+          let c := x.coefficient + t.coefficient
+          ⟨c, x.monomial⟩ :: mergeTerms xs ts'
+        | .lt => t :: (takeTillGE x xs ts')
+
+-- retaining this because this is reducible where as the other definition
+-- is irredicible, this might matter for some stuff
+@[reducible]
+def mergeTerms_old [Grind.CommRing R]
+    (xs ys : List (PolyTerm R n))
+ : List (PolyTerm R n) :=
+  match xs with
+  | [] => ys
+  | x :: xs' =>
+    takeTillGE x ys (mergeTerms_old xs')
   where
     takeTillGE (x : PolyTerm R n) (ts : List (PolyTerm R n))
       (tailFunc : List (PolyTerm R n) → List (PolyTerm R n))
