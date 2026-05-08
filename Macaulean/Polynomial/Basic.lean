@@ -83,8 +83,9 @@ def grevlex (m1 m2 : Mon n) : Ordering :=
 def Grevlex (m1 m2 : Mon n) : Prop :=
   m1.degree > m2.degree ∨ (m1.degree = m2.degree ∧ m1.powers < m2.powers)
 
+-- TODO: Think about whether this simp lemma should be reversed
 @[simp]
-theorem powers_eq_iff_eq (m1 m2 : Mon n) : m1.powers = m2.powers ↔ m1 = m2 := by
+theorem powers_eq_iff_eq {m1 m2 : Mon n} : m1.powers = m2.powers ↔ m1 = m2 := by
   have ⟨p1,_⟩ := m1
   have ⟨p2,_⟩ := m2
   simp
@@ -124,6 +125,39 @@ instance : @DecidableRel (Mon n) (Mon n) Grevlex :=
   | .gt => .isTrue (by simp [h, grevlex_iff_grevlex_gt])
   | .eq => .isFalse (by simp [h, grevlex_iff_grevlex_gt])
   | .lt => .isFalse (by simp [h, grevlex_iff_grevlex_gt])
+
+/--
+  Grevlex is asymmetric
+-/
+instance : @Std.Asymm (Mon n) Grevlex where
+  asymm a b abh := by
+    simp [Grevlex] at abh
+    cases abh
+    case inl h =>
+      simp [Grevlex, h, Nat.le_iff_lt_or_eq]
+      intro h2
+      simp [h2] at h
+    case inr h =>
+      simp [Grevlex, h, List.le_iff_lt_or_eq]
+
+/--
+  Grevlex is irreflexive
+-/
+instance : @Std.Irrefl (Mon n) Grevlex where
+  irrefl a := by simp [Grevlex]
+
+/--
+  Grevlex is trichotomous
+-/
+instance : @Std.Trichotomous (Mon n) Grevlex where
+  trichotomous a b abh bah := by
+    simp [Grevlex] at abh bah
+    have degEqH := Nat.eq_of_le_of_le a.degree b.degree abh.left bah.left
+    simp [degEqH] at abh bah
+    have powersEqH := List.le_antisymm abh bah
+    symm
+    simp at powersEqH
+    trivial
 
 /--
   Equality is decidable for monomials
