@@ -135,5 +135,5 @@ example : (Macaulean.Polynomial.mk [
       ⟨1, .ofPowers [1,1,5]⟩,
       ⟨2, .ofPowers [2,1,2]⟩,
       ⟨1, .ofPowers [1,2,3]⟩]) := by
-  simp +decide
+  simp +decide [HMul.hMul, Mul.mul, Macaulean.Polynomial.mul]
   sorry
