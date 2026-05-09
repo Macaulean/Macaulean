@@ -14,18 +14,23 @@ namespace Macaulean
 structure Mon (n : Nat) where
   powers : List Nat -- Vector Nat n
   powers_length : powers.length = n
-  deriving Repr, BEq
+  deriving Repr, BEq, ReflBEq, LawfulBEq
+
+#check instReflBEqMon
+#check instLawfulBEqMon
 
 instance : Inhabited (Mon n) := ⟨List.replicate n 0, by simp⟩
 
 structure PolyTerm (R : Type) (n : Nat) where
   coefficient : R
   monomial : Mon n
-  deriving Repr, Inhabited, BEq
+  deriving Repr, Inhabited, BEq, ReflBEq, LawfulBEq
 
 structure Polynomial (R : Type) (n : Nat) where
   terms : List (PolyTerm R n)
-  deriving Repr, Inhabited, BEq
+  deriving Repr, Inhabited, BEq, ReflBEq, LawfulBEq
+
+#check instLawfulBEqPolynomial
 
 namespace Polynomial
 inductive Expr (R : Type) (n : Nat) where
@@ -78,10 +83,10 @@ def grevlex (m1 m2 : Mon n) : Ordering :=
   let d1 := m1.degree
   let d2 := m2.degree
   (compare d1 d2).then (
-    (compare m1.powers m2.powers).swap)
+    (compare m1.powers.reverse m2.powers.reverse).swap)
 
 def Grevlex (m1 m2 : Mon n) : Prop :=
-  m1.degree > m2.degree ∨ (m1.degree = m2.degree ∧ m1.powers < m2.powers)
+  m1.degree > m2.degree ∨ (m1.degree = m2.degree ∧ m1.powers.reverse < m2.powers.reverse)
 
 -- TODO: Think about whether this simp lemma should be reversed
 @[simp]
@@ -168,6 +173,8 @@ instance : DecidableEq (Mon n) :=
     match d with
     | .isTrue h => .isTrue (by simp [h])
     | .isFalse h => .isFalse (by simp [h])
+
+deriving instance DecidableEq for PolyTerm, Polynomial
 
 --this is the same as grevlex_swap
 instance {n : Nat} : Std.OrientedCmp (grevlex (n := n)) := by
@@ -288,6 +295,26 @@ def removeZeros [Zero R] [BEq R] (p : List (PolyTerm R n)) : List (PolyTerm R n)
 abbrev Normalized [Semiring R] (p : Polynomial R n) : Prop :=
   Sorted p.terms ∧ (∀ t ∈ p.terms, t.coefficient ≠ 0)
 
+def normalize [CommRing R] [BEq R] (p : Polynomial R n) : Polynomial R n :=
+  ⟨removeZeros <| coalesceTerms <| sortTerms p.terms⟩
+
+def Equiv [CommRing R] [BEq R] (p q : Polynomial R n) : Prop := normalize p = normalize q
+
+instance [CommRing R] [BEq R] : HasEquiv (Polynomial R n) where
+  Equiv := Equiv
+
+#check decidable_of_iff
+
+instance [CommRing R] [BEq R] [LawfulBEq R] : DecidableRel (@Equiv R n _ _) :=
+  fun p q =>
+    decidable_of_bool _ <| by
+      unfold Equiv
+      constructor
+      case mp =>
+        apply LawfulBEq.eq_of_beq
+      case mpr =>
+        simp
+
 def denoteTerms [Grind.CommRing R] (ctx : Context R) : List (PolyTerm R n) → R
   | [] => 0
   | t :: ts => t.coefficient * t.monomial.denote ctx + denoteTerms ctx ts
@@ -335,7 +362,7 @@ def mergeTerms [Grind.CommRing R]
     takeTillGE (x : PolyTerm R n) (xs ys: List (PolyTerm R n))
       : (List (PolyTerm R n)) :=
       match ys with
-      | [] => x :: mergeTerms xs []
+      | [] => x :: xs
       | t :: ts' =>
         match x.monomial.grevlex t.monomial with
         | .gt => x :: mergeTerms xs ys
