@@ -237,9 +237,11 @@ attribute [local instance] Grind.Semiring.natCast Grind.Ring.intCast
 
 /-! ## Sortedness preservation -/
 
+omit inst in
 private theorem Sorted_tail {t : PolyTerm R n} {ts : List (PolyTerm R n)}
     (h : Sorted (t :: ts)) : Sorted ts := (List.pairwise_cons.mp h).2
 
+omit inst in
 private theorem Sorted_head_grevlex_all :
     ∀ (ts : List (PolyTerm R n)) (t : PolyTerm R n),
     Sorted (t :: ts) → ∀ t' ∈ ts, t.monomial.Grevlex t'.monomial := by
@@ -287,17 +289,20 @@ private theorem pairwise_cons_trans {R : α → α → Prop} [Trans R R R] {a b 
   intro h1 h2 h3 a1 a1Hyp
   exact Trans.trans h3 (h1 a1 a1Hyp)
 
+omit inst in
 @[simp]
 theorem sorted_cons {x : PolyTerm R n} :
     Sorted (x::xs) ↔ (∀ y ∈ xs, x.monomial.Grevlex y.monomial) ∧ Sorted xs := by
   simp [Sorted,List.pairwise_cons]
 
+omit inst in
 @[simp]
 theorem sorted_nil : @Sorted n R [] := .nil
 
 @[simp]
 theorem sorted_singleton : Sorted [x] := by simp [Sorted]
 
+omit inst in
 @[simp high]
 theorem sorted_cons_with_trans {x1 x2 : PolyTerm R n} {xs : List (PolyTerm R n) }:
     Sorted (x1::x2::xs) ↔ x1.monomial.Grevlex x2.monomial ∧ Sorted (x2 :: xs) := by
@@ -305,6 +310,26 @@ theorem sorted_cons_with_trans {x1 x2 : PolyTerm R n} {xs : List (PolyTerm R n) 
   intro sortedHyp1 sortedHyp2 x1x2Ord a amem
   specialize sortedHyp1 a amem
   exact Trans.trans x1x2Ord sortedHyp1
+
+omit inst in
+theorem isSorted_iff_sorted (terms : List (PolyTerm R n)) :
+    isSorted terms = true ↔ Sorted terms := by
+  induction terms
+  case nil =>
+    simp [isSorted, Sorted]
+  case cons head tail ih  =>
+    cases tail
+    case nil =>
+      simp [isSorted]
+    case cons =>
+      simp [isSorted, -sorted_cons]
+      rw [← Mon.grevlex_iff_grevlex_gt, ih]
+
+instance : @DecidablePred (List (PolyTerm R n)) Sorted :=
+  fun terms =>
+    if h : isSorted terms
+    then isTrue (by exact (isSorted_iff_sorted terms).mp h)
+    else isFalse (by rwa [← isSorted_iff_sorted terms])
 
 private theorem coalesceTerms_step_leadTerm (t : PolyTerm R n) (ts : List (PolyTerm R n)) :
     ∃ t' ts', coalesceTerms.step t ts = t'::ts' ∧ t'.monomial = t.monomial := by
@@ -464,6 +489,26 @@ theorem mergeTerms_nil_iff_nil (xs ys : List (PolyTerm R n)) :
     intro hx hy
     simp [hx, hy]
 
+#check List.mergeSort_cons
+
+@[simp]
+theorem mergeTerms_cons_cons_grevlex (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) (h : x.monomial.Grevlex y.monomial) :
+    mergeTerms (x :: xs) (y :: ys) = x :: mergeTerms xs (y :: ys) := by
+  simp [Mon.grevlex_iff_grevlex_gt] at h
+  simp [mergeTerms, mergeTerms.takeTillGE, h]
+
+@[simp]
+theorem mergeTerms_cons_cons_rev_grevlex (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) (h : y.monomial.Grevlex x.monomial) :
+    mergeTerms (x :: xs) (y :: ys) = y :: mergeTerms (x :: xs) ys := by
+  simp [Mon.grevlex_iff_grevlex_gt, ← Mon.grevlex_flip] at h
+  simp [mergeTerms, mergeTerms.takeTillGE, h]
+
+@[simp]
+theorem mergeTerms_cons_cons_eq (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) (h : y.monomial = x.monomial) :
+    mergeTerms (x :: xs) (y :: ys) = ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTerms xs ys := by
+  simp [mergeTerms, mergeTerms.takeTillGE, h]
+
+
 @[simp]
 theorem mergeTerms_cons_left {x : PolyTerm R n} {xs ys : List (PolyTerm R n)}
   (xsorted : Sorted (x :: xs)) (ysorted : Sorted ys)
@@ -506,6 +551,13 @@ theorem mulTerms_nil_right (xs : List (PolyTerm R n)) : mulTerms xs [] = [] := b
   simp
   split
   all_goals trivial
+
+@[simp]
+theorem mulTerms_cons_cons (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) :
+  mulTerms (x :: xs) (y :: ys) = ⟨x.coefficient * y.coefficient, x.monomial.mul y.monomial⟩ ::
+    mergeTerms (mulMonTerms x.coefficient x.monomial ys) (mulTerms xs (y::ys)) := by
+  simp [mulTerms]
+
 
 @[simp]
 theorem mulTerms_cons_left (x : PolyTerm R n) (xs ys : List (PolyTerm R n))
@@ -791,6 +843,38 @@ theorem mul_leadTerm_expand (ctx : Context R)
   rw [denote_mul]; simp only [denote_mk, denoteTerms_cons]; rw [foil]
   ac_nf
   simp [Mon.denote_mul]
+
+/-!
+## Simp lemmas for removeZeros
+-/
+omit lawfulbeq in
+@[simp]
+theorem removeZeros_nil : removeZeros ([] : List (PolyTerm R n)) = [] := by
+  simp [removeZeros]
+
+@[simp]
+theorem removeZeros_cons_zero (x : PolyTerm R n) (xs : List (PolyTerm R n)) (h : x.coefficient = 0) :
+    removeZeros (x :: xs) = removeZeros xs := by
+  simp [removeZeros, h]
+
+@[simp]
+theorem removeZeros_cons_nonzero (x : PolyTerm R n) (xs : List (PolyTerm R n)) (h : x.coefficient ≠ 0) :
+    removeZeros (x :: xs) = x :: removeZeros xs := by
+  simp [removeZeros, h]
+
+/-!
+## Simp lemmas for mulMonTerms
+-/
+
+omit lawfulbeq beq in
+@[simp]
+theorem mulMonTerms_nil (c : R) (m : Mon n) : mulMonTerms c m [] = [] := by simp [mulMonTerms]
+
+omit lawfulbeq beq in
+@[simp]
+theorem mulMonTerms_cons (c : R) (m : Mon n) (x : PolyTerm R n) (xs : List (PolyTerm R n)) :
+  mulMonTerms c m (x :: xs) = ⟨c * x.coefficient, m.mul x.monomial⟩ :: mulMonTerms c m xs := by
+  simp [mulMonTerms]
 
 end Theorems
 end Polynomial

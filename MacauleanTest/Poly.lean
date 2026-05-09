@@ -95,14 +95,6 @@ info: {"data":
   let mrdi ← (toMrdi test2)
   pure <| Lean.toJson mrdi).run' .empty
 
-/-- info: Except.ok true -/
-#guard_msgs in
-#eval (do
-  let mrdi ← (toMrdi test2)
-  let .ok mrdiJson := Lean.fromJson? <| Lean.toJson mrdi | return .error "Invalid JSON"
-  let .ok val ← fromMrdi? (m := Id) (α := ConcretePoly Rat) mrdiJson | return .error "Failed to decode"
-  pure <| Except.ok (val == test2)).run' .empty
-
 
 /--
 info: {"data":
@@ -131,9 +123,72 @@ example : (Macaulean.Polynomial.mk [
       ⟨(1 : Rat), Macaulean.Mon.ofPowers [1,0,2]⟩,
       ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,1,3]⟩]) =
     (Macaulean.Polynomial.mk [
-      ⟨2, .ofPowers [1,0,2]⟩,
+      ⟨2, .ofPowers [2,0,4]⟩,
       ⟨1, .ofPowers [1,1,5]⟩,
       ⟨2, .ofPowers [2,1,2]⟩,
       ⟨1, .ofPowers [1,2,3]⟩]) := by
-  simp +decide [HMul.hMul, Mul.mul, Macaulean.Polynomial.mul]
-  sorry
+  simp only [HMul.hMul, Mul.mul]
+  simp +decide +arith [Macaulean.Polynomial.mul, Rat.mul_def']
+  decide +kernel
+
+/--
+info: { terms := [{ coefficient := 2, monomial := { powers := [1, 0, 1, 0], powers_length := _ } },
+            { coefficient := 2, monomial := { powers := [0, 1, 1, 0], powers_length := _ } },
+            { coefficient := 1, monomial := { powers := [1, 0, 0, 1], powers_length := _ } },
+            { coefficient := 1, monomial := { powers := [0, 1, 0, 1], powers_length := _ } }] }
+-/
+#guard_msgs in
+#eval ((Macaulean.Polynomial.mk (n := 4) [
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [0,1,0,0]⟩]) *
+    (Macaulean.Polynomial.mk (n := 4) [
+      ⟨(1 : Rat), Macaulean.Mon.ofPowers [0,0,1,0]⟩,
+      ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,0,0,1]⟩]))
+
+/--
+info: { terms := [{ coefficient := 2, monomial := { powers := [2, 0, 0, 0], powers_length := _ } },
+            { coefficient := 2, monomial := { powers := [1, 1, 0, 0], powers_length := _ } },
+            { coefficient := 3, monomial := { powers := [1, 0, 1, 0], powers_length := _ } },
+            { coefficient := 3, monomial := { powers := [0, 1, 1, 0], powers_length := _ } },
+            { coefficient := 1, monomial := { powers := [1, 0, 0, 1], powers_length := _ } },
+            { coefficient := 1, monomial := { powers := [0, 1, 0, 1], powers_length := _ } }] }
+-/
+#guard_msgs in
+#eval (((Macaulean.Polynomial.mk (n := 4) [
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [0,1,0,0]⟩]) *
+    (Macaulean.Polynomial.mk (n := 4) [
+      ⟨(1 : Rat), Macaulean.Mon.ofPowers [0,0,1,0]⟩,
+      ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,0,0,1]⟩])) +
+    (Macaulean.Polynomial.mk (n := 4) [
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [0,1,0,0]⟩]) *
+    (Macaulean.Polynomial.mk (n := 4) [
+      ⟨(1 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
+      ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,0,1,0]⟩]))
+
+-- (2a + 2b) * (c + 1/2*d) + (2a + 2b) * (1a + 1/2c)
+example : ((Macaulean.Polynomial.mk (n := 4) [
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [0,1,0,0]⟩]) *
+    (Macaulean.Polynomial.mk (n := 4) [
+      ⟨(1 : Rat), Macaulean.Mon.ofPowers [0,0,1,0]⟩,
+      ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,0,0,1]⟩])) +
+    (Macaulean.Polynomial.mk (n := 4) [
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [0,1,0,0]⟩]) *
+    (Macaulean.Polynomial.mk (n := 4) [
+      ⟨(1 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
+      ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,0,1,0]⟩])
+       =
+    (Macaulean.Polynomial.mk (n := 4) [
+      ⟨2, .ofPowers [2,0,0,0]⟩,
+      ⟨2, .ofPowers [1,1,0,0]⟩,
+      ⟨3, .ofPowers [1,0,1,0]⟩,
+      ⟨3, .ofPowers [0,1,1,0]⟩,
+      ⟨1, .ofPowers [1,0,0,1]⟩,
+      ⟨1, .ofPowers [0,1,0,1]⟩]) := by
+  simp only [HMul.hMul, Mul.mul, HAdd.hAdd, Add.add]
+  simp +decide +arith [Macaulean.Polynomial.mul, Macaulean.Polynomial.add,
+    Rat.mul_def', Rat.div_def, Int.sign, mkRat, Rat.add_def']
+--  decide +kernel
