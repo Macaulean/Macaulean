@@ -192,3 +192,14 @@ example : ((Macaulean.Polynomial.mk (n := 4) [
   simp +decide +arith [Macaulean.Polynomial.mul, Macaulean.Polynomial.add,
     Rat.mul_def', Rat.div_def, Int.sign, mkRat, Rat.add_def']
 --  decide +kernel
+
+example : (Macaulean.Polynomial.mk (n := 4) [
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
+      ⟨(2 : Rat), Macaulean.Mon.ofPowers [0,1,0,0]⟩])^2 =
+      (.mk [
+        ⟨4, .ofPowers [2,0,0,0]⟩,
+        ⟨8, .ofPowers [1,1,0,0]⟩,
+        ⟨4, .ofPowers [0,2,0,0]⟩]) := by
+  simp only [HPow.hPow, Pow.pow, NatPow.pow]
+  simp +decide +arith [Macaulean.Polynomial.pow,Macaulean.Polynomial.mul, Macaulean.Polynomial.add,
+      Rat.mul_def', Rat.div_def, Int.sign, mkRat, Rat.add_def']

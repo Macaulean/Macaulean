@@ -16,9 +16,6 @@ structure Mon (n : Nat) where
   powers_length : powers.length = n
   deriving Repr, BEq, ReflBEq, LawfulBEq
 
-#check instReflBEqMon
-#check instLawfulBEqMon
-
 instance : Inhabited (Mon n) := ⟨List.replicate n 0, by simp⟩
 
 structure PolyTerm (R : Type) (n : Nat) where
@@ -29,8 +26,6 @@ structure PolyTerm (R : Type) (n : Nat) where
 structure Polynomial (R : Type) (n : Nat) where
   terms : List (PolyTerm R n)
   deriving Repr, Inhabited, BEq, ReflBEq, LawfulBEq
-
-#check instLawfulBEqPolynomial
 
 namespace Polynomial
 inductive Expr (R : Type) (n : Nat) where
@@ -227,6 +222,9 @@ def mul (m1 m2 : Mon n) : Mon n :=
   ⟨m1.powers.zipWith (· + ·) m2.powers,
   by simp [m1.powers_length, m2.powers_length]⟩
 
+def pow (m : Mon n) (a : Nat) : Mon n :=
+  ⟨m.powers.map (a * ·), by simp [m.powers_length]⟩
+
 @[reducible]
 def fromVarPower (i : Fin n) (k : Nat) : Mon n :=
   ⟨List.ofFn (fun j => if j == i then k else 0), by simp⟩
@@ -302,8 +300,6 @@ def Equiv [CommRing R] [BEq R] (p q : Polynomial R n) : Prop := normalize p = no
 
 instance [CommRing R] [BEq R] : HasEquiv (Polynomial R n) where
   Equiv := Equiv
-
-#check decidable_of_iff
 
 instance [CommRing R] [BEq R] [LawfulBEq R] : DecidableRel (@Equiv R n _ _) :=
   fun p q =>
@@ -416,17 +412,17 @@ instance [Grind.CommRing R] [BEq R] : Sub (Polynomial R n) := ⟨sub⟩
 /-
   Multiplication implementation
 -/
-def smul [Grind.CommRing R] (c : R) (p : Polynomial R n) : Polynomial R n :=
-  ⟨p.terms.map fun ⟨c',m⟩ => ⟨c * c', m⟩⟩
+def smul [CommRing R] [BEq R] (c : R) (p : Polynomial R n) : Polynomial R n :=
+  ⟨removeZeros <| p.terms.map fun ⟨c',m⟩ => ⟨c * c', m⟩⟩
 
-def mulMon [Grind.CommRing R] (c : R) (m : Mon n) (p : Polynomial R n) : Polynomial R n :=
-  ⟨p.terms.map fun ⟨c',m'⟩ => ⟨c * c', m.mul m'⟩⟩
-
-def mulMonTerms [Grind.CommRing R] (c : R) (m : Mon n) (p : List (PolyTerm R n))
+def mulMonTerms [CommRing R] (c : R) (m : Mon n) (p : List (PolyTerm R n))
   : List (PolyTerm R n) :=
   p.map fun ⟨c',m'⟩ => ⟨c * c', m.mul m'⟩
 
-def mulTerms [Grind.CommRing R]
+def mulMon [CommRing R] [BEq R] (c : R) (m : Mon n) (p : Polynomial R n) : Polynomial R n :=
+  ⟨removeZeros <| mulMonTerms c m p.terms⟩
+
+def mulTerms [CommRing R]
     (xs ys : List (PolyTerm R n)) : List (PolyTerm R n) :=
   match xs with
   | [] => []
@@ -439,10 +435,18 @@ def mulTerms [Grind.CommRing R]
       ⟨c * c', m.mul m'⟩ ::
       mergeTerms (mulMonTerms c m ys') (mulTerms xs' ys)
 
-def mul [Grind.CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
+def mul [CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
   ⟨removeZeros <| mulTerms p.terms q.terms⟩
 
-instance [Grind.CommRing R] [BEq R] : Mul (Polynomial R n) := ⟨mul⟩
+instance [CommRing R] [BEq R] : Mul (Polynomial R n) := ⟨mul⟩
+
+def pow [BEq R] [CommRing R] (p : Polynomial R n) (m : Nat) : Polynomial R n := match m with
+  | 0 => ⟨[.mk 1 .unit]⟩
+  | .succ m' => p.mul (pow p m')
+
+instance [CommRing R] [BEq R] : NatPow (Polynomial R n) := ⟨pow⟩
+
+instance [CommRing R] [BEq R] : SMul R (Polynomial R n) := ⟨smul⟩
 
 /--
   Get the lead term of the polynomial,
