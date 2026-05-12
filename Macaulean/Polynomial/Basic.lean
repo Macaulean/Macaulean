@@ -216,7 +216,7 @@ instance : @Trans (Mon n) _ _ Grevlex Grevlex Grevlex := by
   Denotation for monomials, `ctx` provides the substitutions for the variables
 -/
 def denote [Grind.CommRing R] (ctx : Context R) (m : Mon n) : R :=
-  (m.powers.mapIdx (fun i k => (ctx.get i ^ k))).foldl (.*.) 1
+  (m.powers.mapFinIdx (fun i k _ => (ctx.get i ^ k))).foldl (.*.) 1
 
 def mul (m1 m2 : Mon n) : Mon n :=
   ⟨m1.powers.zipWith (· + ·) m2.powers,
@@ -261,6 +261,11 @@ def zero {n : Nat} : Polynomial R n := ⟨[]⟩
 def ofTerm (t : PolyTerm R n) : Polynomial R n := ⟨[t]⟩
 
 def ofVar [One R] (i : Fin n) : Polynomial R n := ofTerm ⟨1, Mon.fromVar i⟩
+
+def ofConst (c : R) : Polynomial R n := ⟨[⟨c, .unit⟩]⟩
+
+instance [OfNat R m] : OfNat (Polynomial R n) m where
+  ofNat := ⟨[⟨OfNat.ofNat m, .unit⟩]⟩
 
 def Sorted {R} (l : List (PolyTerm R n)) : Prop :=
   l.Pairwise fun m₁ m₂ => m₁.monomial.Grevlex m₂.monomial

@@ -203,3 +203,81 @@ example : (Macaulean.Polynomial.mk (n := 4) [
   simp only [HPow.hPow, Pow.pow, NatPow.pow]
   simp +decide +arith [Macaulean.Polynomial.pow,Macaulean.Polynomial.mul, Macaulean.Polynomial.add,
       Rat.mul_def', Rat.div_def, Int.sign, mkRat, Rat.add_def']
+
+-- namespace BenchmarkExample
+
+-- open Lean Macaulean
+
+-- def n : Nat := 9
+-- def u : Polynomial Rat n := .mk [⟨1,.fromVar <| .mk 0 (by simp [n])⟩]
+-- def r : Polynomial Rat n := .mk [⟨1,.fromVar <| .mk 1 (by simp [n])⟩]
+-- def k : Polynomial Rat n := .mk [⟨1,.fromVar <| .mk 2 (by simp [n])⟩]
+-- def x : Polynomial Rat n := .mk [⟨1,.fromVar <| .mk 3 (by simp [n])⟩]
+-- def y : Polynomial Rat n := .mk [⟨1,.fromVar <| .mk 4 (by simp [n])⟩]
+-- def z : Polynomial Rat n := .mk [⟨1,.fromVar <| .mk 5 (by simp [n])⟩]
+-- def a : Polynomial Rat n := .mk [⟨1,.fromVar <| .mk 6 (by simp [n])⟩]
+-- def b : Polynomial Rat n := .mk [⟨1,.fromVar <| .mk 7 (by simp [n])⟩]
+-- def c : Polynomial Rat n := .mk [⟨1,.fromVar <| .mk 8 (by simp [n])⟩]
+
+-- -- variable (u' r' k' x' y' z' a' b' c' : Rat)
+
+-- -- def ctx : Context Rat := RArray.ofArray #[u',r',k',x',y',z',a',b',c'] (by simp)
+
+-- set_option maxHeartbeats 20000000
+
+-- #check Macaulean.Polynomial.instOfNat
+
+-- example
+--   --(let ctx : Context Rat := RArray.ofArray #[u',r',k',x',y',z',a',b',c'] (by simp)
+--   (ctx : Context Rat)
+--   (ho : ((x - u * z) ^ 2 + y ^ 2 - r ^ 2 * z ^ 2).denote ctx = 0)
+--   (hi : (a ^ 2 + b ^ 2 - c ^ 2).denote ctx = 0)
+--   (hpq : (x * a + y * b - z * c).denote ctx = 0)
+--   (hk : (k ^ 2 - (u + r) ^ 2 + (Macaulean.Polynomial.mk [⟨1,.unit⟩])).denote ctx = 0) :
+--   ((r *
+--             ((k * x + ((u + r) ^ 2 - 1) * y) * c ^ 2 +
+--               (2 * u * k * a ^ 2 + u * ((u + r) ^ 2 - 2) * a * b +
+--                       (r * (u + r) - 2) * k * a * c +
+--                     (2 - (u + r) * (u + 2 * r)) * b * c -
+--                   u * k * c ^ 2) *
+--                 z) +
+--           r * ((u + r) * a - c) * ((u + r) * b + k * c) * z * u) ^
+--         4 *
+--       y ^ 2 -
+--     r ^ 2 * 2 ^ 2 * k ^ 2 * z ^ 2 *
+--       (r ^ 2 *
+--             (((k * x + ((u + r) ^ 2 - 1) * y) * c ^ 2 +
+--                   (2 * u * k * a ^ 2 + u * ((u + r) ^ 2 - 2) * a * b +
+--                           (r * (u + r) - 2) * k * a * c +
+--                         (2 - (u + r) * (u + 2 * r)) * b * c -
+--                       u * k * c ^ 2) *
+--                     z) ^
+--                 3 *
+--               (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z)) +
+--           (1 - u ^ 2 - r ^ 2) *
+--             (((k * x + ((u + r) ^ 2 - 1) * y) * c ^ 2 +
+--                   (2 * u * k * a ^ 2 + u * ((u + r) ^ 2 - 2) * a * b +
+--                           (r * (u + r) - 2) * k * a * c +
+--                         (2 - (u + r) * (u + 2 * r)) * b * c -
+--                       u * k * c ^ 2) *
+--                     z) ^
+--                 2 *
+--               (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 2) +
+--         u ^ 2 *
+--             ((k * x + ((u + r) ^ 2 - 1) * y) * c ^ 2 +
+--               (2 * u * k * a ^ 2 + u * ((u + r) ^ 2 - 2) * a * b +
+--                       (r * (u + r) - 2) * k * a * c +
+--                     (2 - (u + r) * (u + 2 * r)) * b * c -
+--                   u * k * c ^ 2) *
+--                 z) *
+--           (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 3)).denote ctx = 0
+--    := by
+--     simp only [n, u,r,k,x,y,z,a,b,c,HMul.hMul, Mul.mul, HAdd.hAdd, Add.add, HSub.hSub, Sub.sub, HPow.hPow, Pow.pow, NatPow.pow, Mon.fromVar, Mon.fromVarPower, Polynomial.pow, OfNat.ofNat] at *
+--     simp at *
+--     simp +decide +arith [Macaulean.Polynomial.pow,Macaulean.Polynomial.mul, Macaulean.Polynomial.add,
+--       Macaulean.Polynomial.sub, Macaulean.Mon.mul, Macaulean.Mon.unit, Macaulean.Polynomial.neg,
+--       Rat.mul_def', Rat.div_def, Int.sign, mkRat, Rat.add_def']
+
+--     sorry
+
+-- end BenchmarkExample
