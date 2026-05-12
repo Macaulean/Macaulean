@@ -78,7 +78,7 @@ private theorem degree_mul {m1 m2 : Mon n} : (m1.mul m2).degree = m1.degree + m2
       ac_nf
 
 /-- Monotonicity of grevlex under monomial multiplication -/
-private theorem grevlex_mul_mono {m₁ m₂ m : Mon n}
+theorem grevlex_mul_mono_left {m₁ m₂ m : Mon n}
     : m₁.Grevlex m₂ ↔ (m.mul m₁).Grevlex (m.mul m₂) := by
   simp [Mon.Grevlex, degree_mul]
   constructor
@@ -151,6 +151,24 @@ private theorem grevlex_mul_mono {m₁ m₂ m : Mon n}
           specialize ih m1tail m2tail m1length m2length rfl h.right
           simp [h,ih]
 
+instance : @Std.Commutative (Mon n) Mon.mul where
+  comm a b := by
+    simp [mul]
+    exact List.zipWith_comm_of_comm Nat.add_comm
+
+theorem grevlex_mul_mono_right {m₁ m₂ m : Mon n}
+    : m₁.Grevlex m₂ ↔ (m₁.mul m).Grevlex (m₂.mul m) := by
+  conv =>
+    right
+    congr
+    all_goals
+      rw [Mon.instCommutativeMul.comm]
+  exact grevlex_mul_mono_left
+
+-- instance : @Std.Associative (Mon n) Mon.mul where
+--   assoc a b c := by
+--     simp [mul]
+
 /-! ## Denotational Lemmas for monomials -/
 theorem degree_unit_iff (m : Mon n) : m.degree = 0 ↔ m = unit := by
   constructor
@@ -183,22 +201,77 @@ theorem denote_unit (ctx : Context R) : unit.denote (n := n) ctx = 1 := by
   case zero => trivial
   case succ ih => simp [List.replicate_succ', Semiring.pow_zero, ih]
 
-theorem denote_mulVarPower (ctx : Context R) (m : Mon n) (i : Fin n) (k : Nat)
-  : denote (n := n) ctx (m.mulVarPower i k) = (ctx[i])^k * m.denote (n := n) ctx:= by
-  sorry
-
-theorem denote_fromVarPower (ctx : Context R) (m : Mon n) (i : Fin n) (k : Nat)
+theorem denote_fromVarPower (ctx : Context R) (i : Fin n) (k : Nat)
   : denote ctx (.fromVarPower i k) = (ctx[i])^k := by
-  sorry
+  unfold denote fromVarPower
+  rw [List.mapFinIdx_eq_ofFn]
+  simp [List.ofFn, Fin.foldr_eq_finRange_foldr, List.foldl_map]
+  induction n
+  case zero =>
+    have h := i.isLt
+    contradiction
+  case succ m ih1 =>
+    have h := i.isLt
+    by_cases ivalH : Fin.last m = i
+    case pos =>
+      simp [← ivalH, List.finRange_succ_last, List.foldl_map, GetElem.getElem]
+      have succ_neq_last := fun y => Fin.ne_of_lt (Fin.castSucc_lt_last (n:=m) y)
+      simp [succ_neq_last, Semiring.pow_zero, Semiring.mul_one]
+      clear ivalH i h ih1 succ_neq_last
+      generalize (RArray.get ctx m) = t
+      induction m
+      case zero => simp [Semiring.one_mul]
+      case succ m' ih2 =>
+        simp [List.foldl_cons, List.finRange_succ, List.foldl_map, ih2]
+    case neg =>
+      specialize ih1 (Fin.castLT i (by grind))
+      conv at ih1 =>
+        enter [1, 1, _, _, 2, 2, 1]
+        rw [← Fin.castSucc_inj]
+      simp [Fin.castSucc_castLT] at ih1
+      simp [List.finRange_succ_last, List.foldl_map, GetElem.getElem, ivalH,
+        Semiring.pow_zero, Semiring.mul_one]
+      exact ih1
 
-theorem denote_fromVar (ctx : Context R) (m : Mon n) (i : Fin n)
+theorem denote_fromVar (ctx : Context R) (i : Fin n)
   : denote ctx (.fromVar i) = ctx[i] := by
-  sorry
+  unfold fromVar
+  rw [denote_fromVarPower]
+  simp [Semiring.pow_one]
+
+#check List.dropLast_concat_getLast
+#check List.zipWith_append
 
 theorem denote_mul {ctx : Context R} {m1 m2 : Mon n}
   : (m1.mul m2).denote ctx = m1.denote ctx * m2.denote ctx := by
   simp only [Mon.mul, Mon.denote]
-  sorry
+  have m1length := m1.powers_length
+  have m2length := m2.powers_length
+  generalize m1.powers = m1powers, m2.powers = m2powers at *
+  clear m1 m2
+  induction n generalizing m1powers m2powers
+  case zero =>
+    simp at m1length m2length
+    simp [m1length, m2length, Semiring.one_mul]
+  case succ n' ih =>
+    specialize ih m1powers.dropLast m2powers.dropLast
+    simp [m1length, m2length] at ih
+    have m1structure : m1powers ≠ [] := by grind
+    have m2structure : m2powers ≠ [] := by grind
+    have m1structure := List.dropLast_concat_getLast m1structure
+    have m2structure := List.dropLast_concat_getLast m2structure
+    rw [← m1structure, ← m2structure]
+    simp
+    rw [List.zipWith_append]
+    simp [Semiring.pow_add, ih]
+    grind
+    simp [m1length, m2length]
+
+theorem denote_mulVarPower (ctx : Context R) (m : Mon n) (i : Fin n) (k : Nat)
+  : denote (n := n) ctx (m.mulVarPower i k) = (ctx[i])^k * m.denote (n := n) ctx:= by
+  unfold mulVarPower
+  rw [denote_mul, denote_fromVarPower]
+
 end Mon
 
 namespace Polynomial
@@ -237,12 +310,12 @@ theorem mergeTerms_nil_left (xs : List (PolyTerm R n)) :
 @[simp]
 theorem mergeTerms_nil_right (xs : List (PolyTerm R n)) :
     mergeTerms xs [] = xs := by
-  induction xs
+  cases xs
   case nil =>
     simp
-  case cons head tail ih =>
+  case cons head tail =>
     unfold mergeTerms mergeTerms.takeTillGE
-    simp [ih]
+    simp
 
 theorem mergeTerms_symm (xs ys : List (PolyTerm R n)) : mergeTerms xs ys = mergeTerms ys xs := by
   induction xs generalizing ys
@@ -301,9 +374,56 @@ theorem mergeTerms_cons_cons_eq (x y : PolyTerm R n) (xs ys : List (PolyTerm R n
     mergeTerms (x :: xs) (y :: ys) = ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTerms xs ys := by
   simp [mergeTerms, mergeTerms.takeTillGE, h]
 
-theorem mergeTerms_mon_mem {xs ys : List (PolyTerm R n)} {m : Mon n} :
-    (∃ t ∈ mergeTerms xs ys, t.monomial = m) ↔ (∃ x ∈ xs, x.monomial = m) ∨ (∃ y ∈ ys, y.monomial = m) := by
-  sorry
+theorem mergeTerms_mon_mem {xs ys : List (PolyTerm R n)} (tmem : t ∈ mergeTerms xs ys) :
+    (∃ x ∈ xs, t.monomial = x.monomial) ∨ (∃ y ∈ ys, t.monomial = y.monomial) := by
+  induction xs generalizing ys with
+  | nil =>
+    simp at tmem
+    right
+    exists t
+  | cons xhead xtail ih1 =>
+    induction ys with
+    | nil =>
+      simp at tmem
+      cases tmem with
+      | inl h => simp [h]
+      | inr h =>
+        left
+        exists t
+        simp [h]
+    | cons yhead ytail ih2 =>
+      cases grevlexH : xhead.monomial.grevlex yhead.monomial with
+      | lt =>
+        simp [Mon.grevlex_flip, ← Mon.grevlex_iff_grevlex_gt] at grevlexH
+        simp [grevlexH] at tmem
+        -- Working with or statements seems very awkward like this, is there a better way?
+        cases tmem with
+        | inl h => simp [h]
+        | inr h =>
+          simp [h] at ih2
+          cases ih2 with
+          | inl h' => simp [h']
+          | inr h' => simp [h']
+      | eq =>
+        simp at grevlexH
+        simp [grevlexH] at tmem
+        cases tmem with
+        | inl h => simp [h]
+        | inr h =>
+          specialize ih1 h
+          cases ih1 with
+          | inl h' => simp [h']
+          | inr h' => simp [h']
+      | gt =>
+        simp [← Mon.grevlex_iff_grevlex_gt] at grevlexH
+        simp [grevlexH] at tmem
+        cases tmem with
+        | inl h => simp [h]
+        | inr h =>
+          specialize ih1 h
+          cases ih1 with
+          | inl h' => simp [h']
+          | inr h' => right; exact h'
 
 @[simp]
 theorem mergeTerms_nil_iff_nil (xs ys : List (PolyTerm R n)) :
@@ -652,7 +772,6 @@ theorem mergeTerms_cons_left {x : PolyTerm R n} {xs ys : List (PolyTerm R n)}
         have xConsTailSorted : Sorted (x :: xtail) := by
           sorry
         simp [xConsTailSorted, Sorted_tail ysorted] at ih1 ih2
-
         sorry
 
 theorem sorted_mergeTerms (xs ys : List (PolyTerm R n)) (hx : Sorted xs) (hy : Sorted ys) :
@@ -668,22 +787,85 @@ theorem sorted_mergeTerms (xs ys : List (PolyTerm R n)) (hx : Sorted xs) (hy : S
 
 theorem sorted_mulMonTerms (xs : List (PolyTerm R n)) (hx : Sorted xs) :
     Sorted (mulMonTerms c m xs) := by
-  simp [Sorted,mulMonTerms, List.pairwise_map, ← Mon.grevlex_mul_mono]
+  simp [Sorted,mulMonTerms, List.pairwise_map, ← Mon.grevlex_mul_mono_left]
   exact hx
+
+theorem mulMonTerms_mem (xs : List (PolyTerm R n)) (tmem : t ∈ mulMonTerms c m xs) :
+    ∃ t' ∈ xs, t.monomial = m.mul t'.monomial := by
+  induction xs with
+  | nil =>
+    contradiction
+  | cons head tail ih =>
+    simp at ⊢ tmem
+    cases tmem with
+    | inl h => simp [h]
+    | inr h => simp [h, ih]
+
+theorem mulTerms_mem (xs ys : List (PolyTerm R n)) (tmem : t ∈ mulTerms xs ys) :
+    ∃ tx ∈ xs, ∃ ty ∈ ys, t.monomial = tx.monomial.mul ty.monomial := by
+  induction xs generalizing t
+  case nil => contradiction
+  case cons ih1 =>
+    simp
+    induction ys
+    case nil => contradiction
+    case cons ih2 =>
+      simp at tmem
+      cases tmem with
+      | inl h => simp [h]
+      | inr h =>
+        cases mergeTerms_mon_mem h with
+        | inl h' =>
+          have ⟨x,⟨xmemh, xmonh⟩⟩ := h'
+          have ⟨x',x'h⟩ := mulMonTerms_mem _ xmemh
+          left
+          exists x'
+          simp [xmonh, x'h]
+        | inr h' =>
+          have ⟨y,⟨ymemh, ymonh⟩⟩ := h'
+          right
+          specialize ih1 ymemh
+          have ⟨tx, ⟨txmemh, txmonh⟩⟩ := ih1
+          exists tx
+          simp [txmemh, ymonh]
+          simp at txmonh
+          exact txmonh
 
 theorem sorted_mulTerms (xs ys : List (PolyTerm R n)) (hx : Sorted xs) (hy : Sorted ys) :
     Sorted (mulTerms xs ys) := by
   fun_induction mulTerms
   case case1 => trivial
   case case2 => simp [Sorted]
-  case case3 ysh ih =>
+  case case3 cx mx xs' cy my ys' ysh ih =>
     simp [ysh, Sorted_tail hx] at ih
     simp at hx
-    simp [hx]
+    simp
     constructor
     case left =>
       intro y ymem
-      sorry
+      cases mergeTerms_mon_mem ymem
+      case inl h =>
+        have ⟨x,h⟩ := h
+        have ⟨t',h'⟩ := mulMonTerms_mem _ h.left
+        simp [h.right, h'.right, ← Mon.grevlex_mul_mono_left]
+        simp [ysh] at hy
+        simp [hy.left, h'.left]
+      case inr h =>
+        have ⟨x, h⟩ := h
+        have ⟨tx,⟨htx,⟨ty,hty⟩⟩⟩ := mulTerms_mem _ _ h.left
+        simp [h.right, hty.right]
+        cases hty.left
+        case head =>
+          simp [← Mon.grevlex_mul_mono_right, hx, htx]
+        case tail hty' =>
+          calc
+            (mx.mul my).Grevlex (mx.mul ty.monomial) := by
+              simp [ysh] at hy
+              simp [← Mon.grevlex_mul_mono_left]
+              exact hy.left _ hty'
+            (mx.mul ty.monomial).Grevlex (tx.monomial.mul ty.monomial) := by
+              simp [← Mon.grevlex_mul_mono_right]
+              exact hx.left _ htx
     case right =>
       apply sorted_mergeTerms
       case hx =>
@@ -871,7 +1053,7 @@ theorem denote_singleton (ctx : Context R) (i : Fin n)
     lhs
     left
     right
-    apply Mon.denote_fromVar ctx (Mon.fromVar i)
+    apply Mon.denote_fromVar ctx
   simp [getElem, Semiring.add_zero]
 
 omit beq lawfulbeq in
@@ -881,7 +1063,7 @@ theorem denote_singleton_no_constant (ctx : Context R) (x : R) (i : Fin n) (h2 :
     lhs
     left
     right
-    apply Mon.denote_fromVar ctx (Mon.fromVar i)
+    apply Mon.denote_fromVar ctx
   simp [getElem, Semiring.add_zero, h2, Semiring.one_mul]
 
 omit beq lawfulbeq in
