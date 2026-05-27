@@ -154,3 +154,14 @@ Rely less on unfolding and more on definitional lemmas.
 Examine Joaquim Breitner's post on fast computation of Bernoulli numbers and, more generally about kernel reduction.
 
 ---
+
+## 2026-05-26 Tue - Term 3, Week 5
+
+* Meeting times.
+* Hiring more people, now that Doug will no longer be funded?
+* MI computations?
+* SOS in Lean
+* Can we produce side goals that would allow us to conclude?
+* `simp` improvements, `simproc`s
+
+---
