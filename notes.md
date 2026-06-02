@@ -165,3 +165,24 @@ Examine Joaquim Breitner's post on fast computation of Bernoulli numbers and, mo
 * `simp` improvements, `simproc`s
 
 ---
+
+## 2026-06-02 Tue - Term 3, Week 6
+
+Shorter meeting.
+
+Should we concentrate on elementary tasks?
+
+For instance, polynomial identities. Reducing a problem to a finite set of elementary tasks could be an intermediate goal.
+
+This may require work
+* on the Macaulay2 side, for producing more granular certificates and
+* on the Lean side, for producing reduction steps as proofs of lemmas.
+
+Intermediate tasks? Maybe checking that something is a Groebner basis?
+
+More general questions to this about:
+* working with modules
+* computing dimensions
+* checking whether the vanishing set of an ideal is empty
+
+---
