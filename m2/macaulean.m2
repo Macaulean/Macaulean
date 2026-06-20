@@ -69,7 +69,7 @@ value ConcretePoly := f -> (
 addNamespace("Lean", "https://github.com/leanprover/lean4", "4.29.1")
 
 addSaveMethod(RingElement,
-    f -> leanRings#(coefficientRing R),
+    f -> leanRings#(coefficientRing ring f),
     f -> apply(listForm f, (m, c) -> {toLean c, m}),
     Name => "Polynomial",
     Namespace => "Lean")
@@ -230,10 +230,10 @@ registerMethod(server, "quotientRemainder", (polymrdi, idealmrdi) -> (
 	(q, r) := quotientRemainder(matrix f, gens I);
 	hashTable {
 	    "quotient" => apply(flatten entries q,
-		g -> saveMRDI(ConcretePoly g,
+		g -> saveMRDI(g,
 		    Namespace => "Lean",
 		    ToString => false)),
-	    "remainder" => saveMRDI(ConcretePoly r_(0,0),
+	    "remainder" => saveMRDI(r_(0,0),
 		Namespace => "Lean",
 		ToString => false)}))
 

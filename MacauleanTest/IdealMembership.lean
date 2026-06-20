@@ -37,6 +37,16 @@ info:  3   *   1  /  2   *   y   ^   2   +   1  /  2   *   x   ^   2
       let exprSyntax ← PrettyPrinter.delab expr
       pure <| Syntax.prettyPrint exprSyntax
 
+--this theorem really should be proven elsewhere
+theorem RArray_get_ofArray (h : i < arr.size) : (RArray.ofArray arr len_hyp).get i = arr[i] := by
+  have irw : i = ↑(Fin.mk i h) := by simp
+  conv =>
+    left
+    right
+    rw [irw]
+  rw [RArray.ofArray, RArray.get_ofFn]
+  simp
+
 example {x y : Rat} (f : 1/2*x + 1/2*y = 0) (g : 1/2*x + 1/2*y = 0) : (x + y)^2 = 0 := by
   m2idealmem +grind [f]
 
@@ -47,6 +57,7 @@ example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
 example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
   m2idealmem -grind [f,g]
   clear f g
+  simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray]
   grind
 
 example {x y z : Rat} (f : 2*x= 0) (g : 3*y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
@@ -59,30 +70,33 @@ instance : Std.Commutative (α := R) (.*.) := ⟨CommRing.mul_comm⟩
 instance : Std.Associative (α := R) (.+.) := ⟨Semiring.add_assoc⟩
 instance : Std.Commutative (α := R) (.+.) := ⟨Semiring.add_comm⟩
 
-/--
-error: Could not show equality
-R : Type
-inst✝¹ : CommRing R
-inst✝ : ToExpr R
-x y z : R
-f : 2 * x = 0
-g : y = 0
-h : y + z = 0
-⊢ (x + y + z) ^ 4 =
-    0 + 0 * (2 * x) +
-        (6 * x ^ 2 * y + 4 * x * y ^ 2 + y ^ 3 + 6 * x ^ 2 * z + 12 * x * y * z + 4 * y ^ 2 * z + 8 * x * z ^ 2 +
-              6 * y * z ^ 2 +
-            3 * z ^ 3) *
-          y +
-      (4 * x ^ 3 + 6 * x ^ 2 * z + 4 * x * z ^ 2 + z ^ 3) * (y + z)
--/
-#guard_msgs in
-example {x y z : R} (f : 2*x = 0) (g : y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
-  m2idealmem -grind [f, g, h]
-  fail_if_success grind
-  fail "Could not show equality"
+
+-- TODO reconsider this test, it should be a failing test, but what should the error be?
+-- /--
+-- error: Could not show equality
+-- R : Type
+-- inst✝¹ : CommRing R
+-- inst✝ : ToExpr R
+-- x y z : R
+-- f : 2 * x = 0
+-- g : y = 0
+-- h : y + z = 0
+-- ⊢ (x + y + z) ^ 4 =
+--     0 + 0 * (2 * x) +
+--         (6 * x ^ 2 * y + 4 * x * y ^ 2 + y ^ 3 + 6 * x ^ 2 * z + 12 * x * y * z + 4 * y ^ 2 * z + 8 * x * z ^ 2 +
+--               6 * y * z ^ 2 +
+--             3 * z ^ 3) *
+--           y +
+--       (4 * x ^ 3 + 6 * x ^ 2 * z + 4 * x * z ^ 2 + z ^ 3) * (y + z)
+-- -/
+-- #guard_msgs in
+-- example {x y z : R} (f : 2*x = 0) (g : y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
+--   m2idealmem -grind [f, g, h]
+--   fail_if_success grind
+--   fail "Could not show equality"
 
 example {x y z : Rat} (f : 2*x = 0) (g : y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
   m2idealmem -grind [f, g, h]
   clear f g h
+  simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray]
   grind

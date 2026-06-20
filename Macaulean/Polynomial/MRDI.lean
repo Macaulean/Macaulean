@@ -9,7 +9,7 @@ open Lean Json MRDI Macaulean
 -/
 
 def encodeMon (m : Mon n) : MrdiEncodeM Json := do
-  pure <| toJson m.powers
+  pure <| toJson <| m.powers.map toString
 
 def encodePolyTerm [MrdiType R] (t : PolyTerm R n) : MrdiEncodeM Json := do
   let coeffJson ← MrdiType.encode t.coefficient
@@ -18,21 +18,24 @@ def encodePolyTerm [MrdiType R] (t : PolyTerm R n) : MrdiEncodeM Json := do
 
 def decodeMon? : Json → MrdiDecodeM (Except String (Mon n))
   | .arr powersJson =>
-    let powers? := powersJson.map Json.getNat?
+    let powers? := powersJson.map getStr?
     match (powers?.mapM id).map Array.toList with
     | .ok powers =>
-      if h : powers.length = n
-      then pure <| .ok <| Mon.mk powers h
-      else pure <| .error s!"Expected an array of length {n}"
+      match powers.mapM String.toNat? with
+      | .some powers =>
+        if h : powers.length = n
+        then pure <| .ok <| Mon.mk powers h
+        else pure <| .error s!"Expected an array of length {n}"
+      | _ => pure <| .error s!"Expected an array of Naturals as powers"
     | .error s => pure <| .error s
   | _ => pure <| .error "Expected an array of Naturals as powers"
 
-def decodeTerm? [MrdiType R] : Json →  MrdiDecodeM (Except String (PolyTerm R n))
+def decodeTerm? [MrdiType R] : Json →  ExceptT String MrdiDecodeM (PolyTerm R n)
   | .arr #[c, m] => do
-    let coeff : Except String R ← MrdiType.decode? c
+    let coeff : R ← MrdiType.decode? c
     let mon ← decodeMon? m
-    pure <| PolyTerm.mk <$> coeff <*> mon
-  | _ => pure <| .error "Expected a pair of a coefficient and a monoial"
+    pure <| PolyTerm.mk coeff mon
+  | _ => throw "Expected a pair of a coefficient and a monoial"
 
 instance [MrdiType R] : MrdiType (Polynomial R n) where
   mrdiType := .parameterized "Polynomial" (toJson <| MrdiType.mrdiType R) --TODO encode the n as well
@@ -40,9 +43,9 @@ instance [MrdiType R] : MrdiType (Polynomial R n) where
     .arr <$> List.toArray <$> poly.terms.mapM encodePolyTerm
   decode?
     | .arr elems => do
-      let terms? ← elems.mapM (decodeTerm? (R := R) (n := n))
-      let terms := terms?.mapM id
-      pure <| terms.map (fun ts => Polynomial.mk <| Array.toList ts)
+      (elems.mapM (decodeTerm? (R := R) (n := n))).runK
+        (ok := fun terms => pure <| .ok <| Polynomial.mk terms.toList)
+        (error := fun err => pure <| .error err)
     | _ => pure <| .error s!"Expected an Array of terms"
 
 instance [MrdiType R] : MrdiType (Polynomial.Expr R n) := sorry

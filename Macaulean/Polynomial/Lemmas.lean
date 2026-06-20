@@ -1,6 +1,6 @@
 import Macaulean.Polynomial.Basic
 import Lean
-open Lean Grind CommRing
+open Lean Grind CommRing Meta
 
 namespace Macaulean
 
@@ -239,9 +239,6 @@ theorem denote_fromVar (ctx : Context R) (i : Fin n)
   rw [denote_fromVarPower]
   simp [Semiring.pow_one]
 
-#check List.dropLast_concat_getLast
-#check List.zipWith_append
-
 theorem denote_mul {ctx : Context R} {m1 m2 : Mon n}
   : (m1.mul m2).denote ctx = m1.denote ctx * m2.denote ctx := by
   simp only [Mon.mul, Mon.denote]
@@ -271,6 +268,55 @@ theorem denote_mulVarPower (ctx : Context R) (m : Mon n) (i : Fin n) (k : Nat)
   : denote (n := n) ctx (m.mulVarPower i k) = (ctx[i])^k * m.denote (n := n) ctx:= by
   unfold mulVarPower
   rw [denote_mul, denote_fromVarPower]
+
+example : [1,2,3].length = 3 := Eq.refl 3
+
+#check mkEqRefl
+
+simproc_decl mon_mul_simproc (Mon.mul ⟨_,_⟩ ⟨_,_⟩) := fun e => do
+  let_expr Mon.mul _ m1 m2 ← e | return .continue
+  let_expr Mon.mk _ p1 _ ← m1 | return .continue
+  let_expr Mon.mk _ p2 _ ← m2 | return .continue
+  let .some p1Exprs ← getListLit? p1 | return .continue
+  let .some p2Exprs ← getListLit? p2 | return .continue
+  let .some sumExprs ← Array.mapM id <$> Array.zipWithM (fun aExpr bExpr => do
+    let .some a ← getNatValue? aExpr | return none
+    let .some b ← getNatValue? bExpr | return none
+    pure <| some <| mkNatLit (a + b)
+    ) p1Exprs p2Exprs | return .continue
+  let sum ← mkListLit Nat.mkType sumExprs.toList
+  let nExpr := mkNatLit sumExprs.size
+  let sumLenExpr ← mkAppM ``List.length #[sum]
+  let lenProof ← mkEqRefl nExpr
+  let lenProof := mkExpectedPropHint lenProof (← mkEq sumLenExpr nExpr)
+  let mon ← mkAppOptM ``Mon.mk #[nExpr, sum, lenProof]
+  pure <| .visit {expr := mon}
+
+#check Fin.mk
+
+example : (Mon.fromVar (n:=3) (Fin.mk 1 (by grind))).mul (Mon.fromVar (n:=3) (Fin.mk 2 (by simp))) = Mon.ofPowers [0,1,1] := by
+  simp [Mon.fromVar,Mon.fromVarPower,mon_mul_simproc]
+  trivial
+
+@[simp]
+theorem mul_unit (m1 : Mon n) : m1.mul unit = m1 := by
+  simp [mul, unit,← powers_eq_iff_eq]
+  simp only [← m1.powers_length]
+  induction m1.powers
+  case nil =>
+    trivial
+  case cons ih =>
+    simp [List.replicate_succ, ih]
+
+@[simp]
+theorem unit_mul (m1 : Mon n) : unit.mul m1 = m1 := by
+  simp [mul, unit,← powers_eq_iff_eq]
+  simp only [← m1.powers_length]
+  induction m1.powers
+  case nil =>
+    trivial
+  case cons ih =>
+    simp [List.replicate_succ, ih]
 
 end Mon
 
@@ -743,7 +789,7 @@ theorem sorted_insertTerm (t : PolyTerm R n) (ts : List (PolyTerm R n)) (hs : So
       simp at hs
       simp [hs, xmem]
 
-@[simp]
+--@[simp]
 theorem mergeTerms_cons_left {x : PolyTerm R n} {xs ys : List (PolyTerm R n)}
   (xsorted : Sorted (x :: xs)) (ysorted : Sorted ys)
   : mergeTerms (x :: xs) ys = insertTerm x (mergeTerms xs ys) := by

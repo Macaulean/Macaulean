@@ -169,19 +169,19 @@ info: { terms := [{ coefficient := 2, monomial := { powers := [2, 0, 0, 0], powe
 
 -- (2a + 2b) * (c + 1/2*d) + (2a + 2b) * (1a + 1/2c)
 example : ((Macaulean.Polynomial.mk (n := 4) [
-      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
-      ⟨(2 : Rat), Macaulean.Mon.ofPowers [0,1,0,0]⟩]) *
-    (Macaulean.Polynomial.mk (n := 4) [
-      ⟨(1 : Rat), Macaulean.Mon.ofPowers [0,0,1,0]⟩,
-      ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,0,0,1]⟩])) +
-    (Macaulean.Polynomial.mk (n := 4) [
-      ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
-      ⟨(2 : Rat), Macaulean.Mon.ofPowers [0,1,0,0]⟩]) *
-    (Macaulean.Polynomial.mk (n := 4) [
-      ⟨(1 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
-      ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,0,1,0]⟩])
+      ⟨(2 : Rat), .ofPowers [1,0,0,0]⟩,
+      ⟨(2 : Rat), .ofPowers [0,1,0,0]⟩]) *
+    (.mk (n := 4) [
+      ⟨(1 : Rat), .ofPowers [0,0,1,0]⟩,
+      ⟨(1/2 : Rat), .ofPowers [0,0,0,1]⟩])) +
+    (.mk (n := 4) [
+      ⟨(2 : Rat), .ofPowers [1,0,0,0]⟩,
+      ⟨(2 : Rat), .ofPowers [0,1,0,0]⟩]) *
+    (.mk (n := 4) [
+      ⟨(1 : Rat), .ofPowers [1,0,0,0]⟩,
+      ⟨(1/2 : Rat), .ofPowers [0,0,1,0]⟩])
        =
-    (Macaulean.Polynomial.mk (n := 4) [
+    (.mk (n := 4) [
       ⟨2, .ofPowers [2,0,0,0]⟩,
       ⟨2, .ofPowers [1,1,0,0]⟩,
       ⟨3, .ofPowers [1,0,1,0]⟩,
@@ -189,10 +189,10 @@ example : ((Macaulean.Polynomial.mk (n := 4) [
       ⟨1, .ofPowers [1,0,0,1]⟩,
       ⟨1, .ofPowers [0,1,0,1]⟩]) := by
   simp only [HMul.hMul, Mul.mul, HAdd.hAdd, Add.add]
-  simp +decide +arith [Macaulean.Polynomial.mul, Macaulean.Polynomial.add,
-    Rat.mul_def', Rat.div_def, Int.sign, mkRat, Rat.add_def']
+  simp +decide [Rat.mul_def, Rat.div_def, Int.sign, Rat.add_def]
 --  decide +kernel
 
+-- (2a + 2b)^2
 example : (Macaulean.Polynomial.mk (n := 4) [
       ⟨(2 : Rat), Macaulean.Mon.ofPowers [1,0,0,0]⟩,
       ⟨(2 : Rat), Macaulean.Mon.ofPowers [0,1,0,0]⟩])^2 =

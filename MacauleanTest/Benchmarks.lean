@@ -48,5 +48,5 @@ theorem foo
                   u * k * c ^ 2) *
                 z) *
           (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 3) = 0 := by
-  -- m2idealmem [ho, hi, hpq, hk]
+  -- m2idealmem -grind [ho, hi, hpq, hk]
   sorry

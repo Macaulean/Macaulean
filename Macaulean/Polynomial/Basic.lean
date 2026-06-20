@@ -16,16 +16,21 @@ structure Mon (n : Nat) where
   powers_length : powers.length = n
   deriving Repr, BEq, ReflBEq, LawfulBEq
 
+instance : ToExpr (Mon n) where
+  toExpr m :=
+    mkApp3 (.const ``Mon.mk []) (toExpr n) (toExpr m.powers) (mkApp2 (.const ``Eq.refl [1]) (.const ``Nat []) (toExpr n))
+  toTypeExpr := mkApp (.const ``Mon []) <| toExpr n
+
 instance : Inhabited (Mon n) := ⟨List.replicate n 0, by simp⟩
 
 structure PolyTerm (R : Type) (n : Nat) where
   coefficient : R
   monomial : Mon n
-  deriving Repr, Inhabited, BEq, ReflBEq, LawfulBEq
+  deriving Repr, Inhabited, BEq, ReflBEq, LawfulBEq, ToExpr
 
 structure Polynomial (R : Type) (n : Nat) where
   terms : List (PolyTerm R n)
-  deriving Repr, Inhabited, BEq, ReflBEq, LawfulBEq
+  deriving Repr, Inhabited, BEq, ReflBEq, LawfulBEq, ToExpr
 
 namespace Polynomial
 inductive Expr (R : Type) (n : Nat) where
