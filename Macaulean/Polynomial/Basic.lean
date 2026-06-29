@@ -267,6 +267,8 @@ def ofTerm (t : PolyTerm R n) : Polynomial R n := ⟨[t]⟩
 
 def ofVar [One R] (i : Fin n) : Polynomial R n := ofTerm ⟨1, Mon.fromVar i⟩
 
+def ofMon [One R] (m : Mon n) : Polynomial R n := ofTerm ⟨1, m⟩
+
 def ofConst (c : R) : Polynomial R n := ⟨[⟨c, .unit⟩]⟩
 
 instance [OfNat R m] : OfNat (Polynomial R n) m where
@@ -401,6 +403,7 @@ def mergeTerms_old [Grind.CommRing R]
           ⟨c, x.monomial⟩ :: tailFunc ts'
         | .lt => t :: (takeTillGE x ts' tailFunc)
 
+@[simp]
 def add [Grind.CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
   ⟨removeZeros <| mergeTerms p.terms q.terms⟩
 
@@ -445,6 +448,7 @@ def mulTerms [CommRing R]
       ⟨c * c', m.mul m'⟩ ::
       mergeTerms (mulMonTerms c m ys') (mulTerms xs' ys)
 
+@[simp]
 def mul [CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
   ⟨removeZeros <| mulTerms p.terms q.terms⟩
 
@@ -489,6 +493,33 @@ where
 def fromGrindPolyAs [inst : Grind.CommRing R] (p : CommRing.Poly) : Polynomial R (numVars p) :=
   have : IntCast R := inst.toRing.intCast
   ⟨(fromGrindPoly p).terms.map fun t => ⟨Int.cast t.coefficient, t.monomial⟩⟩
+
+/--
+  Sorting polynomials
+-/
+
+def grevlexTerms (p q : List (PolyTerm R n)) : Ordering :=
+  match p, q with
+  | [], [] => .eq
+  | [], _ => .lt
+  | _ , [] => .gt
+  | phead::ptail, qhead::qtail =>
+    match phead.monomial.grevlex qhead.monomial with
+    | .eq => grevlexTerms ptail qtail
+    | ord => ord
+
+def grevlex (p q : Polynomial R n) : Ordering :=
+  grevlexTerms p.terms q.terms
+
+
+/--
+  Comparison of polynomials using grevlex. Based on the first term where the monomial differs
+  The zero polynoial is less than any other polynomial (i.e. `p.Grevlex zero`) as long as p is non-zero
+
+  Warning: This is not trichotomous because it cannot distinguish polynomials on the same set of monomials
+-/
+def Grevlex (p q : Polynomial R n) : Prop := p.grevlex q = .gt
+
 
 end Polynomial
 

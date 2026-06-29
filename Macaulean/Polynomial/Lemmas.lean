@@ -271,8 +271,6 @@ theorem denote_mulVarPower (ctx : Context R) (m : Mon n) (i : Fin n) (k : Nat)
 
 example : [1,2,3].length = 3 := Eq.refl 3
 
-#check mkEqRefl
-
 simproc_decl mon_mul_simproc (Mon.mul ⟨_,_⟩ ⟨_,_⟩) := fun e => do
   let_expr Mon.mul _ m1 m2 ← e | return .continue
   let_expr Mon.mk _ p1 _ ← m1 | return .continue
@@ -291,8 +289,6 @@ simproc_decl mon_mul_simproc (Mon.mul ⟨_,_⟩ ⟨_,_⟩) := fun e => do
   let lenProof := mkExpectedPropHint lenProof (← mkEq sumLenExpr nExpr)
   let mon ← mkAppOptM ``Mon.mk #[nExpr, sum, lenProof]
   pure <| .visit {expr := mon}
-
-#check Fin.mk
 
 example : (Mon.fromVar (n:=3) (Fin.mk 1 (by grind))).mul (Mon.fromVar (n:=3) (Fin.mk 2 (by simp))) = Mon.ofPowers [0,1,1] := by
   simp [Mon.fromVar,Mon.fromVarPower,mon_mul_simproc]
@@ -321,6 +317,132 @@ theorem unit_mul (m1 : Mon n) : unit.mul m1 = m1 := by
 end Mon
 
 namespace Polynomial
+
+/-!
+## Lemmas about grevlex for polynomials
+-/
+
+@[simp]
+theorem not_Grevlex_zero_zero {R : Type} {n : Nat} [Zero R] : ¬ zero.Grevlex (zero (R := R) (n := n)) := by
+  simp [Grevlex, grevlex, zero, grevlexTerms]
+
+instance : @Trans (Polynomial R n) _ _ Grevlex Grevlex Grevlex where
+  trans hab hbc := by
+    expose_names
+    simp [Grevlex, grevlex] at ⊢ hab hbc
+    generalize a.terms = aterms at *
+    generalize b.terms = bterms at *
+    generalize c.terms = cterms at *
+    fun_induction grevlexTerms aterms cterms generalizing bterms
+    any_goals
+      cases bterms
+      all_goals
+        contradiction
+    case case3 =>
+      trivial
+    case case4 ahead atail chead ctail headOrdH ih =>
+      cases bterms
+      case nil => contradiction
+      case cons bhead btail =>
+        simp at headOrdH
+        simp [grevlexTerms] at hab hbc
+        by_cases bhead.monomial = ahead.monomial
+        case pos h =>
+          simp [h,← headOrdH] at hab hbc
+          exact ih _ hab hbc
+        case neg h =>
+          simp [← headOrdH] at hbc
+          rw [← Mon.eq_of_grevlex] at h
+          simp [← Mon.grevlex_flip] at hbc
+          simp [hbc] at hab
+    case case5 ahead atail chead ctail headOrdH =>
+      cases bterms
+      case nil => contradiction
+      case cons bhead btail =>
+        simp at headOrdH
+        simp [grevlexTerms] at hab hbc
+        by_cases ahead.monomial = bhead.monomial
+        case pos h =>
+          simp [h] at headOrdH ⊢
+          simp [h, headOrdH] at hab hbc
+          trivial
+        case neg h =>
+          rw [← Mon.eq_of_grevlex] at h
+          simp at hab
+          split at hbc
+          case h_1 heq =>
+            simp at heq
+            simp [heq] at hab
+            trivial
+          case h_2 =>
+            simp [← Mon.grevlex_iff_grevlex_gt] at hab hbc ⊢
+            exact Trans.trans hab hbc
+
+/--
+  Grevlex is decidable
+-/
+instance : @DecidableRel (Polynomial R n) (Polynomial R n) Grevlex :=
+  fun m1 m2 => match h : grevlex m1 m2 with
+  | .gt => .isTrue (by simp [h, Grevlex])
+  | .eq => .isFalse (by simp [h, Grevlex])
+  | .lt => .isFalse (by simp [h, Grevlex])
+
+/--
+  Grevlex is asymetric
+-/
+instance : @Std.Asymm (Polynomial R n) Grevlex where
+  asymm a b abh := by
+    simp [Grevlex, grevlex] at ⊢ abh
+    generalize a.terms = aterms at *
+    generalize b.terms = bterms at *
+
+    induction aterms generalizing bterms
+    case nil =>
+      unfold grevlexTerms at abh
+      split at abh
+      all_goals
+        contradiction
+    case cons ih =>
+      cases bterms
+      case nil =>
+        unfold grevlexTerms
+        trivial
+      case cons =>
+        unfold grevlexTerms at ⊢ abh
+        split
+        case h_1 heq =>
+          simp at heq
+          simp [heq] at abh
+          simp [*]
+        case h_2 h =>
+          simp at h
+          split at abh
+          case h_1 h2 =>
+            simp at h2
+            simp [h2]
+          case h_2 =>
+            simp [← Mon.grevlex_iff_grevlex_gt] at ⊢ abh
+            simp [abh, Std.Asymm.asymm]
+
+
+/--
+  Grevlex is irreflexive
+-/
+instance : @Std.Irrefl (Polynomial R n) Grevlex where
+  irrefl a := by
+    simp [Grevlex, grevlex]
+    induction a.terms
+    case nil =>
+      simp [grevlexTerms]
+    case cons ih =>
+      unfold grevlexTerms
+      split
+      case h_1 =>
+        exact ih
+      case h_2 h =>
+        simp
+
+
 variable {R : Type} [inst : Grind.CommRing R]
 /-! ## Simp Lemmas for insertTerm -/
 
@@ -789,36 +911,83 @@ theorem sorted_insertTerm (t : PolyTerm R n) (ts : List (PolyTerm R n)) (hs : So
       simp at hs
       simp [hs, xmem]
 
---@[simp]
+
+theorem sorted_remove_second : (Sorted (x1 :: x2 :: xtail)) → (Sorted (x1 :: xtail)) := by
+  intro h
+  simp at h
+  simp [h.right.right]
+  intro y hy
+  calc
+    Mon.Grevlex _ _ := h.left
+    Mon.Grevlex _ _ := h.right.left y hy
+
+omit inst in
+theorem insertTerm_grevlex_head [CommRing R] :
+  (grevlexTerms [x] ts = .gt) → (insertTerm (R := R) x ts) = x :: ts := by
+  cases ts
+  case nil =>
+    simp
+  case cons head tail =>
+    simp [grevlexTerms]
+    split
+    case h_1 =>
+      intro h
+      cases tail
+      all_goals
+        contradiction
+    case h_2 =>
+      intro h
+      simp [insertTerm, h]
+
+@[simp]
 theorem mergeTerms_cons_left {x : PolyTerm R n} {xs ys : List (PolyTerm R n)}
   (xsorted : Sorted (x :: xs)) (ysorted : Sorted ys)
   : mergeTerms (x :: xs) ys = insertTerm x (mergeTerms xs ys) := by
-  induction xs
+  induction xs generalizing ys
   case nil =>
     simp
   case cons xhead xtail ih1 =>
+    --have ih1' := ih1 (sorted_remove_second xsorted)
+    --clear ih1
     induction ys
     case nil =>
       simp at xsorted
       simp [xsorted]
-    case cons ih2 =>
-      conv =>
-        left
-        unfold mergeTerms mergeTerms.takeTillGE
-      split
-      case h_1 ordH =>
-        sorry
-      case h_2 eqH =>
-        sorry
-      case h_3 ordH =>
-        conv at ih1 =>
-          right
-          left
-          unfold mergeTerms
-        have xConsTailSorted : Sorted (x :: xtail) := by
-          sorry
-        simp [xConsTailSorted, Sorted_tail ysorted] at ih1 ih2
-        sorry
+    case cons yhead ytail ih2 =>
+      cases h : x.monomial.grevlex yhead.monomial
+      case lt =>
+        simp [Mon.grevlex_flip, ← Mon.grevlex_iff_grevlex_gt] at h
+        simp [h]
+        have headOrdH : yhead.monomial.Grevlex xhead.monomial := by
+          calc
+            Mon.Grevlex _ _ := h
+            Mon.Grevlex _ _ := (sorted_cons_with_trans.mp xsorted).left
+        simp [headOrdH, h]
+        apply ih2 (List.pairwise_cons.mp ysorted).right
+      case eq =>
+        simp at h
+        simp [h]
+        have headOrdH : yhead.monomial.Grevlex xhead.monomial := by
+          simp [← h, sorted_cons_with_trans.mp xsorted]
+        simp [headOrdH, h]
+      case gt =>
+        have h' := Mon.grevlex_iff_grevlex_gt.mpr h
+        simp [h']
+        apply Eq.symm
+        apply insertTerm_grevlex_head
+        cases headOrd : xhead.monomial.grevlex yhead.monomial
+        case lt =>
+          simp [Mon.grevlex_flip, ← Mon.grevlex_iff_grevlex_gt] at headOrd
+          simp [headOrd, grevlexTerms,h]
+        case eq =>
+          simp at headOrd
+          simp [headOrd, grevlexTerms, h]
+        case gt =>
+          simp [← Mon.grevlex_iff_grevlex_gt] at headOrd
+          have xord := sorted_cons_with_trans.mp xsorted
+          simp [Mon.grevlex_iff_grevlex_gt] at xord
+          simp [headOrd, grevlexTerms, xord.left]
+
 
 theorem sorted_mergeTerms (xs ys : List (PolyTerm R n)) (hx : Sorted xs) (hy : Sorted ys) :
     Sorted (mergeTerms xs ys) := by
