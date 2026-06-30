@@ -341,8 +341,6 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
       result.quotient.mapM deserializer
     let deserializedRemainder ← ExceptT.run do
       deserializer result.remainder
-    logInfo <| repr deserializedCoefficients
-    logInfo <| repr deserializedRemainder
     match deserializedCoefficients, deserializedRemainder with
     | .ok c, .ok r  => pure (
       ← c.mapM fun x => mkAppM ``Macaulean.Polynomial.denote #[varContextExpr, x],
@@ -356,7 +354,6 @@ theorem helper [CommRing R] (a b c d : R) (h1 : a = d) (h2 : b = 0) : a+c*b = d 
   simp [Semiring.mul_zero,Semiring.add_zero]
 
 -- factor out the core tactic to make the code a bit simpler
--- this only reduces down the the polynomial equality step
 unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name) (goal : MVarId) (target : Expr) (genHyps : Array Expr) : TacticM Unit := do
   let genProps ←  genHyps.mapM (fun genH => inferType genH)
   let some (targetRing,targetLhs,targetRhs) := target.eq? |

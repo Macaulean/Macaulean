@@ -38,7 +38,7 @@ info:  3   *   1  /  2   *   y   ^   2   +   1  /  2   *   x   ^   2
       pure <| Syntax.prettyPrint exprSyntax
 
 --this theorem really should be proven elsewhere
-theorem RArray_get_ofArray (h : i < arr.size) : (RArray.ofArray arr len_hyp).get i = arr[i] := by
+private theorem RArray_get_ofArray (h : i < arr.size) : (RArray.ofArray arr len_hyp).get i = arr[i] := by
   have irw : i = ↑(Fin.mk i h) := by simp
   conv =>
     left
@@ -62,6 +62,19 @@ example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
 
 example {x y z : Rat} (f : 2*x= 0) (g : 3*y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
   m2idealmem +grind [f, g, h]
+
+-- determinential ideal example
+-- this is the ideal of 2x2 minors of a generic 3x3 **symmetric** matrix
+example {a b c d e f : Rat}
+  (f1 : e^2-d*f = 0) (f2 : c*e-b*f = 0) (f3 : c*d-b*e = 0)
+  (f4 : c^2-a*f = 0) (f5 : b*c-a*e = 0) (f6 : b^2 - a*d = 0) :
+    (c^2*d-2*b*c*e+a*e^2+b^2*f-a*d*f = 0) := by
+  m2idealmem [f1,f2,f3,f4,f5,f6]
+  simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray]
+  simp only [Semiring.add_zero]
+  clear f1 f2 f3 f4 f5 f6
+  grind
+
 
 variable {R : Type} [CommRing R] [ToExpr R]
 instance : Std.Associative (α := R) (.*.) := ⟨Semiring.mul_assoc⟩
