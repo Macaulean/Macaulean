@@ -18,7 +18,7 @@ open Lean Grind
 structure Macaulay2 where
   requestStream : IO.FS.Stream
   responseStream : IO.FS.Stream
-  nextRequestId : IO.Ref Nat
+  nextRequestId : Std.Mutex Nat --we use a mutex on nextRequestId to ensure that request are processed sequentially
 
 def startM2Server : IO (IO.Process.Child {stdin := .null, stdout := .piped, stderr := .inherit} × Macaulay2) :=
   do let (m2stdin,m2Process) <-
@@ -35,7 +35,7 @@ def startM2Server : IO (IO.Process.Child {stdin := .null, stdout := .piped, stde
         IO.FS.Stream.ofHandle m2stdin
      let m2stdoutStream :=
         IO.FS.Stream.ofHandle m2Process.stdout
-     (m2Process,.) <$> .mk m2stdinStream m2stdoutStream <$> IO.mkRef 1
+     (m2Process,.) <$> .mk m2stdinStream m2stdoutStream <$> Std.Mutex.new 1
 
 initialize macaulay2ServerRef : IO.Ref (Option Macaulay2)
   ← IO.mkRef .none
@@ -50,14 +50,16 @@ def globalM2Server : IO Macaulay2 :=
                   pure server'
 
 def Macaulay2.sendRequest [Lean.ToJson a] [Lean.FromJson b] (m2 : Macaulay2) (requestName : String) (requestBody : a) : IO b := do
-  let reqId ←
-    Lean.JsonRpc.RequestID.num <$> m2.nextRequestId.modifyGet (fun x => (x,x+1))
-  m2.requestStream.writeLspRequest
-    { id := reqId
-      method := requestName
-      param :=  requestBody }
-  let response <- m2.responseStream.readLspResponseAs reqId (α := b)
-  pure response.result
+  m2.nextRequestId.atomically $ do
+    let reqId ← get
+    set (reqId + 1)
+    dbg_trace "SENDING REQUEST"
+    m2.requestStream.writeLspRequest
+      { id := reqId
+        method := requestName
+        param :=  requestBody }
+    let response <- m2.responseStream.readLspResponseAs reqId (α := b)
+    pure response.result
 
 def Macaulay2.eval (m2 : Macaulay2) (cmd : String) : IO String :=
   m2.sendRequest "testMethod" [cmd]
