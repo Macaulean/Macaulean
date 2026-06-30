@@ -27,16 +27,16 @@ Macaulay2-side proof-synthesis item.
 
 Three concrete signals of working progress:
 
-- **A non-trivial example is verified end-to-end on the main line.** Lean checks,
-  through Macaulay2, that a Gröbner basis and the determinant of a 3×3 matrix of
-  indeterminates lie in a **10-generator ideal in 9 variables** — a genuine
-  commutative-algebra computation, not a toy
-  (`MacauleanTest/TestGB5Pts.lean`, via the `m2idealmem` tactic + `grind`).
+- **The full Lean→Macaulay2→Lean path runs end-to-end on a non-trivial problem.**
+  Lean checks, through Macaulay2, that a Gröbner basis and the determinant of a 3×3
+  matrix of indeterminates lie in a **10-generator ideal in 9 variables** — a smoke
+  test that exercises the whole pipeline on real input, on the way to genuine
+  mathematical use (`MacauleanTest/TestGB5Pts.lean`, via the `m2idealmem` tactic +
+  `grind`).
 - **Part of the interface has been upstreamed into Macaulay2 itself.** The
-  JSON-RPC package now ships with the Macaulay2 distribution rather than living
-  only in our repository — durable impact that outlasts the grant and is reusable
-  by anyone, not just this project. (The MRDI serialization layer is maintained
-  with the project and is a candidate for the same treatment.)
+  JSON-RPC and MRDI packages now ship with the Macaulay2 distribution rather than
+  living only in our repository — durable impact that outlasts the grant and is
+  reusable by anyone, not just this project.
 - **The architecture has been validated across three CAS backends** (Macaulay2,
   SymPy, Oscar/GAP) on the active development branches — the proposal's Q2 2027
   "general framework" thesis demonstrated early.
@@ -65,7 +65,8 @@ shape everything below:
    set of problems we can usefully serve and is the main direction of current work.
 2. **A consolidated core, with breadth proven on branches.** `main` holds the
    core (serialization, the `ConcretePoly` representation, the
-   ideal-membership/factorization/remainder tactics, the flagship example); the
+   ideal-membership/factorization/remainder tactics, the end-to-end smoke-test
+   example); the
    additional breadth — SymPy and Oscar backends, Gröbner-reduction / radical /
    divisibility / sum-of-squares / `polyrith` / algebra-normalization strategies,
    and permutation-group membership — is implemented and tested on active feature
@@ -75,7 +76,7 @@ shape everything below:
 ## Demonstrable results today
 
 **On `main`:**
-- **Ideal membership at real scale.** `MacauleanTest/TestGB5Pts.lean` proves,
+- **Ideal membership, full path end to end.** `MacauleanTest/TestGB5Pts.lean` proves,
   kernel-checked, that a Gröbner basis and the 3×3 determinant
   `e11 e22 e33 − …` lie in a 10-generator ideal in the 9 variables `e11…e33`. The
   `m2idealmem` tactic obtains the quotient–remainder certificate from Macaulay2,
@@ -89,9 +90,8 @@ shape everything below:
   `m2idealmem` and `m2remainder` (ideal membership / quotient–remainder), and the
   generic `macaulay` entry point, with a config option to run `grind` or hand the
   reduced goal back.
-- **Interface upstreamed:** the JSON-RPC package now ships with Macaulay2; the MRDI
-  serialization layer and the project-specific glue live in `m2/` (`macaulean.m2`,
-  `lean-mrdi.m2`).
+- **Interface upstreamed:** the JSON-RPC and MRDI packages now ship with Macaulay2;
+  the remaining project-specific glue lives in `m2/` (`macaulean.m2`, `lean-mrdi.m2`).
 
 **On active branches (validated, consolidation pending):**
 - **Three CAS backends behind one interface** — Macaulay2, SymPy, Oscar/GAP.
@@ -141,10 +141,10 @@ UUID-identified, via `ConcretePoly`), sends them to Macaulay2, and deserializes
 structured results back into Lean; round-tripping is exercised by
 `MacauleanTest/Poly.lean`. The payoff of committing to a *standard* serialization
 format rather than ad-hoc strings is larger than it looks: it is what let the
-**JSON-RPC package be upstreamed into Macaulay2 itself** this period, so the
-transport layer is now reusable by anyone — concrete evidence of a "framework for
-future CAS-theorem prover integrations" — with the MRDI data layer a candidate to
-follow. The same standard format also underpins a
+**JSON-RPC and MRDI packages be upstreamed into Macaulay2 itself** this period (they
+were removed from our repo as standalone copies), so the transport and data layers
+are now reusable by anyone — concrete evidence of a "framework for future
+CAS-theorem prover integrations." The same standard format also underpins a
 saved-state pathway: results serialized to MRDI can be written to disk and a proof
 restored from that stored artifact rather than recomputed (Row 5). The
 project-specific glue remains in `m2/macaulean.m2` and `m2/lean-mrdi.m2`.
@@ -217,10 +217,10 @@ objects, factorization, sum-of-squares, and `toLean`/`fromLean` conversions
 (`m2/lean-mrdi.m2`) and MRDI validation (`m2/validate-mrdi.m2`). The most valuable
 outcome here is that the reusable components have proven good enough to **seed the
 broader Macaulay2 ecosystem rather than stay confined to one Lean-specific
-package**: the JSON-RPC layer is already upstreamed into the Macaulay2
-distribution, so any Macaulay2 user gets the transport layer for free, and because
-none of it is Lean-specific the same components (the MRDI serialization layer
-included) can serve other proof assistants. New work this period also includes an AI-assisted stored-artifact
+package**: the JSON-RPC and MRDI layers are already upstreamed into the Macaulay2
+distribution, so any Macaulay2 user gets the serialization/transport layer for free,
+and because none of it is Lean-specific the same components can serve other proof
+assistants. New work this period also includes an AI-assisted stored-artifact
 prototype (M2 writes results to files that proofs reference) and a June prototype
 that decomposes a CAS problem into atomic polynomial-identity tasks for Lean. The
 remaining step to formally close this Q4 row is registering the project-specific
@@ -280,8 +280,8 @@ backend (Gröbner bases, factorization, radical membership) and an **Oscar/Julia
 backend (permutation-group membership via GAP), each plugging into the same core.
 Dissemination: a contribution on the Lean–Macaulay2 interface was **accepted for
 ICMS 2026 (Waterloo)** (with an invited talk by Michael Stillman); the design is
-documented in `CAS_ARCHITECTURE.md` (CAS branches); and the JSON-RPC layer is now
-shipped with Macaulay2. Formal publication of the general framework remains the
+documented in `CAS_ARCHITECTURE.md` (CAS branches); and the MRDI/JSON-RPC layer is
+now shipped with Macaulay2. Formal publication of the general framework remains the
 Q2 2027 target.
 *Evidence:* `Macaulean/SymPy.lean`, `Macaulean/Oscar.lean`,
 `Macaulean/PermGroup.lean`, `sympy/macaulean_sympy.py`, `oscar/macaulean_oscar.jl`,
@@ -307,7 +307,7 @@ approved plan.
 - **Core on `main` vs. breadth on branches.** The three backends, the six-strategy
   set, the AlgPoly normalizer, and permutation-group membership are validated on
   active branches rather than `main`. To be clear about what is settled vs. still in
-  flight: the *core* pipeline and the ideal-membership flagship are settled on
+  flight: the *core* pipeline and the ideal-membership smoke test are settled on
   `main`; the breadth on branches is real and tested but is partly exploratory
   (which strategies are worth promoting, and how the finishing-step modularity
   should be exposed, are still being decided). Consolidation onto `main` is in
@@ -317,11 +317,11 @@ approved plan.
   the structural mechanism now in place for ℤ/p and richer coefficients. Mod-p
   support is actively being added, which also opens modular/CRT finishing routes and
   applications like primality checking.
-- **Macaulay2 package.** Strong here: the JSON-RPC layer is upstreamed into
-  Macaulay2. The open step for the Q4 2026 row is registering the remaining glue
-  (and the MRDI serialization layer) as an installable package — with the
-  deliberate emphasis on keeping the reusable components seeding the wider
-  ecosystem rather than locking them into one package.
+- **Macaulay2 package.** Strong here: the JSON-RPC and MRDI layers are upstreamed
+  into Macaulay2. The open step for the Q4 2026 row is registering the remaining
+  project-specific glue as an installable package — with the deliberate emphasis on
+  keeping the reusable components seeding the wider ecosystem rather than locking
+  them into one package.
 
 ## By the numbers (verified against the repo)
 
@@ -329,9 +329,9 @@ approved plan.
   (Macaulay2 co-creator), Damiano Testa, Jay Yang, Douglas Torrance.
 - **3** CAS backends behind one interface (Macaulay2, SymPy, Oscar/GAP).
 - **6** certificate-bearing strategies, **0** added axioms (kernel `decide`).
-- Flagship verified on `main`: a **10-generator ideal in 9 variables**
+- End-to-end smoke test verified on `main`: a **10-generator ideal in 9 variables**
   (`MacauleanTest/TestGB5Pts.lean`).
-- Part of the interface (**JSON-RPC**) **now distributed with Macaulay2**.
+- Part of the interface (**JSON-RPC + MRDI**) **now distributed with Macaulay2**.
 
 ## Engagement and dissemination
 
