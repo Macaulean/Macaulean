@@ -327,6 +327,9 @@ approved plan.
 
 ## Wins
 
+*What are your project's key wins this quarter? Please include quantitative
+evidence or metrics of success, why each win is notable, etc.*
+
 **Part of the interface is now permanent infrastructure in Macaulay2.** The
 JSON-RPC and MRDI serialization packages were upstreamed into the Macaulay2
 distribution this period — they ship with M2 itself rather than living only in our
@@ -369,39 +372,51 @@ kind in Lean.
 
 ## Challenges
 
+*What challenges have you come across during the last quarter, and how do you plan
+on overcoming them?*
+
 **Kernel verification performance at scale — the dominant technical risk.** Sound
 verification is not yet cheap: the 9-variable example needs a raised kernel budget
 (`maxHeartbeats 1000000`), and larger certificates (e.g. a ~3,700-monomial identity)
 still exceed practical kernel limits. Certificate size — large Gröbner bases, long
-cofactor expressions — is the recurring bottleneck, and most current engineering is
-aimed here.
+cofactor expressions — is the recurring bottleneck. *Plan:* the compact
+`ConcretePoly` representation already on `main`; shorter certificates via
+syzygy/GrevLex choices and modular/CRT finishing; the atomic-task decomposition; and
+engaging the Lean core team on kernel recursion-depth / large-term handling
+(the biggest lever is upstream).
 
-**Coefficient generality.** The pipeline is strongest over ℚ/ℤ (characteristic 0).
-Finite-field (ℤ/p) support — which also unlocks modular/CRT finishing routes and
-applications like primality — is designed for (via `ConcretePoly`) and underway, but
-not yet delivered.
+**Coefficient generality.** The pipeline is strongest over ℚ/ℤ (characteristic 0);
+finite-field (ℤ/p) support is not yet delivered. *Plan:* `ConcretePoly` is already
+parameterized over its coefficient ring, so the remaining work is finishing the ℤ/p
+path — which doubles as the enabling step for the modular/CRT finishing routes and
+for applications like primality.
 
 **Consolidation debt.** The breadth (three backends, six strategies, AlgPoly,
-perm-group membership) lives on feature branches, not yet on `main`. Which strategies
-to promote, and how to expose the finishing-step modularity, are still being decided.
+perm-group membership) lives on feature branches, not yet on `main`. *Plan:*
+consolidate the settled strategies onto `main` over the coming quarter, deciding
+per-strategy what is mature enough to promote versus kept exploratory.
 
 **Testing does not yet guard the end-to-end path.** The current CI ("Lean Action
 CI") runs a bare `lake build`, which builds only the default `macaulean` target — it
 does **not** build `MacauleanTest`, so the Macaulay2-backed tactics and the
 9-variable example are never exercised in CI, and a regression in the live path can
 land green. (Relatedly, now that the interface depends on M2-distributed packages,
-contributors on an older Macaulay2 can hit failures current-M2 users don't.)
+contributors on an older Macaulay2 can hit failures current-M2 users don't.) *Plan:*
+add a CI job that installs Macaulay2 (and SymPy / Oscar) and runs
+`lake build MacauleanTest`, so the real path is gated and version drift surfaces
+early.
 
 ## Events
 
+*Do you have any events or publications to share?*
+
 - **Weekly team meeting.** The core team meets weekly over Zoom to coordinate the
   Lean, Macaulay2, and Oscar workstreams; this remains the main driver of the work.
-- **ICMS 2026 (Waterloo):** a contribution on the Lean–Macaulay2 interface was
-  **accepted**, with an **invited talk by Michael Stillman**. *[Anton to confirm
-  acceptance status and invited-talk wording.]* The extended abstract is being
-  finalized; reviewer feedback asked for a worked example that Macaulay2 can certify
-  but plain `grind` cannot — which we are assembling from cubic-generated ideals
-  already in the repo.
+- **ICMS 2026 (Waterloo) — publication:** a contribution on the Lean–Macaulay2
+  interface was **accepted**, with an **invited talk by Michael Stillman**. The
+  extended abstract is being finalized; reviewer feedback asked for a worked example
+  that Macaulay2 can certify but plain `grind` cannot — which we are assembling from
+  cubic-generated ideals already in the repo.
 - **Upcoming:** the **AI for Math** event in **London, Sep 17–18, 2026**; visits
   around Georgia Tech / Macaulay2.
 - **External interest and collaboration.** A UK group formalizing the **LMFDB** has
@@ -412,6 +427,8 @@ contributors on an older Macaulay2 can hit failures current-M2 users don't.)
   we are in active talks about collaboration and shared hiring.
 
 ## Needs
+
+*What are some of your project needs, if any, that you want to highlight?*
 
 - **Lean kernel performance.** Upstream improvements to recursion depth and
   large-term handling would directly unlock larger certificates; engagement with the
@@ -425,8 +442,8 @@ contributors on an older Macaulay2 can hit failures current-M2 users don't.)
 
 ## Budget Requests
 
-**Did you submit any budget reallocation requests to the AI for Math Team for
-approval? If so, please describe.**
+*Did you submit any budget reallocation requests to the AI for Math Team for
+approval? If so, please describe.*
 
 No. We did not submit any budget reallocation requests this period. Current funding
 is adequate and is being used as needed; no reallocation has been required.
