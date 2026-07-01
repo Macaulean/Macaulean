@@ -61,6 +61,7 @@ theorem foo
                 z) *
           (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 3) = 0 := by
   m2idealmem -grind [ho, hi, hpq, hk]
+  clear ho hi hpq hk
   -- simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray]
   -- simp [*]
   sorry
@@ -74,8 +75,17 @@ theorem foo2
     r^2*k^2*z^2-1/4*k^4*z^2-u*r^2*x*z-r^3*x*z+1/2*u*k^2*x*z+r*k^2*x*z-1/2*u*r*x^2-1/2*r^2*x^2-1/4*k^2*x^2-1/2*u*r*y^2-1/2*r^2*y^2-1/4*k^2*y^2+r^2*z^2-1/2*k^2*z^2+1/2*u*
       x*z+r*x*z-1/4*x^2-1/4*y^2-1/4*z^2 = 0 := by
   m2idealmem -grind [ho, hi, hpq, hk]
-  simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring.add_zero]
+  clear ho hi hpq hk
+  repeat conv in (occs := *) (_ + _)^_ =>
+    all_goals
+      rw [Semiring.pow_succ, Semiring.pow_one]
+  repeat conv in (occs := *) (_ - _)^_ =>
+    all_goals
+      rw [Semiring.pow_succ, Semiring.pow_one]
 
-  simp [Semiring.left_distrib, Semiring.right_distrib]
+  simp [Semiring.left_distrib, Semiring.right_distrib, Ring.sub_eq_add_neg]
+  simp [← Semiring.pow_two, ← Semiring.pow_succ]
+
+  ac_nf
   -- simp [*]
   grind

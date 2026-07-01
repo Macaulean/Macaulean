@@ -57,7 +57,6 @@ example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
 example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
   m2idealmem -grind [f,g]
   clear f g
-  simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray]
   grind
 
 example {x y z : Rat} (f : 2*x= 0) (g : 3*y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
@@ -70,8 +69,6 @@ example {a b c d e f : Rat}
   (f4 : c^2-a*f = 0) (f5 : b*c-a*e = 0) (f6 : b^2 - a*d = 0) :
     (c^2*d-2*b*c*e+a*e^2+b^2*f-a*d*f = 0) := by
   m2idealmem [f1,f2,f3,f4,f5,f6]
-  simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray]
-  simp only [Semiring.add_zero]
   clear f1 f2 f3 f4 f5 f6
   grind
 

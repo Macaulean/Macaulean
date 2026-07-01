@@ -192,7 +192,7 @@ macauleanMainLoop (JSONRPCServer, File) := (server, file) -> (
         if atEndOfFile file then return;
         if isReady file then (
             headers := readLSPHeaders file;
-            stderr << headers << endl;
+            --stderr << headers << endl;
             requestLength := (NNParser : charAnalyzer) headers#"Content-Length";
             requestBody := concatenate while requestLength > 0 list (
                 block := read(file,requestLength);

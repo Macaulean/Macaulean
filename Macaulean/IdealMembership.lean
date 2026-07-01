@@ -343,7 +343,8 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
       deserializer result.remainder
     match deserializedCoefficients, deserializedRemainder with
     | .ok c, .ok r  => pure (
-      ← c.mapM fun x => mkAppM ``Macaulean.Polynomial.denote #[varContextExpr, x],
+      ← c.mapM fun x =>
+          mkAppM ``Macaulean.Polynomial.denote #[varContextExpr, x],
       ← mkAppM ``Macaulean.Polynomial.denote #[varContextExpr, r])
     | .error e, _ => throwTacticEx `m2idealmem goal e
     | _, .error e => throwTacticEx `m2idealmem goal e
@@ -352,6 +353,21 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
 theorem helper [CommRing R] (a b c d : R) (h1 : a = d) (h2 : b = 0) : a+c*b = d := by
   rewrite [h1,h2]
   simp [Semiring.mul_zero,Semiring.add_zero]
+
+--this theorem really should be proven elsewhere
+private theorem RArray_get_ofArray (h : i < arr.size) : (RArray.ofArray arr len_hyp).get i = arr[i] := by
+  have irw : i = ↑(Fin.mk i h) := by simp
+  conv =>
+    left
+    right
+    rw [irw]
+  rw [RArray.ofArray, RArray.get_ofFn]
+  simp
+
+--as should this one
+private theorem Semiring_zero_add [Semiring R] (a : R) : 0 + a = a := by grind
+
+set_option stderrAsMessages false
 
 -- factor out the core tactic to make the code a bit simpler
 unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name) (goal : MVarId) (target : Expr) (genHyps : Array Expr) : TacticM Unit := do
@@ -383,10 +399,14 @@ unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name
   then
     dbg_trace "New Goal Created"
     pushGoals [eqGoalMVar.mvarId!]
+    let (newGoals,_) ←
+      runTactic (← getMainGoal) (← `(tactic|simp (maxSteps:=1000000) [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+    setGoals newGoals
   else
     tacticError "Failed to show vanishing"
   where
     tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
+
 
 /--
   This expects goal to be a proposition of the type `g = h` over some ring
@@ -419,6 +439,7 @@ unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Nam
   then
     dbg_trace "New Goal Created"
     pushGoals [eqGoalMVar.mvarId!]
+    _ ← runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray]))
   else
     tacticError "Failed to show remainder"
   where
