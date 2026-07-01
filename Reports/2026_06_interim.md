@@ -323,48 +323,122 @@ approved plan.
   keeping the reusable components seeding the wider ecosystem rather than locking
   them into one package.
 
-## By the numbers (verified against the repo)
+---
 
+## Wins
+
+**Part of the interface is now permanent infrastructure in Macaulay2.** The
+JSON-RPC and MRDI serialization packages were upstreamed into the Macaulay2
+distribution this period — they ship with M2 itself rather than living only in our
+repository. Durable impact that outlives the grant and is reusable by any project,
+not just ours.
+
+**The full Lean→Macaulay2→Lean loop runs end-to-end on `main`.** A kernel-checked,
+`sorry`-free example verifies that a Gröbner basis and the 3×3 determinant of a
+matrix of indeterminates lie in a 10-generator ideal in 9 variables
+(`MacauleanTest/TestGB5Pts.lean`). It is a smoke test rather than a headline
+theorem, but it drives the whole pipeline — reification, MRDI round-trip to M2,
+certificate rebuild, kernel discharge — on non-trivial input, and we re-ran it this
+period to confirm it still builds and passes against a current Macaulay2.
+
+**A compact, coefficient-parameterized polynomial representation landed on `main`.**
+`ConcretePoly` mirrors Macaulay2's term structure (what makes kernel checking
+tractable) and is parameterized over its coefficient ring — the structural
+mechanism for moving past ℚ toward ℤ/p.
+
+**A cleaner conceptual model for the tactics.** We separated the fixed CAS
+round-trip from the *finishing step*: certificate checking is now distinct from
+theorem closing, which opens the door to user-selectable dischargers (kernel
+`grind` by default; coefficient comparison, modular sampling, or handing the reduced
+goal back as alternatives). This widens the set of problems the interface can serve.
+
+**Breadth validated on branches.** Three CAS backends behind one interface
+(Macaulay2, SymPy, Oscar/GAP); six certificate-bearing strategies, each
+kernel-checked with **zero added axioms**; and kernel-verified permutation-group
+membership for A₅, S₅, and D₄ — to our knowledge the first CAS-backed tactic of its
+kind in Lean.
+
+### By the numbers
+- **57** commits on `main` since the last report (Jay Yang 37, Doug Torrance 18,
+  Anton Leykin 2), with further breadth on feature branches.
 - **6** core contributors: Matthew Ballard, Anton Leykin, Michael Stillman
   (Macaulay2 co-creator), Damiano Testa, Jay Yang, Douglas Torrance.
-- **3** CAS backends behind one interface (Macaulay2, SymPy, Oscar/GAP).
-- **6** certificate-bearing strategies, **0** added axioms (kernel `decide`).
-- End-to-end smoke test verified on `main`: a **10-generator ideal in 9 variables**
-  (`MacauleanTest/TestGB5Pts.lean`).
-- Part of the interface (**JSON-RPC + MRDI**) **now distributed with Macaulay2**.
+- **3** CAS backends, **6** certificate strategies, **0** added axioms.
+- JSON-RPC + MRDI **now distributed with Macaulay2**; the 9-variable end-to-end
+  example verified on `main`.
 
-## Engagement and dissemination
+## Challenges
 
-- **ICMS 2026 (Waterloo):** contribution **accepted**; **invited talk** by Michael
-  Stillman.
-- **Upcoming:** the **AI for Math** event in **London, Sep 17–18, 2026**; Georgia
-  Tech / Macaulay2 visits.
-- **External interest / collaboration:** a UK group formalizing the **LMFDB** has
-  expressed interest in our polynomial-verification work; and the newly funded
-  **Mathlib Initiative** (Alex Gerko/XTX; a Sloan Foundation gift to expand
-  Mathlib's *computational* capabilities) is now active in this exact space — its
-  first PR on verified computer algebra (computing determinants via the `ring`
-  tactic) landed recently. We are in active talks with the Initiative about
-  collaboration and shared hiring (below).
+**Kernel verification performance at scale — the dominant technical risk.** Sound
+verification is not yet cheap: the 9-variable example needs a raised kernel budget
+(`maxHeartbeats 1000000`), and larger certificates (e.g. a ~3,700-monomial identity)
+still exceed practical kernel limits. Certificate size — large Gröbner bases, long
+cofactor expressions — is the recurring bottleneck, and most current engineering is
+aimed here.
 
-## Risks, resourcing, and where the next half goes
+**Coefficient generality.** The pipeline is strongest over ℚ/ℤ (characteristic 0).
+Finite-field (ℤ/p) support — which also unlocks modular/CRT finishing routes and
+applications like primality — is designed for (via `ConcretePoly`) and underway, but
+not yet delivered.
 
-- **Kernel verification performance is the dominant risk** and the main current
-  focus. Mitigations in progress: the compact `ConcretePoly` representation, the
-  modular/CRT finishing routes, and the atomic-task decomposition. Upstream Lean
-  improvements to recursion-depth and large-term handling would directly unlock
-  larger instances; engagement with the Lean core team and the Mathlib Initiative on
-  this is valuable.
-- **Coefficient generality** beyond ℚ/ℤ is being addressed via the
-  coefficient-parameterized representation, with mod-p support underway.
-- **Consolidation and packaging** (merging the branch breadth onto `main`;
-  registering an installable Macaulay2 package) are near-term engineering steps, not
-  research risks.
-- **Resourcing, looking forward.** With the core design settled, the next half is
-  implementation-heavy, and we want to deploy effort where it compounds. There is
-  room on the Lean side in particular, and rather than hiring narrowly for "someone
-  to write Lean code for commutative algebra" — a thin labor market — the most
-  leveraged move may be to **interlace with the Mathlib Initiative's verified-CAS
-  work**, e.g. topping up one of their hires or scoping shared work at the seam
-  between their efficient in-Lean computation and our CAS-certificate approach. We
-  would welcome RenPhil's guidance on structuring such a collaboration.
+**Consolidation debt.** The breadth (three backends, six strategies, AlgPoly,
+perm-group membership) lives on feature branches, not yet on `main`. Which strategies
+to promote, and how to expose the finishing-step modularity, are still being decided.
+
+**Testing does not yet guard the end-to-end path.** The current CI ("Lean Action
+CI") runs a bare `lake build`, which builds only the default `macaulean` target — it
+does **not** build `MacauleanTest`, so the Macaulay2-backed tactics and the
+9-variable example are never exercised in CI, and a regression in the live path can
+land green. (Relatedly, now that the interface depends on M2-distributed packages,
+contributors on an older Macaulay2 can hit failures current-M2 users don't.)
+
+## Events
+
+- **Weekly team meeting.** The core team meets weekly over Zoom to coordinate the
+  Lean, Macaulay2, and Oscar workstreams; this remains the main driver of the work.
+- **ICMS 2026 (Waterloo):** a contribution on the Lean–Macaulay2 interface was
+  **accepted**, with an **invited talk by Michael Stillman**. *[Anton to confirm
+  acceptance status and invited-talk wording.]* The extended abstract is being
+  finalized; reviewer feedback asked for a worked example that Macaulay2 can certify
+  but plain `grind` cannot — which we are assembling from cubic-generated ideals
+  already in the repo.
+- **Upcoming:** the **AI for Math** event in **London, Sep 17–18, 2026**; visits
+  around Georgia Tech / Macaulay2.
+- **External interest and collaboration.** A UK group formalizing the **LMFDB** has
+  expressed interest in our polynomial-verification work. The newly funded **Mathlib
+  Initiative** (Alex Gerko / XTX, with a Sloan Foundation gift to expand Mathlib's
+  *computational* capabilities) is now active in exactly this space — its first PR on
+  verified computer algebra (computing determinants via `ring`) landed recently — and
+  we are in active talks about collaboration and shared hiring.
+
+## Needs
+
+- **Lean kernel performance.** Upstream improvements to recursion depth and
+  large-term handling would directly unlock larger certificates; engagement with the
+  Lean core team and the Mathlib Initiative on this would be valuable.
+- **CI that exercises the real path.** A pipeline that installs Macaulay2 (and SymPy
+  / Oscar) and runs `lake build MacauleanTest` would catch regressions in the
+  end-to-end tactics that the current build misses.
+- **Finite-field / non-ℚ coefficient support** — planned, not yet implemented.
+- **User-facing documentation** for installing backends and using the tactics beyond
+  Macaulay2 (current docs are developer-facing).
+- **Personnel at the Lean / Mathlib seam** — see Budget Requests.
+
+## Budget Requests
+
+*(The figures below need the team's confirmation before submission — they reflect the
+June planning discussion, not a reconciled ledger.)*
+
+- **Year-1 spend has been efficient, and the Lean side is underspent.** The
+  Macaulay2-side budget was largely used as planned; the Lean side has more unspent
+  runway, and a portion allocated for **supercomputing** proved hard to redirect
+  toward AI/compute and remains largely unused. *[Matt / Anton: confirm actual spend
+  against the approved $100k + consulting lines.]*
+- **Requested direction for the next tranche: fund people at the seam with the
+  Mathlib Initiative.** Rather than hiring narrowly for "a Lean commutative-algebra
+  developer" — a thin market — the most leveraged use of funds is to **interlace with
+  the Mathlib Initiative's verified-CAS effort**: e.g. topping up one of their hires,
+  or scoping shared work between their efficient in-Lean computation and our
+  CAS-certificate approach. We would welcome RenPhil's guidance on structuring such a
+  collaboration and, if useful, permission to redirect the underspent (especially
+  supercomputing) lines toward it.
