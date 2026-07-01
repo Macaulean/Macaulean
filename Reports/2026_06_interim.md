@@ -422,23 +422,11 @@ contributors on an older Macaulay2 can hit failures current-M2 users don't.)
 - **Finite-field / non-ℚ coefficient support** — planned, not yet implemented.
 - **User-facing documentation** for installing backends and using the tactics beyond
   Macaulay2 (current docs are developer-facing).
-- **Personnel at the Lean / Mathlib seam** — see Budget Requests.
 
 ## Budget Requests
 
-*(The figures below need the team's confirmation before submission — they reflect the
-June planning discussion, not a reconciled ledger.)*
+**Did you submit any budget reallocation requests to the AI for Math Team for
+approval? If so, please describe.**
 
-- **Year-1 spend has been efficient, and the Lean side is underspent.** The
-  Macaulay2-side budget was largely used as planned; the Lean side has more unspent
-  runway, and a portion allocated for **supercomputing** proved hard to redirect
-  toward AI/compute and remains largely unused. *[Matt / Anton: confirm actual spend
-  against the approved $100k + consulting lines.]*
-- **Requested direction for the next tranche: fund people at the seam with the
-  Mathlib Initiative.** Rather than hiring narrowly for "a Lean commutative-algebra
-  developer" — a thin market — the most leveraged use of funds is to **interlace with
-  the Mathlib Initiative's verified-CAS effort**: e.g. topping up one of their hires,
-  or scoping shared work between their efficient in-Lean computation and our
-  CAS-certificate approach. We would welcome RenPhil's guidance on structuring such a
-  collaboration and, if useful, permission to redirect the underspent (especially
-  supercomputing) lines toward it.
+No. We did not submit any budget reallocation requests this period. Current funding
+is adequate and is being used as needed; no reallocation has been required.
