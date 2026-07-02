@@ -179,11 +179,11 @@ example
     grind
 \end{verbatim}
 
-Unfortunately, we do not at this point have an example where \verb|m2idealmem| succeeds but \verb|grind| does not, however.
+While this represents a larger example that better demonstrates the capabilities of our work, We do not at this point have an example where \verb|m2idealmem| succeeds but \verb|grind| does not.
 
 \end{example}
 
-While we have focused on the \verb|m2idealmem| tactic, we also give the following example of the usage of \verb|m2remainder|
+While we have focused on the \verb|m2idealmem| tactic, we also give the following example of the usage of the \verb|m2remainder| tactic.
 \begin{example}
 
   We consider the non-radical ideal $I = \left<xy^2-x^2, y^4-x^2\right>$. The ideal $I$ does not contain $xy^3  - x^2y - y^3  + xy$, however the radical ideal $\sqrt{I}$ does. If we wish to show $xy^3-x^2y-y^3+xy=0$ subject to the constraints $xy^2-x^2=0$ and $y^4-x^2=0$, the \verb|m2idealmem| tactic would not produce the desired result as the polynomial is not contained in the ideal $I$. Here we can use \verb|m2remainder| to make progress.
