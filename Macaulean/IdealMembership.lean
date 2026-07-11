@@ -312,7 +312,8 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
       polyExpr.collectFVars
       _ ← idealExprs.mapM (Expr.collectFVars)
     ).run Inhabited.default
-  let vars : FVarIdMap Nat := .ofArray (cmp := _) <| varsInfo.fvarSet.toArray.mapIdx (fun a b => (b,a))
+  let fvarsSorted := varsInfo.fvarSet.toList -- .mergeSort (le := fun a b => a.name.toString ≥ b.name.toString)
+  let vars : FVarIdMap Nat := .ofArray (cmp := _) <| fvarsSorted.toArray.mapIdx (fun a b => (b,a))
   let polyExprPoly ← toPolynomialExpr? vars ring polyExpr
   let idealExprsPolys ← idealExprs.mapM (toPolynomialExpr? vars ring)
   let varContextExpr ← mkAppM ``RArray.ofArray
@@ -400,7 +401,7 @@ unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name
     dbg_trace "New Goal Created"
     pushGoals [eqGoalMVar.mvarId!]
     let (newGoals,_) ←
-      runTactic (← getMainGoal) (← `(tactic|simp (maxSteps:=1000000) [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+      runTactic (← getMainGoal) (← `(tactic|simp (maxSteps:=100000) [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
     setGoals newGoals
   else
     tacticError "Failed to show vanishing"
@@ -424,7 +425,7 @@ unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Nam
     if (← isDefEq targetRing ring) && (← isDefEq rhs zeroExpr)
     then pure <| lhs
     else tacticError "Expected equalities to zero over the same ring")
-  let (coeffs,_) ← m2QuotientRemainderImpl goal targetRing genPolys targetLhs
+  let (coeffs,remainder) ← m2QuotientRemainderImpl goal targetRing genPolys targetLhs
   dbg_trace "Coefficients Read"
   let startingExpr ← mkEqRefl targetRhs
   let remainderProof ← (coeffs.zip genHyps.toList).foldlM
@@ -434,12 +435,19 @@ unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Nam
   let remainderProofType ← inferType remainderProof
   let some (_,expectedTarget,_) := remainderProofType.eq?
     | tacticError "Impossible"
-  let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs expectedTarget)
+  let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs (← mkAdd expectedTarget remainder))
+  let remainderZeroGoal ← mkFreshExprMVar (← mkEq remainder zeroExpr)
   if ← goal.checkedAssign (← mkEqTrans eqGoalMVar remainderProof)
   then
     dbg_trace "New Goal Created"
     pushGoals [eqGoalMVar.mvarId!]
-    _ ← runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray]))
+    let (newGoals,_) ←
+      runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+    setGoals newGoals
+    pushGoals [remainderZeroGoal.mvarId!]
+    let (newGoals2,_) ←
+      runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+    pushGoals newGoals2
   else
     tacticError "Failed to show remainder"
   where

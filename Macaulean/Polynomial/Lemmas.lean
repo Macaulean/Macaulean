@@ -290,6 +290,20 @@ simproc_decl mon_mul_simproc (Mon.mul ⟨_,_⟩ ⟨_,_⟩) := fun e => do
   let mon ← mkAppOptM ``Mon.mk #[nExpr, sum, lenProof]
   pure <| .visit {expr := mon}
 
+-- simproc mon_denote_array_context_simproc (Macaulean.Mon.denote _ ⟨_,_⟩) := fun e => do
+--   let_expr Macaulean.Mon.denote R n inst ctx m ← e | return .continue
+--   let_expr Mon.mk _ p _ ← m | return .continue
+--   let_expr RArray.ofArray _ arr _ ← ctx | return .continue
+--   let .some powExprs ← getListLit? p | return .continue
+--   let .some arrExprs ← getArrayLit? arr | return .continue
+--   if h1 : powExprs.size = arrExprs.size
+--   then
+--     let powers ← powExprs.mapFinIdxM (fun i d h2 => mkAppM ``HPow.hPow #[arrExprs[i],d])
+--     let mon ← powers.foldlM (fun a b => mkMul a b) (← mkAppOptM ``OfNat.ofNat #[R, mkRawNatLit 1, none])
+--     pure <| .visit {expr := mon}
+--   else
+--     pure .continue
+
 example : (Mon.fromVar (n:=3) (Fin.mk 1 (by grind))).mul (Mon.fromVar (n:=3) (Fin.mk 2 (by simp))) = Mon.ofPowers [0,1,1] := by
   simp [Mon.fromVar,Mon.fromVarPower,mon_mul_simproc]
   trivial
