@@ -276,7 +276,7 @@ private unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainCo
       let savedGoals ← getGoals
       setGoals [hChkMVar.mvarId!]
       try
-        evalTactic (← `(tactic| decide))
+        evalTactic (← `(tactic| decide +kernel))
       finally
         setGoals savedGoals
       let hChk ← instantiateMVars hChkMVar
@@ -308,7 +308,7 @@ private unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainCo
     let savedGoals ← getGoals
     setGoals [hBeqMVar.mvarId!]
     try
-      evalTactic (← `(tactic| decide))
+      evalTactic (← `(tactic| decide +kernel))
     finally
       setGoals savedGoals
     let hBeq ← instantiateMVars hBeqMVar
