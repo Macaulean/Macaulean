@@ -9,12 +9,16 @@ import Macaulean.Grind.AlgPoly.Expr
 # Kronecker-packed normal form for `AlgExpr`
 
 `AlgExpr.toAlgPoly` normalizes into `AlgPoly`, whose monomials are grind's
-cons-list `Mon`.  Kernel evaluation of that normal form (the `decide` step of
-`algebra_norm_reflect`) is dominated by structural monomial comparisons and
-does not scale: measured on this machine, a 41-monomial certificate identity
-takes ≈ 9 s while a 296-monomial one exceeds 10 minutes.
+cons-list `Mon`, so every comparison and multiplication during
+normalization is a structural list traversal.  Measured on certificate
+identities (`MacauleanTest/AlgebraNormPerf.lean`, tactic time only, goals
+pre-built as `Expr`s), the cons-list route costs 0.5 s / 9.6 s / 64 s /
+252 s at 41 / 296 / 755 / 1350 monomials of expanded product.
 
-This module provides a second normal form for the same `AlgExpr` syntax.
+This module provides a second normal form for the same `AlgExpr` syntax
+that replaces those traversals with single GMP operations; on the same
+benchmarks the pipeline drops to 0.25 s / 3.1 s / 17 s / 52 s — a 2–5×
+speedup that grows with size.
 Monomials are packed into a single `Nat` key by Kronecker substitution
 
     x₀^e₀ * x₁^e₁ * ⋯ * xₙ^eₙ  ↦  e₀ + e₁·D + e₂·D² + ⋯ + eₙ·Dⁿ
