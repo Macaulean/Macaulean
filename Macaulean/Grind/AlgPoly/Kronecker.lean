@@ -17,7 +17,7 @@ pre-built as `Expr`s), the cons-list route costs 0.5 s / 9.6 s / 64 s /
 
 This module provides a second normal form for the same `AlgExpr` syntax
 that replaces those traversals with single GMP operations; on the same
-benchmarks the pipeline drops to 0.25 s / 3.1 s / 17 s / 52 s — a 2–5×
+benchmarks the pipeline drops to 0.25 s / 2.7 s / 15 s / 37 s — a 2–7×
 speedup that grows with size.
 Monomials are packed into a single `Nat` key by Kronecker substitution
 
