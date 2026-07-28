@@ -3,6 +3,7 @@ import Macaulean.IdealMembership
 open Lean Grind Elab Tactic Meta
 
 set_option maxHeartbeats 10000000
+set_option maxRecDepth 8000
 
 /- From https://github.com/leanprover/lean4/issues/11861 -/
 theorem foo
@@ -48,5 +49,10 @@ theorem foo
                   u * k * c ^ 2) *
                 z) *
           (r * ((u + r) * a - c) * ((u + r) * b + k * c) * z) ^ 3) = 0 := by
-  -- m2idealmem [ho, hi, hpq, hk]
-  sorry
+  -- Closed by the kernel-checked linear-combination certificate: Macaulay2's
+  -- 16024-term cofactors enter the proof as KPoly data (never as ring syntax),
+  -- and one decide +kernel evaluation verifies p = Σ qᵢ·gᵢ.  ≈ 4 min wall
+  -- including Macaulay2 on an 18-core arm64 machine.
+  m2idealmem +cert [ho, hi, hpq, hk]
+
+#print axioms foo
