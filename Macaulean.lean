@@ -3,6 +3,7 @@
 import Macaulean.Basic
 import Macaulean.Macaulay2
 import Macaulean.Factorization
+import Macaulean.IdealMembership
 import Macaulean.SumOfSquares
 import Macaulean.Grind.Algebra.Defs
 import Macaulean.Grind.Algebra.Instances
@@ -12,3 +13,4 @@ import Macaulean.Grind.AlgPoly.Denote
 import Macaulean.Grind.AlgPoly.Expr
 import Macaulean.Grind.AlgPoly.Reify
 import Macaulean.Grind.AlgPoly.Tactic
+import Macaulean.Grind.AlgPoly.Kronecker

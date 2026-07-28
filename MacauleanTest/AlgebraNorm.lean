@@ -103,16 +103,13 @@ theorem reflect_ambient_hypothesis {R : Type} {A : Type} [CommRing R] [CommRing 
     a₁ • x + a₂ • y = (a₁ + a₂) • x := by
   algebra_norm_reflect
 
-/--
-error: algebra_norm_reflect could not solve the goal
-direct attempt: no algebraMap occurrence found
-after smul preprocessing: `simp` made no progress
--/
-#guard_msgs in
-example {A : Type} [CommRing A] (x y : A) :
+-- Plain single-ring goals (no `algebraMap` occurrence) are handled via the
+-- identity algebra since the `Algebra.selfAlgebra` fallback was added.
+theorem plain_ring_comm {A : Type} [CommRing A] (x y : A) :
     x + y = y + x := by
   algebra_norm_reflect
 
+#print axioms plain_ring_comm
 #print axioms diff_of_squares
 #print axioms coeff_hypothesis
 #print axioms six_var
