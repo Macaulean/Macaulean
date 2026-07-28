@@ -1,6 +1,10 @@
 name = "Macaulean"
 version = "0.1.0"
 defaultTargets = ["macaulean"]
+# Large ideal-membership certificates (e.g. the lean4#11861 benchmark) walk
+# >10^4-element lists in the interpreter and the kernel; both need a deep
+# stack. weakLeanArgs so caches stay valid.
+weakLeanArgs = ["--tstack=1048576"]
 
 [[lean_lib]]
 name = "Macaulean"
