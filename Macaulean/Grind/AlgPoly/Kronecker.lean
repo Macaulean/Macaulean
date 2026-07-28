@@ -576,6 +576,123 @@ def degBound : AlgExpr C → Nat
   | .mul a b => a.degBound + b.degBound
   | .pow a k => a.degBound * k
 
+/-! ### Linear-combination certificates (cofactors as data)
+
+For ideal-membership goals the certificate is `p = Σ qᵢ·gᵢ + r`, where `p`
+and the generators `gᵢ` come from the goal (reified as `AlgExpr`, so their
+denotations tie back to the goal by `rfl`), while the cofactors `qᵢ` and the
+remainder `r` are produced by Macaulay2.  The cofactors can be enormous
+(the `lean4#11861` benchmark has 16024-term quotients) and *never appear in
+the goal*, so there is no reason to rebuild them as ring syntax — elaborating
+such expressions costs ~1 s per monomial and was the failure mode of the
+expression-based pipeline.  Here they stay `KPoly` data: list literals inside
+the proof term, touched only by the kernel's evaluation of `checkLinComb`. -/
+
+/-- All generators of the certificate denote to zero (the hypotheses of an
+ideal-membership goal).  Proof terms are nested `And.intro`s. -/
+def ZeroGens {A : Type v} [Lean.Grind.CommRing A] (φ : C → A)
+    (ctx : Context A) : List (KPoly C × AlgExpr C) → Prop
+  | [] => True
+  | (_, g) :: t => g.denote φ ctx = 0 ∧ ZeroGens φ ctx t
+
+/-- Accumulate `Σ qᵢ · gᵢ` in packed form (cofactors `qᵢ` are already data;
+generators `gᵢ` are evaluated from their reified syntax). -/
+def sumLinComb? (D nv : Nat) : List (KPoly C × AlgExpr C) → Option (KPoly C)
+  | [] => some []
+  | (q, g) :: t =>
+    match g.toKPoly? D nv, sumLinComb? D nv t with
+    | some rg, some acc =>
+      match KPoly.mulK? D nv q rg with
+      | some qg => some (KPoly.addK qg acc)
+      | none => none
+    | _, _ => none
+
+/-- The linear-combination certificate check `p = Σ qᵢ·gᵢ + r`, evaluated by
+the kernel via `decide`.  As with `checkKEq`, the base `D` and digit count
+`nv` are guarded, not trusted. -/
+def checkLinComb (D nv : Nat) (p : AlgExpr C) (pairs : List (KPoly C × AlgExpr C))
+    (r : KPoly C) : Bool :=
+  Nat.blt 1 D &&
+    match p.toKPoly? D nv, sumLinComb? D nv pairs with
+    | some rp, some acc =>
+      KPoly.beqK (KPoly.canon rp) (KPoly.canon (KPoly.addK acc r))
+    | _, _ => false
+
+section
+
+variable {A : Type v} [Lean.Grind.CommRing A]
+
+open Lean.Grind
+
+private theorem denote_sumLinComb? (φ : C → A) (ctx : Context A)
+    (hφ : AlgPoly.IsRingHom φ) {D : Nat} (hD : 1 < D) (nv : Nat)
+    (pairs : List (KPoly C × AlgExpr C)) (hz : ZeroGens φ ctx pairs) :
+    ∀ acc : KPoly C, sumLinComb? D nv pairs = some acc →
+      KPoly.denote φ ctx D nv acc = 0 := by
+  have hD0 : 0 < D := Nat.lt_trans Nat.zero_lt_one hD
+  induction pairs with
+  | nil =>
+    intro acc h
+    simp only [sumLinComb?, Option.some.injEq] at h
+    subst h
+    rfl
+  | cons qg t ih =>
+    obtain ⟨q, g⟩ := qg
+    obtain ⟨hg, hzt⟩ := hz
+    intro acc h
+    simp only [sumLinComb?] at h
+    cases hrg : g.toKPoly? D nv with
+    | none => rw [hrg] at h; simp at h
+    | some rg =>
+      cases hacc : sumLinComb? D nv t with
+      | none => rw [hrg, hacc] at h; simp at h
+      | some accT =>
+        simp only [hrg, hacc] at h
+        cases hmul : KPoly.mulK? D nv q rg with
+        | none => simp [hmul] at h
+        | some qgProd =>
+          simp only [hmul, Option.some.injEq] at h
+          subst h
+          rw [KPoly.denote_addK φ ctx hφ,
+            KPoly.denote_mulK? φ ctx hD0 hφ nv q rg qgProd hmul,
+            denote_toKPoly? φ ctx hφ hD nv g rg hrg, hg, ih hzt accT hacc]
+          show KPoly.denote φ ctx D nv q * 0 + 0 = 0
+          grind
+
+/--
+Soundness of the linear-combination certificate: if the kernel evaluates
+`checkLinComb D nv p pairs r` to `true` and every generator denotes to zero,
+then `p` denotes to the denotation of the remainder.  For ideal-membership
+goals the tactic instantiates `r := []`, whose denotation is definitionally
+`0`, closing `p = 0` outright.  The cofactors in `pairs` occur only as data.
+-/
+theorem eq_of_checkLinComb {C : Type u} {A : Type v}
+    [CoeffRing C] [Lean.Grind.CommRing A]
+    (φ : C → A) (ctx : Context A) (hφ : AlgPoly.IsRingHom φ)
+    (D nv : Nat) (p : AlgExpr C) (pairs : List (KPoly C × AlgExpr C))
+    (r : KPoly C) (hz : ZeroGens φ ctx pairs)
+    (h : checkLinComb D nv p pairs r = true) :
+    p.denote φ ctx = KPoly.denote φ ctx D nv r := by
+  simp only [checkLinComb, Bool.and_eq_true] at h
+  obtain ⟨hD, h⟩ := h
+  have hD : 1 < D := Nat.blt_eq.mp hD
+  cases hp : p.toKPoly? D nv with
+  | none => rw [hp] at h; simp at h
+  | some rp =>
+    cases hacc : sumLinComb? D nv pairs with
+    | none => rw [hp, hacc] at h; simp at h
+    | some acc =>
+      rw [hp, hacc] at h
+      have hc := KPoly.beqK_sound _ _ h
+      have hsum := denote_sumLinComb? φ ctx hφ hD nv pairs hz acc hacc
+      rw [← denote_toKPoly? φ ctx hφ hD nv p rp hp,
+        ← KPoly.denote_canon φ ctx hφ D nv rp, hc,
+        KPoly.denote_canon φ ctx hφ, KPoly.denote_addK φ ctx hφ, hsum]
+      show 0 + KPoly.denote φ ctx D nv r = KPoly.denote φ ctx D nv r
+      grind
+
+end
+
 /-- The whole certificate check, evaluated by the kernel via `decide`. -/
 def checkKEq (D nv : Nat) (e₁ e₂ : AlgExpr C) : Bool :=
   Nat.blt 1 D &&
