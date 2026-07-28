@@ -2,6 +2,9 @@ import Lean
 import MRDI.Basic
 import MRDI.Poly
 import Macaulean.Macaulay2
+import Macaulean.Grind.Algebra.Instances
+import Macaulean.Grind.AlgPoly.Kronecker
+import Macaulean.Grind.AlgPoly.Reify
 open Lean Grind Elab Parser Tactic Meta
 
 structure VariableState where
@@ -255,6 +258,11 @@ namespace Macaulean.IdealMembership
 structure Config where
   --whether to use grind to prove the final polynomial equalities
   grind : Bool := false
+  /-- Close the goal with a kernel-checked linear-combination certificate:
+  Macaulay2's cofactors enter the proof as `KPoly` data (never as ring
+  syntax), and one `decide +kernel` evaluation of
+  `Macaulean.AlgExpr.checkLinComb` verifies `p = Σ qᵢ·gᵢ`. -/
+  cert : Bool := false
   deriving Inhabited, Repr
 
 declare_config_elab configElab Config
@@ -267,11 +275,13 @@ open Macaulean
 This function implements the core of the tactic, serializing and deserializing
 the polynomials to Macaulay2. `ring` should be an expression for the ring
 `idealExprs` should be a list of generators for the ideal and `polyExpr` should be
-the candidate polynomial. The returned list of expressions is a list of
-coefficients such that the product with the generators in idealExprs gives polyExpr
+the candidate polynomial. Returns the cofactors and the remainder as *data*
+(`ExprPoly`), together with the variable table mapping Macaulay2's variables
+back to the goal's free variables; `m2QuotientRemainderImpl` below rebuilds
+ring expressions from these for the expression-based tactics.
 -/
-unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
-  : MetaM (List Expr × Expr) := do
+unsafe def m2QuotientRemainderData (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
+  : MetaM (List ExprPoly × ExprPoly × List (CommRing.Var × Expr)) := do
   dbg_trace "M2IdealMem Start"
   --parse a expression into a polynomial, checking that the ring matches using isDefEq
   let getPoly (expectedRing : Expr) (pExpr : Expr) : StateT VariableState MetaM ExprPoly := do
@@ -336,16 +346,26 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
       | throwTacticEx `m2idealmem goal "Ideal membership failed"
     dbg_trace "Coefficients Returned"
     --deserialize the result
-    let deserializedCoefficients ← ExceptT.run do
-      let coefficients ← result.quotient.mapM liftedDeserializer
-      coefficients.mapM (liftM ∘ exprFromPoly ring (.ofList varTable))
-    let deserializedRemainder ← ExceptT.run do
-      let remainder ← liftedDeserializer result.remainder
-      exprFromPoly ring (.ofList varTable) remainder
+    let deserializedCoefficients ← ExceptT.run <|
+      result.quotient.mapM liftedDeserializer
+    let deserializedRemainder ← ExceptT.run <|
+      liftedDeserializer result.remainder
     match deserializedCoefficients, deserializedRemainder with
-    | .ok c, .ok r  => pure (c, r)
+    | .ok c, .ok r  => pure (c, r, varTable)
     | .error e, _ => throwTacticEx `m2idealmem goal e
     | _, .error e => throwTacticEx `m2idealmem goal e
+
+/--
+Expression-based variant of `m2QuotientRemainderData`: the returned list of
+expressions is a list of coefficients such that the product with the
+generators in `idealExprs` gives `polyExpr` (up to the returned remainder).
+-/
+unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
+  : MetaM (List Expr × Expr) := do
+  let (quotients, remainder, varTable) ← m2QuotientRemainderData goal ring idealExprs polyExpr
+  let c ← quotients.mapM (exprFromPoly ring (.ofList varTable))
+  let r ← exprFromPoly ring (.ofList varTable) remainder
+  pure (c, r)
 
 --TODO rename this
 theorem helper [CommRing R] (a b c d : R) (h1 : a = d) (h2 : b = 0) : a+c*b = d := by
@@ -424,6 +444,207 @@ unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Nam
   where
     tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
 
+/-! ### Certificate-based ideal membership (cofactors as data)
+
+`m2CertTacticRunner` closes `p = 0` from hypotheses `gᵢ = 0` with a single
+kernel computation of `Macaulean.AlgExpr.checkLinComb`: the target and the
+generators are reified to `AlgExpr` (their denotations tie back to the goal
+by `rfl`), while Macaulay2's cofactors enter the proof term as Kronecker-packed
+`KPoly` list literals.  The cofactors are never rebuilt as ring expressions,
+so their size costs neither elaboration nor reification — which is what makes
+16k-term quotients (`lean4#11861`) representable at all. -/
+
+/-- Tail-recursive listing of a `Poly`'s monomials as `(coeff, [(var, pow)])`;
+the trailing constant becomes a monomial with no powers. -/
+private def polyMonomialList (p : CommRing.Poly) : List (Int × List (Nat × Nat)) :=
+  go p []
+where
+  monPowers (m : CommRing.Mon) (acc : List (Nat × Nat)) : List (Nat × Nat) :=
+    match m with
+    | .unit => acc.reverse
+    | .mult pw m => monPowers m ((pw.x, pw.k) :: acc)
+  go (p : CommRing.Poly) (acc : List (Int × List (Nat × Nat))) :
+      List (Int × List (Nat × Nat)) :=
+    match p with
+    | .num k => ((if k == 0 then acc else (k, []) :: acc)).reverse
+    | .add k m rest => go rest ((k, monPowers m []) :: acc)
+
+unsafe def m2CertTacticRunner (tacName : Name) (goal : MVarId) (target : Expr)
+    (genHyps : Array Expr) : TacticM Unit := withMainContext do
+  let genProps ← genHyps.mapM (fun genH => inferType genH)
+  let some (targetRing, targetLhs, targetRhs) := target.eq? |
+    tacticError "Expected an equality for the target"
+  let zeroExpr ← natAsRingElem targetRing 0
+  unless (← isDefEq targetRhs zeroExpr) do
+    tacticError "Expected an equality of the form _ = 0 for the target"
+  let genPolys ← genProps.mapM fun (e : Expr) => do
+    let some (ring, lhs, rhs) := e.eq? | tacticError "Expected a list of equalities"
+    if (← isDefEq targetRing ring) && (← isDefEq rhs zeroExpr)
+    then pure lhs
+    else tacticError "Expected equalities to zero over the same ring"
+  -- Macaulay2 division, results as data
+  let (quotData, remData, varTableList) ←
+    m2QuotientRemainderData goal targetRing genPolys targetLhs
+  dbg_trace "m2 cert: coefficients received"
+  -- ideal membership needs a zero remainder
+  match remData.poly with
+  | .num 0 => pure ()
+  | _ => tacticError m!"Macaulay2 remainder is nonzero: the target is not in the ideal \
+      generated by the hypotheses"
+  -- reify target and generators with one shared atom state
+  let uA ← Macaulean.AlgPoly.Reify.getTypeLevel targetRing
+  let csInst ← synthInstance (mkApp (mkConst ``Lean.Grind.CommSemiring [uA]) targetRing)
+  let sInst ← synthInstance (mkApp (mkConst ``Lean.Grind.Semiring [uA]) targetRing)
+  let commRingAInst ← synthInstance (mkApp (mkConst ``Lean.Grind.CommRing [uA]) targetRing)
+  let ringAInst ← synthInstance (mkApp (mkConst ``Lean.Grind.Ring [uA]) targetRing)
+  let algInst := mkApp2 (mkConst ``Lean.Grind.Algebra.selfAlgebra [uA]) targetRing csInst
+  let algebraMapFn := mkApp5 (mkConst ``Lean.Grind.algebraMap [uA, uA])
+    targetRing targetRing csInst sInst algInst
+  let ((pReified, gsReified), rstate) ← (do
+      let p ← Macaulean.AlgPoly.Reify.reifyAmbientExpr algebraMapFn targetLhs
+      let gs ← genPolys.mapM (Macaulean.AlgPoly.Reify.reifyAmbientExpr algebraMapFn)
+      pure (p, gs)).run {}
+  -- map Macaulay2's variables to reified atoms (mirrors exprFromPoly's reindexing)
+  let vt : Std.TreeMap CommRing.Var Expr := .ofList varTableList
+  let varList := vt.keys.mergeSort.toArray
+  let ambMap := rstate.ambientVarMap
+  -- coefficient atoms: goal-derived ones first, then Macaulay2's rational constants
+  let mut coeffVars := rstate.coeffVars
+  let mut coeffVarMap := rstate.coeffVarMap
+  -- pass 1: classify every cofactor monomial
+  -- rawQuots : per cofactor, list of (int coeff, [(ambient idx, pow)], [(coeff idx, pow)])
+  let mut rawQuots : Array (Array (Int × List (Nat × Nat) × List (Nat × Nat))) := #[]
+  for q in quotData do
+    let mut mons : Array (Int × List (Nat × Nat) × List (Nat × Nat)) := #[]
+    for (k, pows) in polyMonomialList q.poly do
+      let mut realPows : List (Nat × Nat) := []
+      let mut coeffPows : List (Nat × Nat) := []
+      for (v, pow) in pows do
+        match varList[v]? >>= vt.get? with
+        | some fvarE =>
+          let some idx := ambMap[fvarE]? |
+            tacticError m!"certificate variable {fvarE} does not occur in the goal"
+          realPows := (idx, pow) :: realPows
+        | none =>
+          let some cE := q.coefficients.get? v |
+            tacticError m!"invalid variable index {v} in Macaulay2 cofactor"
+          let cIdx ← match coeffVarMap[cE]? with
+            | some i => pure i
+            | none =>
+              let i := coeffVars.size
+              coeffVars := coeffVars.push cE
+              coeffVarMap := coeffVarMap.insert cE i
+              pure i
+          coeffPows := (cIdx, pow) :: coeffPows
+      mons := mons.push (k, realPows, coeffPows)
+    rawQuots := rawQuots.push mons
+  -- choose the Kronecker parameters (guards inside checkLinComb re-check them)
+  let algExprTy := mkApp (mkConst ``Macaulean.AlgExpr [.zero]) Macaulean.AlgPoly.Reify.polyType
+  let pVal ← evalExpr (Macaulean.AlgExpr CommRing.Poly) algExprTy pReified
+  let gVals ← gsReified.mapM fun gE =>
+    liftM (evalExpr (Macaulean.AlgExpr CommRing.Poly) algExprTy gE : MetaM _)
+  let nv := rstate.ambientVars.size
+  let mut dBound := pVal.degBound
+  for i in [0:rawQuots.size] do
+    let qMax := rawQuots[i]!.foldl (fun acc (_, realPows, _) =>
+      realPows.foldl (fun acc (_, pow) => Nat.max acc pow) acc) 0
+    let gBound := (gVals[i]?.map Macaulean.AlgExpr.degBound).getD 0
+    dBound := Nat.max dBound (qMax + gBound)
+  let dBase := dBound + 2
+  -- pass 2: build the KPoly values (native) and literals (Expr)
+  let natTy := mkConst ``Nat
+  let kEntryTy := mkApp2 (mkConst ``Prod [.zero, .zero]) natTy Macaulean.AlgPoly.Reify.polyType
+  let kPolyTy := mkApp (mkConst ``List [.zero]) kEntryTy
+  let pairTy := mkApp2 (mkConst ``Prod [.zero, .zero]) kPolyTy algExprTy
+  let mut qValsAndLits : Array (Macaulean.KPoly CommRing.Poly × Expr) := #[]
+  for mons in rawQuots do
+    let mut entries : Array ((Nat × CommRing.Poly) × Expr) := #[]
+    for (k, realPows, coeffPows) in mons do
+      let key := realPows.foldl (fun acc (idx, pow) => acc + pow * dBase ^ idx) 0
+      -- coefficient as a grind Poly: k · Π coeffVarᵢ^powᵢ, normalized by toPoly
+      let coeffExpr : CommRing.Expr := coeffPows.foldl
+        (fun acc (cIdx, pow) => .mul acc (.pow (.var cIdx) pow)) (.num k)
+      let coeffPoly := coeffExpr.toPoly
+      entries := entries.push ((key, coeffPoly),
+        mkApp4 (mkConst ``Prod.mk [.zero, .zero]) natTy Macaulean.AlgPoly.Reify.polyType
+          (mkRawNatLit key) (Macaulean.AlgPoly.Reify.mkPolyValueExpr coeffPoly))
+    -- sort by key ascending so the merge-based kernel ops stay near-linear
+    let sorted := entries.qsort (fun a b => a.1.1 < b.1.1)
+    let qVal := sorted.toList.map (·.1)
+    let qLit := sorted.foldr
+      (fun e acc => mkApp3 (mkConst ``List.cons [.zero]) kEntryTy e.2 acc)
+      (mkApp (mkConst ``List.nil [.zero]) kEntryTy)
+    qValsAndLits := qValsAndLits.push (qVal, qLit)
+  -- native pre-check before any kernel work
+  let pairsVal := (qValsAndLits.toList.map (·.1)).zip (gVals.toList)
+  unless Macaulean.AlgExpr.checkLinComb dBase nv pVal pairsVal [] do
+    tacticError m!"linear-combination certificate check failed natively \
+      (base {dBase}, {nv} variables) — this usually indicates a variable-mapping bug"
+  dbg_trace "m2 cert: native check passed (base {dBase}, {nv} vars)"
+  -- Expr-level certificate pieces
+  let pairsLit := (qValsAndLits.zip gsReified).foldr
+    (fun ((_, qLit), gE) acc =>
+      mkApp3 (mkConst ``List.cons [.zero]) pairTy
+        (mkApp4 (mkConst ``Prod.mk [.zero, .zero]) kPolyTy algExprTy qLit gE) acc)
+    (mkApp (mkConst ``List.nil [.zero]) pairTy)
+  let rNil := mkApp (mkConst ``List.nil [.zero]) kEntryTy
+  let coeffCtx ← Macaulean.AlgPoly.Reify.mkContextExpr targetRing coeffVars
+  let ambientCtx ← Macaulean.AlgPoly.Reify.mkContextExpr targetRing rstate.ambientVars
+  let coeffRingPolyInst ← synthInstance
+    (mkApp (mkConst ``Macaulean.CoeffRing [.zero]) Macaulean.AlgPoly.Reify.polyType)
+  let commRingRInst := commRingAInst
+  let phi := mkLambda `p .default Macaulean.AlgPoly.Reify.polyType <|
+    mkApp algebraMapFn <|
+      mkAppN (mkConst ``Lean.Grind.CommRing.Poly.denote [uA])
+        #[targetRing, ringAInst, coeffCtx, mkBVar 0]
+  let hphi := mkAppN (mkConst ``Macaulean.AlgPoly.Reify.polyCoeffIsRingHom)
+    #[targetRing, targetRing, commRingRInst, commRingAInst, algInst, coeffCtx]
+  -- rfl bridges: denote of a reified expression is the source expression
+  let denoteOf (e : Expr) : Expr :=
+    mkAppN (mkConst ``Macaulean.AlgExpr.denote [.zero, uA])
+      #[Macaulean.AlgPoly.Reify.polyType, targetRing, commRingAInst, phi, ambientCtx, e]
+  let proveRfl (lhs rhs : Expr) : TacticM Expr := do
+    let mvar ← mkFreshExprMVar (← mkEq lhs rhs)
+    let savedGoals ← getGoals
+    setGoals [mvar.mvarId!]
+    try
+      evalTactic (← `(tactic| rfl))
+    finally
+      setGoals savedGoals
+    instantiateMVars mvar
+  -- ZeroGens: each generator denotes to zero, via its bridge and hypothesis
+  let mut hz : Expr := mkConst ``True.intro
+  for i in [0:gsReified.size] do
+    let j := gsReified.size - 1 - i
+    let bridge ← proveRfl (denoteOf gsReified[j]!) genPolys[j]!
+    let comp ← mkEqTrans bridge genHyps[j]!
+    hz ← mkAppM ``And.intro #[comp, hz]
+  -- the kernel-checked certificate
+  let checkApp := mkAppN (mkConst ``Macaulean.AlgExpr.checkLinComb [.zero])
+    #[Macaulean.AlgPoly.Reify.polyType, coeffRingPolyInst,
+      mkRawNatLit dBase, mkRawNatLit nv, pReified, pairsLit, rNil]
+  let hChkMVar ← mkFreshExprMVar (← mkEq checkApp (mkConst ``true))
+  let savedGoals ← getGoals
+  setGoals [hChkMVar.mvarId!]
+  try
+    evalTactic (← `(tactic| decide +kernel))
+  finally
+    setGoals savedGoals
+  let hChk ← instantiateMVars hChkMVar
+  dbg_trace "m2 cert: kernel check done"
+  let core := mkAppN (mkConst ``Macaulean.AlgExpr.eq_of_checkLinComb [.zero, uA])
+    #[Macaulean.AlgPoly.Reify.polyType, targetRing, coeffRingPolyInst, commRingAInst,
+      phi, ambientCtx, hphi, mkRawNatLit dBase, mkRawNatLit nv,
+      pReified, pairsLit, rNil, hz, hChk]
+  let pBridge ← proveRfl (denoteOf pReified) targetLhs
+  let proof ← mkEqTrans (← mkEqSymm pBridge) core
+  if ← goal.checkedAssign proof then
+    dbg_trace "m2 cert: goal closed"
+  else
+    tacticError "certificate proof failed to close the goal"
+  where
+    tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
+
 syntax (name := m2idealmem) "m2idealmem" optConfig notFollowedBy("|") (ppSpace colGt term:max)* : tactic
 
 @[tactic m2idealmem]
@@ -434,6 +655,10 @@ unsafe def m2IdealMemTactic : Tactic := fun stx => do
     let goal ← getMainGoal
     let target ← getMainTarget
     let genHyps ← args.getElems.mapM (elabTerm · none)
+    if cfg.cert then
+      m2CertTacticRunner `m2idealmem goal target genHyps
+      dbg_trace "m2idealmem finished"
+      return
     m2IdealMemTacticRunner cfg `m2idealmem goal target genHyps
     if cfg.grind
     then
