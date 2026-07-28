@@ -74,7 +74,7 @@ private theorem denote_mulCoeff_go (hφ : IsRingHom φ) (c : C) (p : AlgPoly C) 
          φ c * (φ k * m.denote ctx + p.denote φ ctx)
     rw [IsRingHom.map_mul hφ, ih, Semiring.left_distrib, Semiring.mul_assoc]
 
-/-! ### Remaining theorems (sorry'd — clear dependency structure) -/
+/-! ### Denotation lemmas for the polynomial operations -/
 
 private theorem denote_combine_go (hφ : IsRingHom φ) :
     (fuel : Nat) → (p₁ p₂ : AlgPoly C) →
