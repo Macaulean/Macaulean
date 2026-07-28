@@ -29,6 +29,11 @@ instance (priority := 1100) Algebra.selfAlgebra (R : Type u) [CommSemiring R] : 
   commutes := CommSemiring.mul_comm
   smul_def := by intros; rfl
 
+/-- Over the identity algebra, `algebraMap` is the identity.  Used by the
+reflective tactics when handling plain (single-ring) identities. -/
+@[grind =] theorem Algebra.algebraMap_self (R : Type u) [CommSemiring R] (r : R) :
+    algebraMap R R r = r := rfl
+
 /-! ### Every semiring is a Nat-algebra -/
 
 instance (priority := 99) Semiring.toNatAlgebra (A : Type u) [Semiring A] : Algebra Nat A where

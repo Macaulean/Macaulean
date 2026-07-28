@@ -61,14 +61,24 @@ private def getEqSides? (target : Expr) : Option (Expr × Expr) :=
 private def buildInputs (target : Expr) : TacticM Inputs := do
   let some (lhs, rhs) := getEqSides? target
     | throwError "reflective algebra_norm only handles equality goals"
-  let some algebraMapFn := findAlgebraMapFn? target
-    | throwError "no algebraMap occurrence found"
-  let .const ``Lean.Grind.algebraMap _ := algebraMapFn.getAppFn
-    | throwError "unexpected algebraMap head"
-  let args := algebraMapFn.getAppArgs
-  let R := args[0]!
-  let A := args[1]!
-  let algebraInst := args[4]!
+  let (algebraMapFn, R, A, algebraInst) ←
+    match findAlgebraMapFn? target with
+    | some algebraMapFn => do
+      let .const ``Lean.Grind.algebraMap _ := algebraMapFn.getAppFn
+        | throwError "unexpected algebraMap head"
+      let args := algebraMapFn.getAppArgs
+      pure (algebraMapFn, args[0]!, args[1]!, args[4]!)
+    | none => do
+      -- No `algebraMap` in the goal: view `A` as an algebra over itself
+      -- (`Algebra.selfAlgebra`), so plain commutative-ring identities are
+      -- handled by the same two-level pipeline (numerals become coefficients).
+      let A ← instantiateMVars (← inferType lhs)
+      let uA ← Macaulean.AlgPoly.Reify.getTypeLevel A
+      let csInst ← synthInstance (mkApp (mkConst ``Lean.Grind.CommSemiring [uA]) A)
+      let sInst ← synthInstance (mkApp (mkConst ``Lean.Grind.Semiring [uA]) A)
+      let algInst := mkApp2 (mkConst ``Lean.Grind.Algebra.selfAlgebra [uA]) A csInst
+      let fn := mkApp5 (mkConst ``Lean.Grind.algebraMap [uA, uA]) A A csInst sInst algInst
+      pure (fn, A, A, algInst)
   let reified ← Macaulean.AlgPoly.Reify.runAmbientPair algebraMapFn lhs rhs
   pure {
     R, A, algebraMapFn, algebraInst, lhs, rhs,
@@ -209,7 +219,8 @@ private unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainCo
           Lean.Grind.Algebra.algebraMap_mul,
           Lean.Grind.Algebra.algebraMap_neg,
           Lean.Grind.Algebra.algebraMap_zero,
-          Lean.Grind.Algebra.algebraMap_one
+          Lean.Grind.Algebra.algebraMap_one,
+          Lean.Grind.Algebra.algebraMap_self
         ]))
       if !(← getGoals).isEmpty then
         evalTactic (← `(tactic| grind))
