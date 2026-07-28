@@ -5,6 +5,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 
 import Macaulean.Grind.AlgPoly.Reify
 import Macaulean.Grind.AlgPoly.Denote
+import Macaulean.Grind.AlgPoly.Kronecker
 import Macaulean.Grind.Algebra.Instances
 import Lean.Elab.Tactic.Basic
 
@@ -204,7 +205,7 @@ private unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainCo
     let mvar ← mkFreshExprMVar goalType
     let savedGoals ← getGoals
     setGoals [mvar.mvarId!]
-    try
+    let simpBridge : TacticM Unit := do
       evalTactic (← `(tactic|
         simp [
           Macaulean.AlgExpr.denote,
@@ -225,6 +226,17 @@ private unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainCo
       if !(← getGoals).isEmpty then
         evalTactic (← `(tactic| grind))
         evalTactic (← `(tactic| done))
+    -- Reification mirrors the goal expression node for node, so over
+    -- concrete rings the bridge typically holds definitionally; `rfl` is
+    -- linear in the expression size, where the simp route is far more
+    -- expensive at certificate scale (hundreds of monomials).
+    let rflOrSimp : TacticM Unit := do
+      try
+        evalTactic (← `(tactic| rfl))
+      catch _ =>
+        simpBridge
+    try
+      rflOrSimp
     finally
       setGoals savedGoals
     instantiateMVars mvar
@@ -238,6 +250,57 @@ private unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainCo
       proveBridge denoteRhs inputs.rhs
     catch e =>
       throwError m!"rhs bridge failed: {e.toMessageData}"
+  -- Fast path: Kronecker-packed normal form (single-`Nat` monomial keys), which
+  -- is what scales to certificate identities with ~10³ monomials.  The base and
+  -- digit count are chosen here but re-checked by guards inside `checkKEq`, so
+  -- a bad choice fails over to the other strategies rather than being trusted.
+  let kCore : Option Expr ← (do
+    try
+      let algExprType := mkApp (mkConst ``Macaulean.AlgExpr [.zero])
+        Macaulean.AlgPoly.Reify.polyType
+      let lhsVal ← evalExpr (Macaulean.AlgExpr Lean.Grind.CommRing.Poly)
+        algExprType inputs.lhsReified
+      let rhsVal ← evalExpr (Macaulean.AlgExpr Lean.Grind.CommRing.Poly)
+        algExprType inputs.rhsReified
+      let nv := inputs.ambientVars.size
+      let dBase := Nat.max lhsVal.degBound rhsVal.degBound + 2
+      -- Native pre-check: fail over quickly (and informatively) before asking
+      -- the kernel to evaluate a normalization that will not succeed.
+      if !Macaulean.AlgExpr.checkKEq dBase nv lhsVal rhsVal then
+        throwError "Kronecker normal forms differ (base {dBase}, {nv} variables)"
+      let checkTerm := mkAppN (mkConst ``Macaulean.AlgExpr.checkKEq [.zero])
+        #[Macaulean.AlgPoly.Reify.polyType, coeffRingPolyInst,
+          mkNatLit dBase, mkNatLit nv, inputs.lhsReified, inputs.rhsReified]
+      let checkEqTrue ← mkEq checkTerm (mkConst ``true)
+      let hChkMVar ← mkFreshExprMVar checkEqTrue
+      let savedGoals ← getGoals
+      setGoals [hChkMVar.mvarId!]
+      try
+        evalTactic (← `(tactic| decide))
+      finally
+        setGoals savedGoals
+      let hChk ← instantiateMVars hChkMVar
+      pure <| some <| mkAppN (mkConst ``Macaulean.AlgExpr.eq_of_toKPoly_eq [.zero, uA])
+        #[
+          Macaulean.AlgPoly.Reify.polyType,
+          inputs.A,
+          coeffRingPolyInst,
+          commRingAInst,
+          coeffPolyDenote,
+          ambientCtx,
+          hφ,
+          mkNatLit dBase,
+          mkNatLit nv,
+          inputs.lhsReified,
+          inputs.rhsReified,
+          hChk
+        ]
+    catch _ =>
+      pure none)
+  if let some core := kCore then
+    let hLhsSymm ← mkEqSymm hLhs
+    let hCoreRhs ← mkEqTrans core hRhs
+    return (← mkEqTrans hLhsSymm hCoreRhs)
   try
     let beqTerm ← mkAppM ``BEq.beq #[lhsPoly, rhsPoly]
     let beqEq ← mkEq beqTerm (mkConst ``true)

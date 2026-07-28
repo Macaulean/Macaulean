@@ -560,6 +560,18 @@ private theorem denote_toKPoly? (φ : C → A) (ctx : Context A)
       rw [KPoly.denote_powK? φ ctx hD0 hφ nv ra k r h, iha ra ha]
       rfl
 
+/-- Bound on every per-variable exponent arising while normalizing `e`;
+used by the tactic to pick the Kronecker base `D` (the guards in
+`toKPoly?` re-check the choice, so this need not be trusted). -/
+def degBound : AlgExpr C → Nat
+  | .coeff _ => 0
+  | .var _ => 1
+  | .add a b => Nat.max a.degBound b.degBound
+  | .sub a b => Nat.max a.degBound b.degBound
+  | .neg a => a.degBound
+  | .mul a b => a.degBound + b.degBound
+  | .pow a k => a.degBound * k
+
 /-- The whole certificate check, evaluated by the kernel via `decide`. -/
 def checkKEq (D nv : Nat) (e₁ e₂ : AlgExpr C) : Bool :=
   Nat.blt 1 D &&
