@@ -700,26 +700,35 @@ end AlgExpr
 
 /-! ### The canonical `Int → A` map is a coefficient morphism -/
 
-/-- `Lean.Grind.CommRing.denoteInt` is grind's own canonical map `Int → A`; it
-is an `abbrev` that produces `OfNat.ofNat |k|` (negated when `k < 0`) using
-grind's numeral instance, which makes the tactic's denotation bridge reduce to
-the goal's own numerals. -/
-theorem denoteInt_isRingHom {A : Type v} [Lean.Grind.CommRing A] :
-    AlgPoly.IsRingHom (fun k : Int => (Lean.Grind.CommRing.denoteInt k : A)) where
+/-- The canonical coefficient map `Int → A`.
+
+`Lean.Grind.CommRing.denoteInt` is grind's own canonical map: an `abbrev` that
+produces `OfNat.ofNat |k|` (negated when `k < 0`) using grind's numeral
+instance, which is what makes the tactic's denotation bridge reduce to the
+goal's own numerals.  Packaging
+it as a named definition (rather than letting the tactic build the `denoteInt`
+application itself) keeps the `Lean.Grind.Ring` instance argument in one place,
+so the term the tactic emits and the term `intDenote_isRingHom` talks about are
+syntactically identical. -/
+noncomputable def intDenote (A : Type v) [Lean.Grind.CommRing A] : Int → A :=
+  fun k => Lean.Grind.CommRing.denoteInt k
+
+theorem intDenote_isRingHom (A : Type v) [Lean.Grind.CommRing A] :
+    AlgPoly.IsRingHom (intDenote A) where
   map_zero := by
-    simp only [Lean.Grind.CommRing.denoteInt_eq]
+    simp only [intDenote, Lean.Grind.CommRing.denoteInt_eq]
     exact Lean.Grind.Ring.intCast_zero
   map_one := by
-    simp only [Lean.Grind.CommRing.denoteInt_eq]
+    simp only [intDenote, Lean.Grind.CommRing.denoteInt_eq]
     exact Lean.Grind.Ring.intCast_one
   map_add a b := by
-    simp only [Lean.Grind.CommRing.denoteInt_eq]
+    simp only [intDenote, Lean.Grind.CommRing.denoteInt_eq]
     exact Lean.Grind.Ring.intCast_add a b
   map_mul a b := by
-    simp only [Lean.Grind.CommRing.denoteInt_eq]
+    simp only [intDenote, Lean.Grind.CommRing.denoteInt_eq]
     exact Lean.Grind.Ring.intCast_mul a b
   map_neg a := by
-    simp only [Lean.Grind.CommRing.denoteInt_eq]
+    simp only [intDenote, Lean.Grind.CommRing.denoteInt_eq]
     exact Lean.Grind.Ring.intCast_neg a
 
 end Macaulean

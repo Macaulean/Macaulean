@@ -2,6 +2,7 @@ import MacauleanTest.Poly
 import MacauleanTest.Uuid
 import MacauleanTest.Benchmarks
 import MacauleanTest.AlgebraNorm
+import MacauleanTest.AlgebraNormMod
 import MacauleanTest.SumOfSquares
 import MacauleanTest.Factorization
 import MacauleanTest.IdealMembership

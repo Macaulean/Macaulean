@@ -8,10 +8,12 @@ module
 public import Macaulean.Grind.AlgPoly.Reify
 public import Macaulean.Grind.AlgPoly.Denote
 public import Macaulean.Grind.AlgPoly.Kronecker
+public import Macaulean.Grind.AlgPoly.KroneckerMod
 public import Macaulean.Grind.Algebra.Instances
 public meta import Macaulean.Grind.AlgPoly.Reify
 public meta import Macaulean.Grind.AlgPoly.Denote
 public meta import Macaulean.Grind.AlgPoly.Kronecker
+public meta import Macaulean.Grind.AlgPoly.KroneckerMod
 public meta import Macaulean.Grind.Algebra.Instances
 public meta import Lean.Elab.Tactic.Basic
 
@@ -24,14 +26,31 @@ Verifies polynomial identities in algebras with two-level normalization.
 
 ## Strategy
 
-1. Try reflective two-level normalization first. The ambient algebra layer uses
-   `AlgPoly`, and coefficients are reified into Lean's normalized
-   `Lean.Grind.CommRing.Poly`.
-2. Keep the previous `grind`/`simp` pipeline as a fallback for unsupported
-   syntax and goals the reflective path does not parse directly.
+1. **Default: the GMP-free reflective path.**  When every coefficient of the
+   reified goal is an integer literal, normalize with residue-vector
+   coefficients (`ModVec`) and close the goal with
+   `AlgExpr.eq_of_checkModZero`.  Every `Nat`/`Int` the kernel then computes
+   with stays below `2^62`, so the check never reaches GMP; see the audit in
+   `Macaulean/Grind/AlgPoly/KroneckerMod.lean`.
+2. Fall back to the exact-integer Kronecker path
+   (`AlgExpr.eq_of_toKPoly_eq`), which is what `set_option macaulean.gmpFree
+   false` selects outright.  That path is fine mathematically but has the
+   kernel do big-integer arithmetic.
+3. Then the two-level `AlgPoly` normal form, and finally (only in
+   `algebra_norm`, never in `algebra_norm_reflect`) the `grind`/`simp`
+   pipeline.
 -/
 
 open Lean Meta Elab Tactic
+
+meta section
+
+register_option macaulean.gmpFree : Bool := {
+  defValue := true
+  descr := "algebra_norm_reflect: try the GMP-free residue-vector (single-pass CRT) certificate before the exact-integer Kronecker certificate.  Set to false to use the exact-integer path directly."
+}
+
+end
 
 namespace Macaulean.AlgPoly.Tactic
 
@@ -99,6 +118,148 @@ def buildInputs (target : Expr) : TacticM Inputs := do
     ambientVars := reified.ambientVars
   }
 
+/-! ### Helpers for the GMP-free (residue-vector) path -/
+
+/--
+Moduli pool: the 32 largest primes below `2^31`.
+
+Each is `> 2^30`, so `k` of them certify coefficients up to `2^(30k)`; each is
+`< 2^31`, so a product of two residues is `< 2^62` and the kernel stays on the
+boxed-scalar fast path.  Only a prefix is ever used, and the Bézout table the
+tactic emits is re-checked by the kernel, so this list is data, not trust.
+-/
+def modPool : Array Nat :=
+  #[2147483647, 2147483629, 2147483587, 2147483579, 2147483563, 2147483549,
+    2147483543, 2147483497, 2147483489, 2147483477, 2147483423, 2147483399,
+    2147483353, 2147483323, 2147483269, 2147483249, 2147483237, 2147483179,
+    2147483171, 2147483137, 2147483123, 2147483077, 2147483069, 2147483059,
+    2147483053, 2147483033, 2147483029, 2147482951, 2147482949, 2147482943,
+    2147482937, 2147482921]
+
+/-- Extended Euclid, at meta level (native `Nat`/`Int`; GMP here is harmless). -/
+partial def egcd (a b : Nat) : Nat × Int × Int :=
+  if a == 0 then (b, 0, 1)
+  else
+    let (g, x, y) := egcd (b % a) a
+    (g, y - ((b / a : Nat) : Int) * x, x)
+
+/-- Bézout witness `(a, b)` with `a * m = b * n + 1`, `0 < a < n` and `b < m`
+(so both products are below `2^62` for moduli below `2^31`). -/
+def bezWitness (m n : Nat) : Nat × Nat :=
+  let (_, x, _) := egcd m n
+  let a := (((x % (n : Int)) + (n : Int)) % (n : Int)).toNat
+  let a := if a == 0 then n else a
+  (a, (a * m - 1) / n)
+
+/-- Row `i` of the table holds the witnesses for `ms[i]` against `ms[i+1:]`. -/
+def bezTable : List Nat → List (List (Nat × Nat))
+  | [] => []
+  | m :: ms => ms.map (fun n => bezWitness m n) :: bezTable ms
+
+def natTypeE : Expr := mkConst ``Nat
+def intTypeE : Expr := mkConst ``Int
+def natPairTypeE : Expr := mkApp2 (mkConst ``Prod [0, 0]) natTypeE natTypeE
+def rowTypeE : Expr := mkApp (mkConst ``List [0]) natPairTypeE
+
+/-- `Int` literal in constructor form, which the kernel reduces without going
+through `OfNat`/`Neg` instances. -/
+def intLitE (k : Int) : Expr :=
+  if k < 0 then mkApp (mkConst ``Int.negSucc) (mkRawNatLit (k.natAbs - 1))
+  else mkApp (mkConst ``Int.ofNat) (mkRawNatLit k.toNat)
+
+def mkListE (ty : Expr) (xs : List Expr) : Expr :=
+  xs.foldr (fun x acc => mkApp3 (mkConst ``List.cons [0]) ty x acc)
+    (mkApp (mkConst ``List.nil [0]) ty)
+
+def mkNatListE (l : List Nat) : Expr := mkListE natTypeE (l.map mkRawNatLit)
+
+def mkNatPairE (p : Nat × Nat) : Expr :=
+  mkApp4 (mkConst ``Prod.mk [0, 0]) natTypeE natTypeE (mkRawNatLit p.1) (mkRawNatLit p.2)
+
+def mkTblE (t : List (List (Nat × Nat))) : Expr :=
+  mkListE rowTypeE (t.map fun r => mkListE natPairTypeE (r.map mkNatPairE))
+
+/-- Build the `Expr` for an `AlgExpr Int` value (a literal constructor tree). -/
+def mkAlgIntE : Macaulean.AlgExpr Int → Expr
+  | .coeff k => mkApp2 (mkConst ``Macaulean.AlgExpr.coeff [.zero]) intTypeE (intLitE k)
+  | .var i => mkApp2 (mkConst ``Macaulean.AlgExpr.var [.zero]) intTypeE (mkRawNatLit i)
+  | .add a b =>
+    mkApp3 (mkConst ``Macaulean.AlgExpr.add [.zero]) intTypeE (mkAlgIntE a) (mkAlgIntE b)
+  | .mul a b =>
+    mkApp3 (mkConst ``Macaulean.AlgExpr.mul [.zero]) intTypeE (mkAlgIntE a) (mkAlgIntE b)
+  | .sub a b =>
+    mkApp3 (mkConst ``Macaulean.AlgExpr.sub [.zero]) intTypeE (mkAlgIntE a) (mkAlgIntE b)
+  | .neg a => mkApp2 (mkConst ``Macaulean.AlgExpr.neg [.zero]) intTypeE (mkAlgIntE a)
+  | .pow a k =>
+    mkApp3 (mkConst ``Macaulean.AlgExpr.pow [.zero]) intTypeE (mkAlgIntE a) (mkRawNatLit k)
+
+/-- A grind `Poly` that is a constant. -/
+def polyConst? : Lean.Grind.CommRing.Poly → Option Int
+  | .num k => some k
+  | .add k m p =>
+    if m == Lean.Grind.CommRing.Mon.unit then (polyConst? p).map (k + ·) else none
+
+/-- Re-coefficient a reified expression from grind `Poly` to `Int`; `none` when
+some coefficient is not a plain integer (e.g. it mentions a coefficient-ring
+variable coming through `algebraMap`). -/
+def toAlgIntE? : Macaulean.AlgExpr Lean.Grind.CommRing.Poly → Option (Macaulean.AlgExpr Int)
+  | .coeff p => (polyConst? p).map .coeff
+  | .var i => some (.var i)
+  | .add a b => match toAlgIntE? a, toAlgIntE? b with
+    | some x, some y => some (.add x y)
+    | _, _ => none
+  | .mul a b => match toAlgIntE? a, toAlgIntE? b with
+    | some x, some y => some (.mul x y)
+    | _, _ => none
+  | .sub a b => match toAlgIntE? a, toAlgIntE? b with
+    | some x, some y => some (.sub x y)
+    | _, _ => none
+  | .neg a => (toAlgIntE? a).map .neg
+  | .pow a k => (toAlgIntE? a).map (.pow · k)
+
+/-- `2^62`: the largest power of two whose products of two operands still fit in
+Lean's boxed-scalar range. -/
+def scalarBound : Nat := 4611686018427387904
+
+/-- Every coefficient literal is below `2^62` in absolute value, so `Int.natAbs`
+and `Int.emod` on it stay on the scalar path. -/
+def coeffsSmall : Macaulean.AlgExpr Int → Bool
+  | .coeff k => k.natAbs < scalarBound
+  | .var _ => true
+  | .add a b | .mul a b | .sub a b => coeffsSmall a && coeffsSmall b
+  | .neg a => coeffsSmall a
+  | .pow a _ => coeffsSmall a
+
+/-- Node count of a reified expression tree (it is a literal tree, so no
+sharing to worry about). -/
+partial def exprNodeCount : Expr → Nat
+  | .app f a => 1 + exprNodeCount f + exprNodeCount a
+  | _ => 1
+
+/-- Above this many nodes, `algebra_norm_reflect` refuses to fall through to the
+cons-list `AlgPoly` normal form and its `simp`/`grind` finisher.  Those are
+superlinear and, on certificate-scale goals, do not terminate in practice; a
+loud failure naming the reflective check that went wrong is far more useful
+than a hang.  Small goals (including ones that need `grind` to use a
+hypothesis) are unaffected. -/
+def fallbackNodeLimit : Nat := 3000
+
+/-- `D ^ nv < bound`, by a multiplication loop that stops early. -/
+def powLt (D : Nat) : Nat → Nat → Bool
+  | 0, bound => 1 < bound
+  | n + 1, bound =>
+    let r := powLtVal D n bound
+    match r with
+    | some v => v * D < bound
+    | none => false
+where
+  powLtVal (D : Nat) : Nat → Nat → Option Nat
+    | 0, bound => if 1 < bound then some 1 else none
+    | n + 1, bound =>
+      match powLtVal D n bound with
+      | some v => let w := v * D; if w < bound then some w else none
+      | none => none
+
 def proveDefinallyEq (lhs rhs : Expr) : TacticM Expr := do
   let goalType ← mkEq lhs rhs
   let mvar ← mkFreshExprMVar goalType
@@ -165,6 +326,147 @@ partial def proveNormalizedDenoteEq (A : Expr) (coeffPolyDenote : Expr) (ambient
     setGoals savedGoals
   instantiateMVars mvar
 
+/--
+Bridge the reflective denotation back to the goal.
+
+Reification mirrors the goal expression node for node, and coefficients denote
+through `Lean.Grind.CommRing.denoteInt`, which produces the goal's own numeral
+`OfNat.ofNat` applications; so over concrete rings the bridge holds
+definitionally and `rfl` closes it in time linear in the expression.  The
+`simp`/`grind` route is kept only as a last resort for goals where that fails;
+it is quadratic-or-worse at certificate scale, so `bridgeStrict` refuses it.
+-/
+def proveBridge (bridgeStrict : Bool) (lhs rhs : Expr) : TacticM Expr := do
+  let goalType ← mkEq lhs rhs
+  let mvar ← mkFreshExprMVar goalType
+  let savedGoals ← getGoals
+  setGoals [mvar.mvarId!]
+  let simpBridge : TacticM Unit := do
+    evalTactic (← `(tactic|
+      simp [
+        Macaulean.AlgExpr.denote,
+        Lean.Grind.CommRing.Expr.denote,
+        Lean.Grind.CommRing.Expr.denote_toPoly,
+        Lean.Grind.CommRing.denoteInt_eq,
+        Lean.Grind.CommRing.Var.denote,
+        Lean.RArray.get,
+        Nat.ble,
+        Lean.Grind.Algebra.algebraMap_add,
+        Lean.Grind.Algebra.algebraMap_sub,
+        Lean.Grind.Algebra.algebraMap_mul,
+        Lean.Grind.Algebra.algebraMap_neg,
+        Lean.Grind.Algebra.algebraMap_zero,
+        Lean.Grind.Algebra.algebraMap_one,
+        Lean.Grind.Algebra.algebraMap_self
+      ]))
+    if !(← getGoals).isEmpty then
+      evalTactic (← `(tactic| grind))
+      evalTactic (← `(tactic| done))
+  let run : TacticM Unit := do
+    try
+      evalTactic (← `(tactic| rfl))
+    catch e =>
+      if bridgeStrict then
+        throwError m!"denotation bridge is not closed by `rfl`: {e.toMessageData}"
+      simpBridge
+  try
+    run
+  finally
+    setGoals savedGoals
+  instantiateMVars mvar
+
+/-- Close `t = true` by kernel evaluation. -/
+def proveBoolTrue (t : Expr) : TacticM Expr := do
+  let ty ← mkEq t (mkConst ``true)
+  let mvar ← mkFreshExprMVar ty
+  let savedGoals ← getGoals
+  setGoals [mvar.mvarId!]
+  try
+    evalTactic (← `(tactic| decide +kernel))
+  finally
+    setGoals savedGoals
+  instantiateMVars mvar
+
+/--
+The GMP-free certificate.
+
+Reify as usual, then re-coefficient the reified expressions from grind `Poly`
+to `Int` (possible exactly when every coefficient of the goal is an integer
+literal), and prove the identity with `AlgExpr.eq_of_checkModZero`: the kernel
+normalizes `e₁ - e₂` once with residue-vector coefficients modulo `k` primes in
+`[2^30, 2^31)` and checks the result is zero, plus an a priori `L¹` bound
+showing that a coefficient divisible by all `k` moduli must vanish.
+
+Everything the kernel evaluates stays below `2^62`.  The choices made here (the
+Kronecker base `D`, the digit count `nv`, the moduli, the Bézout witnesses) are
+all re-checked by the kernel, so a bad choice makes the tactic fail, never
+succeed wrongly.
+-/
+unsafe def proveModPath (inputs : Inputs) : TacticM Expr := withMainContext do
+  let uA ← Macaulean.AlgPoly.Reify.getTypeLevel inputs.A
+  let commRingAInst ← synthInstance (mkApp (mkConst ``Lean.Grind.CommRing [uA]) inputs.A)
+  let ambientCtx ← liftM <| Macaulean.AlgPoly.Reify.mkContextExpr inputs.A inputs.ambientVars
+  let algExprPolyType := mkApp (mkConst ``Macaulean.AlgExpr [.zero])
+    Macaulean.AlgPoly.Reify.polyType
+  let lhsVal ← evalExpr (Macaulean.AlgExpr Lean.Grind.CommRing.Poly)
+    algExprPolyType inputs.lhsReified
+  let rhsVal ← evalExpr (Macaulean.AlgExpr Lean.Grind.CommRing.Poly)
+    algExprPolyType inputs.rhsReified
+  let some lhsInt := toAlgIntE? lhsVal
+    | throwError "GMP-free path: the left-hand side has a non-integer coefficient"
+  let some rhsInt := toAlgIntE? rhsVal
+    | throwError "GMP-free path: the right-hand side has a non-integer coefficient"
+  let eSub := Macaulean.AlgExpr.sub lhsInt rhsInt
+  unless coeffsSmall eSub do
+    throwError "GMP-free path: a coefficient is at least 2^62, so the kernel \
+would need bignum arithmetic"
+  let nv := inputs.ambientVars.size
+  let dBase := Nat.max lhsInt.degBound rhsInt.degBound + 2
+  unless powLt dBase nv scalarBound do
+    throwError m!"GMP-free path: the packed monomial keys would exceed 2^62 \
+(base {dBase}, {nv} variables)"
+  let bnd := eSub.ubnd
+  unless bnd.m < 2147483648 do
+    throwError "GMP-free path: internal error, unnormalized coefficient bound"
+  let k := (31 + bnd.e + 29) / 30
+  unless k ≤ modPool.size do
+    throwError m!"GMP-free path: would need {k} moduli, only {modPool.size} available"
+  let ms := modPool.toList.take k
+  let tbl := bezTable ms
+  unless Macaulean.pairwiseCoprimeB ms tbl do
+    throwError "GMP-free path: internal error, bad Bézout table"
+  unless Macaulean.allBig ms do
+    throwError "GMP-free path: internal error, modulus below 2^30"
+  unless Macaulean.AlgExpr.boundOk ms eSub do
+    throwError "GMP-free path: internal error, coefficient bound check failed"
+  unless Macaulean.AlgExpr.checkModZero dBase nv ms eSub do
+    throwError m!"residue-vector normal forms differ (base {dBase}, {nv} \
+variables, {k} moduli)"
+  let e1E := mkAlgIntE lhsInt
+  let e2E := mkAlgIntE rhsInt
+  let eSubE := mkApp3 (mkConst ``Macaulean.AlgExpr.sub [.zero]) intTypeE e1E e2E
+  let msE := mkNatListE ms
+  let tblE := mkTblE tbl
+  let dE := mkRawNatLit dBase
+  let nvE := mkRawNatLit nv
+  let phi := mkApp2 (mkConst ``Macaulean.intDenote [uA]) inputs.A commRingAInst
+  let hphi := mkApp2 (mkConst ``Macaulean.intDenote_isRingHom [uA]) inputs.A commRingAInst
+  let denoteFn := mkConst ``Macaulean.AlgExpr.denote [.zero, uA]
+  let denoteLhs := mkAppN denoteFn #[intTypeE, inputs.A, commRingAInst, phi, ambientCtx, e1E]
+  let denoteRhs := mkAppN denoteFn #[intTypeE, inputs.A, commRingAInst, phi, ambientCtx, e2E]
+  let hLhs ← proveBridge true denoteLhs inputs.lhs
+  let hRhs ← proveBridge true denoteRhs inputs.rhs
+  let hcop ← proveBoolTrue (mkApp2 (mkConst ``Macaulean.pairwiseCoprimeB) msE tblE)
+  let hbig ← proveBoolTrue (mkApp (mkConst ``Macaulean.allBig) msE)
+  let hchk ← proveBoolTrue
+    (mkAppN (mkConst ``Macaulean.AlgExpr.checkModZero) #[dE, nvE, msE, eSubE])
+  let hbnd ← proveBoolTrue (mkApp2 (mkConst ``Macaulean.AlgExpr.boundOk) msE eSubE)
+  let core := mkAppN (mkConst ``Macaulean.AlgExpr.eq_of_checkModZero [uA])
+    #[inputs.A, commRingAInst, phi, ambientCtx, hphi, dE, nvE, msE, tblE, e1E, e2E,
+      hcop, hbig, hchk, hbnd]
+  let hLhsSymm ← mkEqSymm hLhs
+  mkEqTrans hLhsSymm (← mkEqTrans core hRhs)
+
 unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainContext do
   let coeffCtx ← liftM <| Macaulean.AlgPoly.Reify.mkContextExpr inputs.R inputs.coeffVars
   let ambientCtx ← liftM <| Macaulean.AlgPoly.Reify.mkContextExpr inputs.A inputs.ambientVars
@@ -210,54 +512,14 @@ unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainContext do
       ambientCtx,
       inputs.rhsReified
     ]
-  let proveBridge (lhs rhs : Expr) : TacticM Expr := do
-    let goalType ← mkEq lhs rhs
-    let mvar ← mkFreshExprMVar goalType
-    let savedGoals ← getGoals
-    setGoals [mvar.mvarId!]
-    let simpBridge : TacticM Unit := do
-      evalTactic (← `(tactic|
-        simp [
-          Macaulean.AlgExpr.denote,
-          Lean.Grind.CommRing.Expr.denote,
-          Lean.Grind.CommRing.Expr.denote_toPoly,
-          Lean.Grind.CommRing.denoteInt_eq,
-          Lean.Grind.CommRing.Var.denote,
-          Lean.RArray.get,
-          Nat.ble,
-          Lean.Grind.Algebra.algebraMap_add,
-          Lean.Grind.Algebra.algebraMap_sub,
-          Lean.Grind.Algebra.algebraMap_mul,
-          Lean.Grind.Algebra.algebraMap_neg,
-          Lean.Grind.Algebra.algebraMap_zero,
-          Lean.Grind.Algebra.algebraMap_one,
-          Lean.Grind.Algebra.algebraMap_self
-        ]))
-      if !(← getGoals).isEmpty then
-        evalTactic (← `(tactic| grind))
-        evalTactic (← `(tactic| done))
-    -- Reification mirrors the goal expression node for node, so over
-    -- concrete rings the bridge typically holds definitionally; `rfl` is
-    -- linear in the expression size, where the simp route is far more
-    -- expensive at certificate scale (hundreds of monomials).
-    let rflOrSimp : TacticM Unit := do
-      try
-        evalTactic (← `(tactic| rfl))
-      catch _ =>
-        simpBridge
-    try
-      rflOrSimp
-    finally
-      setGoals savedGoals
-    instantiateMVars mvar
   let hLhs ←
     try
-      proveBridge denoteLhs inputs.lhs
+      proveBridge false denoteLhs inputs.lhs
     catch e =>
       throwError m!"lhs bridge failed: {e.toMessageData}"
   let hRhs ←
     try
-      proveBridge denoteRhs inputs.rhs
+      proveBridge false denoteRhs inputs.rhs
     catch e =>
       throwError m!"rhs bridge failed: {e.toMessageData}"
   -- Fast path: Kronecker-packed normal form (single-`Nat` monomial keys), which
@@ -339,7 +601,12 @@ unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainContext do
     let hLhsSymm ← mkEqSymm hLhs
     let hCoreRhs ← mkEqTrans core hRhs
     mkEqTrans hLhsSymm hCoreRhs
-  catch _ =>
+  catch beqErr =>
+    let size := exprNodeCount inputs.lhsReified + exprNodeCount inputs.rhsReified
+    if size > fallbackNodeLimit then
+      throwError m!"reflective normalization did not close this goal \
+({size} reified nodes); refusing the `simp`/`grind` fallback at this size.\n\
+{beqErr.toMessageData}"
     let algPolyType := mkApp (mkConst ``Macaulean.AlgPoly [.zero]) Macaulean.AlgPoly.Reify.polyType
     let lhsNorm ← evalExpr (Macaulean.AlgPoly Lean.Grind.CommRing.Poly) algPolyType lhsPoly
     let rhsNorm ← evalExpr (Macaulean.AlgPoly Lean.Grind.CommRing.Poly) algPolyType rhsPoly
@@ -432,7 +699,21 @@ unsafe def solveGoal : TacticM Unit := withMainContext do
   let mainGoal ← getMainGoal
   let target ← instantiateMVars (← getMainTarget)
   let inputs ← buildInputs target
-  let proof ← instantiateMVars (← proveReifiedEq inputs)
+  let gmpFree := macaulean.gmpFree.get (← getOptions)
+  let proof0 ←
+    if gmpFree then
+      try
+        proveModPath inputs
+      catch modErr =>
+        let modMsg := modErr.toMessageData
+        try
+          proveReifiedEq inputs
+        catch e =>
+          throwError m!"GMP-free certificate failed: {modMsg}\n\
+            exact-integer certificate failed: {e.toMessageData}"
+    else
+      proveReifiedEq inputs
+  let proof ← instantiateMVars proof0
   if proof.hasMVar then
     throwError m!"reflective proof has metavariables: {proof}"
   mainGoal.assign proof
