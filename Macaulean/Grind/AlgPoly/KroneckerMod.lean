@@ -15,15 +15,21 @@ public import Macaulean.Grind.AlgPoly.ModBound
 # A GMP-free reflective certificate for polynomial identities
 
 `AlgExpr.eq_of_toKPoly_eq` (in `Kronecker.lean`) proves `e₁ = e₂` by having the
-kernel normalize both sides with **exact integer** coefficients.  For the
-certificate identities this project cares about, those integers grow to
-thousands of bits, so the kernel spends its time inside GMP.  That is a
-liability: Lean's Linux binaries shipped GMP 6.1.2, whose `mpn_sec_powm` bug
-was exploitable for a proof of `False` (fixed in Lean v4.33.1).  A reflective
-certificate whose truth rests on one big bignum computation should not rest on
-GMP.
+kernel normalize both sides with **exact integer** coefficients.  Nothing in
+that certificate bounds the integers the kernel then computes with: they are
+whatever normalization produces, and the moment one exceeds `2^63` the kernel
+is inside GMP.  That is a liability, because Lean's Linux binaries shipped GMP
+6.1.2, whose `mpn_sec_powm` bug was exploitable for a proof of `False` (fixed
+in Lean v4.33.1): a reflective certificate whose truth is one big computation
+should not rest on GMP.
 
-This module replaces the big-integer arithmetic by a **single-pass CRT**: the
+(To be precise about the motivating example: on the explicit-unirational
+tower-B certificates the exact-integer coefficients happen to stay below about
+`2^40`, so that path does not actually reach GMP *there*.  But it does not say
+so — the bound is a fact about those particular polynomials, not something the
+proof term establishes — and the margin shrinks as certificates grow.)
+
+This module replaces the unbounded integer arithmetic by a **single-pass CRT**: the
 same normalization is run once with coefficients in `ModVec ms`, i.e. as a
 vector of residues modulo each `mᵢ ∈ ms`, with every `mᵢ` in `[2^30, 2^31)`.
 If all residues of every coefficient of `e₁ - e₂` vanish, then every `mᵢ`

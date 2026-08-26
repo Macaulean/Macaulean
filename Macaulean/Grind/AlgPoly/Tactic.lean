@@ -45,6 +45,8 @@ open Lean Meta Elab Tactic
 
 meta section
 
+initialize Lean.registerTraceClass `macaulean.reflect
+
 register_option macaulean.gmpFree : Bool := {
   defValue := true
   descr := "algebra_norm_reflect: try the GMP-free residue-vector (single-pass CRT) certificate before the exact-integer Kronecker certificate.  Set to false to use the exact-integer path directly."
@@ -442,6 +444,8 @@ would need bignum arithmetic"
   unless Macaulean.AlgExpr.checkModZero dBase nv ms eSub do
     throwError m!"residue-vector normal forms differ (base {dBase}, {nv} \
 variables, {k} moduli)"
+  trace[macaulean.reflect] "GMP-free certificate: Kronecker base {dBase}, \
+{nv} variables, {k} moduli (coefficient bound < 2^{31 + bnd.e})"
   let e1E := mkAlgIntE lhsInt
   let e2E := mkAlgIntE rhsInt
   let eSubE := mkApp3 (mkConst ``Macaulean.AlgExpr.sub [.zero]) intTypeE e1E e2E
