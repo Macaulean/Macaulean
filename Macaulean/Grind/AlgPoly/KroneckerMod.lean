@@ -33,34 +33,58 @@ priori L1 bound shows the coefficient is smaller in absolute value than
 
 ## GMP audit
 
-Every `Nat` and `Int` the kernel computes with on this path stays strictly
-below `2^62`, hence inside Lean's boxed-scalar range
-(`LEAN_MAX_SMALL_NAT = 2^63 - 1`), hence on the inline scalar fast paths of
-`lean.h`.  Concretely, the kernel-evaluated functions are:
+Lean's kernel accelerates `Nat` *literal* arithmetic by calling the operations
+in `include/lean/lean.h`.  Those come in two kinds:
+
+* inline, with a small-scalar fast path taken whenever both operands are
+  `≤ LEAN_MAX_SMALL_NAT = 2^63 - 1`: `lean_nat_add`, `lean_nat_sub`,
+  `lean_nat_mul`, `lean_nat_div`, `lean_nat_mod`, `lean_nat_eq`, `lean_nat_le`,
+  `lean_nat_lt`, `lean_nat_land`, `lean_nat_shiftr`, …;
+* out-of-line and GMP-backed for *every* input: `lean_nat_pow`, `lean_nat_gcd`,
+  `lean_nat_log2`.
+
+`Int` is not a kernel-accelerated type; `Int.add`, `Int.mul`, `Int.neg`,
+`Int.emod`, `Int.natAbs` and `Int.beq` are reduced by unfolding their
+definitions down to the `Nat` operations above.
+
+The claim of this module is therefore: **on the certificate-checking path, no
+out-of-line `Nat` primitive is ever reached, and every `Nat` operand stays
+below `2^62`.**  The kernel evaluates exactly two things:
+
+**(1) The four `Bool` checks** closed by `decide +kernel`:
+`pairwiseCoprimeB ms tbl`, `allBig ms`, `AlgExpr.checkModZero D nv ms (e₁ - e₂)`
+and `AlgExpr.boundOk ms (e₁ - e₂)`.
 
 | function | values | why bounded |
 | --- | --- | --- |
 | `KPoly.powNat D i` | `< 2^62` | the tactic checks `D ^ nv < 2^62` natively, computing the power by a multiplication loop, and refuses otherwise |
-| `KPoly.mulKeyOk` (`%`, `/`, `+`, `Nat.blt`) | keys `< 2^62` | keys are sums of packed monomial keys, guarded digit-by-digit to stay below `D ^ nv` |
+| `KPoly.mulKeyOk` (`%`, `/`, `+`, `Nat.blt`) | keys `< 2^62` | a key is a base-`D` digit vector of length `nv`, so `< D ^ nv`; every key sum is guarded digit-by-digit |
 | `KPoly.mergeF`, `scaleK?`, `mulCore?`, `mulK?`, `powK?`, `negK`, `canon` | keys as above; coefficients are `ModVec` | key comparison is `Nat.blt`; `mulK?` compares `List.length` with `Nat.ble` |
-| `ModVec.addVals`, `mulVals`, `negVals`, `ofIntVals` | residues `< 2^31`, products `< 2^62` | every `mᵢ < 2^31` (checked: the moduli are literals in the proof term) and each result is reduced by `Int.emod` |
-| `ModVec.beqVals`, `KPoly.canon` | residues | `Int.beq` on scalars |
-| `UBnd.norm`, `mul`, `add`, `pow`, `shrUp` | mantissas `< 2^31`, so products `< 2^62`; exponents are a few hundred | `UBnd.norm` renormalizes after every operation; `AlgExpr.boundOk` re-checks `m < 2^31` |
-| `AlgExpr.ubnd` on a `.coeff k` leaf | `k.natAbs` | the tactic refuses coefficients with `\|k\| ≥ 2^62` |
-| `bezOk` | `a * m`, `b * n` with `a, b < 2^31`, `m, n < 2^31` | Bézout witnesses are emitted reduced |
-| `allBig`, `boundOk` | literals and small exponents | `Nat.ble`, `Nat.blt` |
+| `ModVec.addVals`, `mulVals`, `negVals`, `ofIntVals` | residues in `[0, mᵢ)` with `mᵢ < 2^31`, so sums `< 2^32` and products `< 2^62` | every result is reduced by `Int.emod`; the moduli are literals in the proof term and `allBig` plus the literal `< 2^31` are visible to the reader |
+| `ModVec.beqVals`, `KPoly.canon` | residues `< 2^31` | `Int.beq` |
+| `UBnd.norm`, `mul`, `add`, `shrUp` | mantissas `< 2^31`, so mantissa products `< 2^62`; exponents are a few hundred | `UBnd.norm` renormalizes after every operation, and `AlgExpr.boundOk` re-checks `m < 2^31` |
+| `AlgExpr.ubnd` on a `.coeff k` leaf | `k.natAbs < 2^62` | the tactic refuses coefficients of absolute value `≥ 2^62` |
+| `bezOk` | `a * m` and `b * n` with `a, b < 2^31` and `m, n < 2^31`, so `< 2^62` | the tactic emits reduced witnesses; the kernel only multiplies and compares |
+| `allBig`, `boundOk` | modulus literals `< 2^31`, exponents in the hundreds | `Nat.ble`, `Nat.blt` |
 
-Lean-core `Nat`/`Int` operations that appear on the kernel path:
-`Nat.add`, `Nat.sub`, `Nat.mul`, `Nat.div`, `Nat.mod`, `Nat.beq`, `Nat.ble`,
-`Nat.blt`, `Nat.decEq`, `Int.add`, `Int.mul`, `Int.neg`, `Int.emod`,
-`Int.beq`, `Int.natAbs`.  Each of these has an inline small-scalar
-implementation in `include/lean/lean.h`.  **Not** used: `Nat.pow`, `Nat.gcd`,
-`Nat.log2`, `Nat.shiftRight`, `Int.gcd`, `Int.pow` — the out-of-line,
-GMP-backed primitives.  (`pow2` appears only in the *specification* function
-`UBnd.val` and in soundness proofs; the only closed values the kernel ever
-reduces it at are `pow2 30` and `pow2 31`, each 30/31 scalar doublings, and
-those reductions happen while checking `ModBound.pow2_30`/`pow2_31`, not
-during certificate checking.)
+**(2) The two denotation bridges** `AlgExpr.denote (intDenote A) ctx eᵢ = goalᵢ`,
+closed by `rfl`.  Reduction there touches `Lean.RArray.get` (`Nat.ble` on
+variable indices below `nv`), `AlgExpr.denote` itself, and `intDenote`, i.e.
+`Lean.Grind.CommRing.denoteInt`, which compares a coefficient literal with `0`
+and takes its `Int.natAbs` — again below `2^62`.  Exponents `a ^ k` appear on
+both sides of the bridge unchanged and are never computed on.
+
+`pow2` occurs only in the *specification* function `UBnd.val` and in soundness
+proofs; the only closed values it is ever reduced at are `pow2 30` and
+`pow2 31`, thirty-odd scalar doublings each, while checking `pow2_30`/`pow2_31`
+at *compile* time of `ModBound.lean` — never during certificate checking.
+
+`MacauleanTest/AlgebraNormMod.lean` re-checks the "no out-of-line primitive"
+half of this mechanically, by walking the definitional closure of the four
+`Bool`s and asserting that `Nat.pow`, `Nat.gcd`, `Nat.log2`,
+`Nat.lcm`, `Int.gcd` and `HPow.hPow` do not occur.  (`Nat.shiftRight`
+and `Nat.land` *do* occur, introduced by the equation compiler's sparse-match
+helpers; both are inline with a scalar fast path.)
 
 Two remarks on scope:
 

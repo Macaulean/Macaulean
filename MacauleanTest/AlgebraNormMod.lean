@@ -15,6 +15,39 @@ open Lean Grind
 
 set_option linter.unusedVariables false
 
+/-! ### Machine-checked half of the GMP audit
+
+Walk the definitional closure of everything the kernel evaluates for the
+GMP-free certificate and check that none of Lean's out-of-line, GMP-backed
+`Nat` primitives is reachable.  (`Nat.shiftRight` and `Nat.land` *are*
+reachable, through the equation compiler's sparse-match helpers; both are
+inline in `lean.h` with a small-scalar fast path, so they are allowed.) -/
+
+open Lean in
+run_meta do
+  let env ← getEnv
+  let forbidden : List Name :=
+    [``Nat.pow, ``Nat.gcd, ``Nat.log2, ``Nat.lcm, ``Int.gcd, ``HPow.hPow]
+  let roots : List Name :=
+    [``Macaulean.AlgExpr.checkModZero, ``Macaulean.AlgExpr.boundOk,
+     ``Macaulean.pairwiseCoprimeB, ``Macaulean.allBig]
+  let mut seen : NameSet := {}
+  let mut todo := roots
+  let mut bad : Array (Name × Name) := #[]
+  while !todo.isEmpty do
+    let n := todo.headD Name.anonymous
+    todo := todo.tail
+    if seen.contains n then continue
+    seen := seen.insert n
+    match env.find? n with
+    | some (.defnInfo v) =>
+      for c in v.value.getUsedConstants do
+        if forbidden.contains c then bad := bad.push (n, c)
+        todo := c :: todo
+    | _ => pure ()
+  unless bad.isEmpty do
+    throwError m!"GMP audit failed: {bad.toList.map (fun p => (p.1, p.2))}"
+
 /-! ### Over `Int` -/
 
 theorem mod_int_sq (x y : Int) : (x + y) ^ 2 = x ^ 2 + 2 * x * y + y ^ 2 := by
