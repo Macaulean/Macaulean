@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
 import Macaulean.Grind.AlgPoly.Tactic
+import Macaulean.PolyDef
 
 set_option maxRecDepth 100000
 set_option maxHeartbeats 100000000
@@ -45,60 +46,25 @@ elab "kbench " name:ident spec:str tac:tactic : command => do
     | throwError "kbench: expected five ';'-separated polynomials"
   liftTermElabM do
     let rat := mkConst ``Rat
-    let natTy := mkConst ``Nat
-    let hMulInst ← synthInstance (mkApp3 (mkConst ``HMul [0, 0, 0]) rat rat rat)
-    let hAddInst ← synthInstance (mkApp3 (mkConst ``HAdd [0, 0, 0]) rat rat rat)
-    let hSubInst ← synthInstance (mkApp3 (mkConst ``HSub [0, 0, 0]) rat rat rat)
-    let hPowInst ← synthInstance (mkApp3 (mkConst ``HPow [0, 0, 0]) rat natTy rat)
-    let mkMul a b := mkApp6 (mkConst ``HMul.hMul [0, 0, 0]) rat rat rat hMulInst a b
-    let mkAddE a b := mkApp6 (mkConst ``HAdd.hAdd [0, 0, 0]) rat rat rat hAddInst a b
-    let mkSubE a b := mkApp6 (mkConst ``HSub.hSub [0, 0, 0]) rat rat rat hSubInst a b
-    let mkPowE a (k : Nat) := mkApp6 (mkConst ``HPow.hPow [0, 0, 0]) rat natTy rat
-      hPowInst a (mkNatLit k)
-    let negInst ← synthInstance (mkApp (mkConst ``Neg [0]) rat)
-    let mkNegE t := mkApp3 (mkConst ``Neg.neg [0]) rat negInst t
-    let mut numCache : Std.HashMap Nat Expr := {}
     let mkNum (n : Nat) : TermElabM Expr := do
-      match numCache[n]? with
-      | some e => pure e
-      | none => do
-        let inst ← synthInstance (mkApp2 (mkConst ``OfNat [0]) rat (mkRawNatLit n))
-        pure <| mkApp3 (mkConst ``OfNat.ofNat [0]) rat (mkRawNatLit n) inst
-    let parsePoly (s : String) (xv yv zv : Expr) : TermElabM Expr := do
-      let mut acc : Option Expr := none
-      for tok in s.splitOn " " do
-        let [a, b, c, k] := (tok.splitOn ".").map (·.trimAscii.toString)
-          | throwError "kbench: bad monomial {tok}"
-        let some a := a.toNat? | throwError "kbench: bad exponent {tok}"
-        let some b := b.toNat? | throwError "kbench: bad exponent {tok}"
-        let some c := c.toNat? | throwError "kbench: bad exponent {tok}"
-        let some k := k.toInt? | throwError "kbench: bad coefficient {tok}"
-        let mut factors : Array Expr := #[]
-        let kAbs := k.natAbs
-        if kAbs != 1 then
-          factors := factors.push (← mkNum kAbs)
-        for (v, e) in [(xv, a), (yv, b), (zv, c)] do
-          if e == 1 then factors := factors.push v
-          else if e > 1 then factors := factors.push (mkPowE v e)
-        let term ←
-          if factors.isEmpty then mkNum kAbs
-          else pure (factors[1:].foldl mkMul factors[0]!)
-        acc := some <| match acc with
-          | none => if k < 0 then mkNegE term else term
-          | some e => if k < 0 then mkSubE e term else mkAddE e term
-      match acc with
-      | some e => pure e
-      | none => mkNum 0
+      let inst ← synthInstance (mkApp2 (mkConst ``OfNat [0]) rat (mkRawNatLit n))
+      pure <| mkApp3 (mkConst ``OfNat.ofNat [0]) rat (mkRawNatLit n) inst
     let goal ← withLocalDeclD `x rat fun xv =>
       withLocalDeclD `y rat fun yv =>
       withLocalDeclD `z rat fun zv => do
-        let a ← parsePoly aS xv yv zv
-        let b ← parsePoly bS xv yv zv
-        let q ← parsePoly qS xv yv zv
-        let g ← parsePoly gS xv yv zv
-        let r ← parsePoly rS xv yv zv
-        let rhs := mkAddE (mkMul q g) r
-        let eq ← mkEq (mkMul a b) rhs
+        -- The monomial parser is shared with `poly_def` (`Macaulean/PolyDef.lean`).
+        let b ← Macaulean.PolyBuilder.ofType rat #[xv, yv, zv] mkNum
+        let parsePoly (s : String) : TermElabM Expr := do
+          match ← b.build? "kbench" s with
+          | some e => pure e
+          | none => b.mkNum 0
+        let aE ← parsePoly aS
+        let bE ← parsePoly bS
+        let qE ← parsePoly qS
+        let gE ← parsePoly gS
+        let rE ← parsePoly rS
+        let rhs := b.mkAdd (b.mkMul qE gE) rE
+        let eq ← mkEq (b.mkMul aE bE) rhs
         mkForallFVars #[xv, yv, zv] eq
     let t0 ← IO.monoMsNow
     let mv ← mkFreshExprMVar goal

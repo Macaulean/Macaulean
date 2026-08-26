@@ -14,3 +14,4 @@ import Macaulean.Grind.AlgPoly.Expr
 import Macaulean.Grind.AlgPoly.Reify
 import Macaulean.Grind.AlgPoly.Tactic
 import Macaulean.Grind.AlgPoly.Kronecker
+import Macaulean.PolyDef
