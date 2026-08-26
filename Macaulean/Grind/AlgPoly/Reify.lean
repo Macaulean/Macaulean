@@ -90,11 +90,26 @@ private def mkCoeffExprCtor (declName : Name) (args : Array Expr) : Expr :=
 private def mkAlgExprCtor (declName : Name) (args : Array Expr) : Expr :=
   mkAppN (mkConst declName [.zero]) (#[polyType] ++ args)
 
-def mkPolyValueExpr (p : Lean.Grind.CommRing.Poly) : Expr :=
-  Lean.Meta.Grind.Arith.CommRing.ofPoly p
+/-! `ToExpr`-style builders for `Lean.Grind.CommRing.{Power, Mon, Poly}`.
+Lean ≤ 4.29 exported these as `Lean.Meta.Grind.Arith.CommRing.ofMon`/`ofPoly`
+(`Grind/Arith/CommRing/ToExpr.lean`); that file is gone in 4.30+, so they are
+inlined here.  They build the literal constructor tree, so the result is
+`rfl`-equal to the value. -/
 
-def mkMonValueExpr (m : Lean.Grind.CommRing.Mon) : Expr :=
-  Lean.Meta.Grind.Arith.CommRing.ofMon m
+private def ofPower (p : Lean.Grind.CommRing.Power) : Expr :=
+  mkApp2 (mkConst ``Lean.Grind.CommRing.Power.mk) (toExpr p.x) (toExpr p.k)
+
+private def ofMon : Lean.Grind.CommRing.Mon → Expr
+  | .unit => mkConst ``Lean.Grind.CommRing.Mon.unit
+  | .mult pw m => mkApp2 (mkConst ``Lean.Grind.CommRing.Mon.mult) (ofPower pw) (ofMon m)
+
+private def ofPoly : Lean.Grind.CommRing.Poly → Expr
+  | .num k => mkApp (mkConst ``Lean.Grind.CommRing.Poly.num) (toExpr k)
+  | .add k m p => mkApp3 (mkConst ``Lean.Grind.CommRing.Poly.add) (toExpr k) (ofMon m) (ofPoly p)
+
+def mkPolyValueExpr (p : Lean.Grind.CommRing.Poly) : Expr := ofPoly p
+
+def mkMonValueExpr (m : Lean.Grind.CommRing.Mon) : Expr := ofMon m
 
 def mkAlgPolyValueExpr : Macaulean.AlgPoly Lean.Grind.CommRing.Poly → Expr
   | .coeff k =>
