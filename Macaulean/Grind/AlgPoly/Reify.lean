@@ -3,13 +3,17 @@ Copyright (c) 2025 Macaulean contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-import Macaulean.Grind.AlgPoly.Expr
-import Macaulean.Grind.Algebra.Instances
-import Lean.Data.RArray
-import Lean.Meta.Basic
-import Lean.Meta.Eval
-import Lean.Meta.SynthInstance
-import Lean.Meta.WHNF
+module
+
+public import Macaulean.Grind.AlgPoly.Expr
+public import Macaulean.Grind.Algebra.Instances
+public import Lean.Data.RArray
+public meta import Lean.Meta.Basic
+public meta import Lean.Meta.Eval
+public meta import Lean.Meta.SynthInstance
+public meta import Lean.Meta.WHNF
+
+@[expose] public section
 
 /-!
 # Reification helpers for `AlgPoly`
@@ -62,6 +66,8 @@ theorem polyCoeffIsRingHom {R : Type} {A : Type} [CommRing R] [CommRing A]
     simpa [Lean.Grind.Algebra.algebraMap_neg, Lean.Grind.Algebra.algebraMap_one, Lean.Grind.Semiring.one_mul] using
       (Ring.neg_mul (1 : A) (algebraMap R A (Lean.Grind.CommRing.Poly.denote coeffCtx a)))
 
+meta section
+
 def polyType : Expr :=
   mkConst ``Lean.Grind.CommRing.Poly
 
@@ -71,7 +77,7 @@ def getTypeLevel (type : Expr) : MetaM Level := do
     | .succ u => u
     | u => u
 
-private def mkNatZero (type : Expr) : MetaM Expr := do
+def mkNatZero (type : Expr) : MetaM Expr := do
   let u ← getTypeLevel type
   let semiringInstType := mkApp (mkConst ``Lean.Grind.Semiring [u]) type
   let semiringInst ← synthInstance semiringInstType
@@ -84,10 +90,10 @@ def mkContextExpr (type : Expr) (vars : Array Expr) : MetaM Expr := do
   else
     Lean.RArray.toExpr type id (Lean.RArray.leaf (← mkNatZero type))
 
-private def mkCoeffExprCtor (declName : Name) (args : Array Expr) : Expr :=
+def mkCoeffExprCtor (declName : Name) (args : Array Expr) : Expr :=
   mkAppN (mkConst declName) args
 
-private def mkAlgExprCtor (declName : Name) (args : Array Expr) : Expr :=
+def mkAlgExprCtor (declName : Name) (args : Array Expr) : Expr :=
   mkAppN (mkConst declName [.zero]) (#[polyType] ++ args)
 
 /-! `ToExpr`-style builders for `Lean.Grind.CommRing.{Power, Mon, Poly}`.
@@ -96,14 +102,14 @@ Lean ≤ 4.29 exported these as `Lean.Meta.Grind.Arith.CommRing.ofMon`/`ofPoly`
 inlined here.  They build the literal constructor tree, so the result is
 `rfl`-equal to the value. -/
 
-private def ofPower (p : Lean.Grind.CommRing.Power) : Expr :=
+def ofPower (p : Lean.Grind.CommRing.Power) : Expr :=
   mkApp2 (mkConst ``Lean.Grind.CommRing.Power.mk) (toExpr p.x) (toExpr p.k)
 
-private def ofMon : Lean.Grind.CommRing.Mon → Expr
+def ofMon : Lean.Grind.CommRing.Mon → Expr
   | .unit => mkConst ``Lean.Grind.CommRing.Mon.unit
   | .mult pw m => mkApp2 (mkConst ``Lean.Grind.CommRing.Mon.mult) (ofPower pw) (ofMon m)
 
-private def ofPoly : Lean.Grind.CommRing.Poly → Expr
+def ofPoly : Lean.Grind.CommRing.Poly → Expr
   | .num k => mkApp (mkConst ``Lean.Grind.CommRing.Poly.num) (toExpr k)
   | .add k m p => mkApp3 (mkConst ``Lean.Grind.CommRing.Poly.add) (toExpr k) (ofMon m) (ofPoly p)
 
@@ -126,7 +132,7 @@ structure State where
 
 abbrev ReifyM := StateT State MetaM
 
-private def mkCoeffVar (e : Expr) : ReifyM Nat := do
+def mkCoeffVar (e : Expr) : ReifyM Nat := do
   let s ← get
   match s.coeffVarMap[e]? with
   | some idx => pure idx
@@ -138,7 +144,7 @@ private def mkCoeffVar (e : Expr) : ReifyM Nat := do
     }
     pure idx
 
-private def mkAmbientVar (e : Expr) : ReifyM Nat := do
+def mkAmbientVar (e : Expr) : ReifyM Nat := do
   let s ← get
   match s.ambientVarMap[e]? with
   | some idx => pure idx
@@ -150,13 +156,13 @@ private def mkAmbientVar (e : Expr) : ReifyM Nat := do
     }
     pure idx
 
-private def mkCoeffVarExpr (idx : Nat) : Expr :=
+def mkCoeffVarExpr (idx : Nat) : Expr :=
   mkCoeffExprCtor ``Lean.Grind.CommRing.Expr.var #[mkRawNatLit idx]
 
-private def mkCoeffLitNat (n : Nat) : Expr :=
+def mkCoeffLitNat (n : Nat) : Expr :=
   mkCoeffExprCtor ``Lean.Grind.CommRing.Expr.num #[mkIntLit n]
 
-private def mkCoeffLitInt (n : Int) : Expr :=
+def mkCoeffLitInt (n : Int) : Expr :=
   mkCoeffExprCtor ``Lean.Grind.CommRing.Expr.intCast #[mkIntLit n]
 
 partial def reifyCoeffExpr (e : Expr) : ReifyM Expr := do
@@ -191,7 +197,7 @@ partial def reifyCoeffExpr (e : Expr) : ReifyM Expr := do
 def mkCoeffPolyExpr (e : Expr) : ReifyM Expr := do
   pure <| mkApp (mkConst ``Lean.Grind.CommRing.Expr.toPoly) (← reifyCoeffExpr e)
 
-private def isAlgebraMapApp? (algebraMapFn e : Expr) : MetaM (Option Expr) := do
+def isAlgebraMapApp? (algebraMapFn e : Expr) : MetaM (Option Expr) := do
   if e.isApp then
     let fn := e.appFn!
     let arg := e.appArg!
@@ -199,10 +205,10 @@ private def isAlgebraMapApp? (algebraMapFn e : Expr) : MetaM (Option Expr) := do
       return some arg
   return none
 
-private def mkAmbientCoeff (coeff : Expr) : Expr :=
+def mkAmbientCoeff (coeff : Expr) : Expr :=
   mkAlgExprCtor ``AlgExpr.coeff #[coeff]
 
-private def mkAmbientVarExpr (idx : Nat) : Expr :=
+def mkAmbientVarExpr (idx : Nat) : Expr :=
   mkAlgExprCtor ``AlgExpr.var #[mkRawNatLit idx]
 
 partial def reifyAmbientExpr (algebraMapFn : Expr) (e : Expr) : ReifyM Expr := do
@@ -278,4 +284,8 @@ def runAmbientPair (algebraMapFn lhs rhs : Expr) : MetaM AmbientPairResult := do
     ambientVars := s.ambientVars
   }
 
+end
+
 end Macaulean.AlgPoly.Reify
+
+end

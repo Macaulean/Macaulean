@@ -3,7 +3,11 @@ Copyright (c) 2025 Macaulean contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-import Macaulean.Grind.AlgPoly.Denote
+module
+
+public import Macaulean.Grind.AlgPoly.Denote
+
+@[expose] public section
 
 /-!
 # AlgExpr: Unsimplified algebraic expressions
@@ -118,3 +122,5 @@ theorem AlgExpr.eq_of_toAlgPoly_eq {C : Type u} {A : Type v}
   rw [heq]
 
 end Macaulean
+
+end

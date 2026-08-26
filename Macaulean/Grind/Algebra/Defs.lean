@@ -3,7 +3,11 @@ Copyright (c) 2025 Macaulean contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-import Lean
+module
+
+public import Lean
+
+@[expose] public section
 
 /-!
 # Algebra typeclass for `grind`
@@ -103,3 +107,5 @@ theorem Algebra.algebraMap_sub_rev (r s : R) :
 end Ring
 
 end Lean.Grind
+
+end

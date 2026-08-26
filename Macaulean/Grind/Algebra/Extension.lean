@@ -3,9 +3,13 @@ Copyright (c) 2025 Macaulean contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-import Macaulean.Grind.Algebra.Instances
-import Lean.Meta.Tactic.Grind.Types
-import Lean.Meta.Tactic.Grind.Simp
+module
+
+public import Macaulean.Grind.Algebra.Instances
+public meta import Lean.Meta.Tactic.Grind.Types
+public meta import Lean.Meta.Tactic.Grind.Simp
+
+@[expose] public section
 
 /-!
 # Algebra solver extension for `grind`
@@ -26,6 +30,8 @@ participation beyond what E-matching can do:
 These require the `mbtc` (model-based theory combination) or `action` hooks,
 not just `internalize`/`newEq`.
 -/
+
+meta section
 
 open Lean Meta Grind
 
@@ -57,3 +63,7 @@ initialize
   algebraExt.setMethods
     (internalize := Lean.Meta.Grind.Algebra.internalize)
     (newEq := Lean.Meta.Grind.Algebra.processNewEq)
+
+end
+
+end

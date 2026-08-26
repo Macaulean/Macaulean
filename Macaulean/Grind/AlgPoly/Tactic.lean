@@ -3,11 +3,19 @@ Copyright (c) 2025 Macaulean contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-import Macaulean.Grind.AlgPoly.Reify
-import Macaulean.Grind.AlgPoly.Denote
-import Macaulean.Grind.AlgPoly.Kronecker
-import Macaulean.Grind.Algebra.Instances
-import Lean.Elab.Tactic.Basic
+module
+
+public import Macaulean.Grind.AlgPoly.Reify
+public import Macaulean.Grind.AlgPoly.Denote
+public import Macaulean.Grind.AlgPoly.Kronecker
+public import Macaulean.Grind.Algebra.Instances
+public meta import Macaulean.Grind.AlgPoly.Reify
+public meta import Macaulean.Grind.AlgPoly.Denote
+public meta import Macaulean.Grind.AlgPoly.Kronecker
+public meta import Macaulean.Grind.Algebra.Instances
+public meta import Lean.Elab.Tactic.Basic
+
+@[expose] public section
 
 /-!
 # algebra_norm tactic
@@ -29,8 +37,10 @@ namespace Macaulean.AlgPoly.Tactic
 
 open Lean.Grind
 
+meta section
+
 namespace Reflect
-private structure Inputs where
+structure Inputs where
   R : Expr
   A : Expr
   algebraMapFn : Expr
@@ -42,7 +52,7 @@ private structure Inputs where
   coeffVars : Array Expr
   ambientVars : Array Expr
 
-private def findAlgebraMapFn? (e : Expr) : Option Expr :=
+def findAlgebraMapFn? (e : Expr) : Option Expr :=
   match e.find? fun sub =>
       sub.isApp &&
       let fn := sub.appFn!
@@ -52,14 +62,14 @@ private def findAlgebraMapFn? (e : Expr) : Option Expr :=
   | some app => some app.appFn!
   | none => none
 
-private def getEqSides? (target : Expr) : Option (Expr × Expr) :=
+def getEqSides? (target : Expr) : Option (Expr × Expr) :=
   match target.getAppFn with
   | .const ``Eq _ =>
     let args := target.getAppArgs
     if args.size == 3 then some (args[1]!, args[2]!) else none
   | _ => none
 
-private def buildInputs (target : Expr) : TacticM Inputs := do
+def buildInputs (target : Expr) : TacticM Inputs := do
   let some (lhs, rhs) := getEqSides? target
     | throwError "reflective algebra_norm only handles equality goals"
   let (algebraMapFn, R, A, algebraInst) ←
@@ -89,7 +99,7 @@ private def buildInputs (target : Expr) : TacticM Inputs := do
     ambientVars := reified.ambientVars
   }
 
-private def proveDefinallyEq (lhs rhs : Expr) : TacticM Expr := do
+def proveDefinallyEq (lhs rhs : Expr) : TacticM Expr := do
   let goalType ← mkEq lhs rhs
   let mvar ← mkFreshExprMVar goalType
   let savedGoals ← getGoals
@@ -155,7 +165,7 @@ partial def proveNormalizedDenoteEq (A : Expr) (coeffPolyDenote : Expr) (ambient
     setGoals savedGoals
   instantiateMVars mvar
 
-private unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainContext do
+unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainContext do
   let coeffCtx ← liftM <| Macaulean.AlgPoly.Reify.mkContextExpr inputs.R inputs.coeffVars
   let ambientCtx ← liftM <| Macaulean.AlgPoly.Reify.mkContextExpr inputs.A inputs.ambientVars
   let uR ← Macaulean.AlgPoly.Reify.getTypeLevel inputs.R
@@ -418,7 +428,7 @@ private unsafe def proveReifiedEq (inputs : Inputs) : TacticM Expr := withMainCo
     let hCoreRhs ← mkEqTrans core hNormRhsGoal
     mkEqTrans hNormLhsGoalSymm hCoreRhs
 
-private unsafe def solveGoal : TacticM Unit := withMainContext do
+unsafe def solveGoal : TacticM Unit := withMainContext do
   let mainGoal ← getMainGoal
   let target ← instantiateMVars (← getMainTarget)
   let inputs ← buildInputs target
@@ -430,7 +440,7 @@ private unsafe def solveGoal : TacticM Unit := withMainContext do
 
 end Reflect
 
-private unsafe def reflectOnly : TacticM Unit := do
+unsafe def reflectOnly : TacticM Unit := do
   let s ← get
   let mut directErr : MessageData := m!""
   try
@@ -494,4 +504,8 @@ elab "algebra_norm" : tactic => do
         Lean.Grind.Algebra.algebraMap_smul_def];
        grind)))
 
+end
+
 end Macaulean.AlgPoly.Tactic
+
+end

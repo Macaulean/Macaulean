@@ -3,8 +3,12 @@ Copyright (c) 2025 Macaulean contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-import Macaulean.Grind.Algebra.Defs
-import Init.Grind.FieldNormNum
+module
+
+public import Macaulean.Grind.Algebra.Defs
+public import Init.Grind.FieldNormNum
+
+@[expose] public section
 
 /-!
 # Standard algebra instances for `grind`
@@ -76,3 +80,5 @@ instance (priority := 98) Field.toRatAlgebra (A : Type u) [Field A] [IsCharP A 0
     rfl
 
 end Lean.Grind
+
+end

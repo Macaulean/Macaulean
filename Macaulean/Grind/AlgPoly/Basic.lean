@@ -3,7 +3,11 @@ Copyright (c) 2025 Macaulean contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-import Lean
+module
+
+public import Lean
+
+@[expose] public section
 
 /-!
 # AlgPoly: Polynomials with parameterized coefficients
@@ -66,7 +70,7 @@ namespace AlgPoly
 variable {C : Type u} [CoeffRing C]
 
 /-- Large fuel value for bounded recursion (same pattern as grind). -/
-private def hugeFuel : Nat := 10000
+def hugeFuel : Nat := 10000
 
 /-! ### Basic constructors -/
 
@@ -251,3 +255,5 @@ instance instCoeffRing : CoeffRing (AlgPoly C) where
 end AlgPoly
 
 end Macaulean
+
+end

@@ -3,7 +3,11 @@ Copyright (c) 2025 Macaulean contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-import Macaulean.Grind.AlgPoly.Expr
+module
+
+public import Macaulean.Grind.AlgPoly.Expr
+
+@[expose] public section
 
 /-!
 # Kronecker-packed normal form for `AlgExpr`
@@ -70,7 +74,7 @@ huge literal costs nothing; the fuel-0 fallback (`++`) is denotation-correct,
 merely unsorted, so running out of fuel could only cost completeness, never
 soundness.  (This deliberately avoids the silent 10000-term cliff of
 `AlgPoly.combine`.) -/
-private def mergeFuel : Nat := 1000000000
+def mergeFuel : Nat := 1000000000
 
 /-- Merge two key-sorted lists, adding coefficients on equal keys.
 Zero coefficients are kept (`canon` strips them at the end). -/
@@ -162,7 +166,7 @@ noncomputable def denote (φ : C → A) (ctx : Context A) (D nv : Nat) : KPoly C
 /-! ### Arithmetic helper lemmas -/
 
 /-- Base-`D` digits add without carries when each digit pair sums below `D`. -/
-private theorem mod_div_add_carryfree {D k₁ k₂ : Nat} (hD : 0 < D)
+theorem mod_div_add_carryfree {D k₁ k₂ : Nat} (hD : 0 < D)
     (h : k₁ % D + k₂ % D < D) :
     (k₁ + k₂) % D = k₁ % D + k₂ % D ∧ (k₁ + k₂) / D = k₁ / D + k₂ / D := by
   have hsum : k₁ + k₂ = (k₁ % D + k₂ % D) + (k₁ / D + k₂ / D) * D := by
@@ -177,7 +181,7 @@ private theorem mod_div_add_carryfree {D k₁ k₂ : Nat} (hD : 0 < D)
 
 /-! ### Denotation lemmas for monomial keys -/
 
-private theorem monDenote_zero (D : Nat) (ctx : Context A) (fuel idx : Nat) :
+theorem monDenote_zero (D : Nat) (ctx : Context A) (fuel idx : Nat) :
     monDenote D ctx fuel idx 0 = 1 := by
   induction fuel generalizing idx with
   | zero => rfl
@@ -185,7 +189,7 @@ private theorem monDenote_zero (D : Nat) (ctx : Context A) (fuel idx : Nat) :
     show Var.denote ctx idx ^ (0 % D) * monDenote D ctx fuel (idx + 1) (0 / D) = 1
     rw [Nat.zero_mod, Nat.zero_div, ih, Semiring.pow_zero, Semiring.one_mul]
 
-private theorem monDenote_mul {D : Nat} (hD : 0 < D) (ctx : Context A)
+theorem monDenote_mul {D : Nat} (hD : 0 < D) (ctx : Context A)
     {fuel k₁ k₂ : Nat} (h : mulKeyOk D fuel k₁ k₂ = true) (idx : Nat) :
     monDenote D ctx fuel idx (k₁ + k₂) =
       monDenote D ctx fuel idx k₁ * monDenote D ctx fuel idx k₂ := by
@@ -202,7 +206,7 @@ private theorem monDenote_mul {D : Nat} (hD : 0 < D) (ctx : Context A)
     rw [hmod, hdiv, ih hrest, Semiring.pow_add]
     grind
 
-private theorem monDenote_var {D : Nat} (hD : 1 < D) (ctx : Context A)
+theorem monDenote_var {D : Nat} (hD : 1 < D) (ctx : Context A)
     {fuel i : Nat} (hi : i < fuel) (idx : Nat) :
     monDenote D ctx fuel idx (D ^ i) = Var.denote ctx (idx + i) := by
   have hD0 : 0 < D := Nat.lt_trans Nat.zero_lt_one hD
@@ -226,7 +230,7 @@ private theorem monDenote_var {D : Nat} (hD : 1 < D) (ctx : Context A)
 
 variable (φ : C → A) (ctx : Context A)
 
-private theorem denote_append (D nv : Nat) (l₁ l₂ : KPoly C) :
+theorem denote_append (D nv : Nat) (l₁ l₂ : KPoly C) :
     denote φ ctx D nv (l₁ ++ l₂) = denote φ ctx D nv l₁ + denote φ ctx D nv l₂ := by
   induction l₁ with
   | nil =>
@@ -238,7 +242,7 @@ private theorem denote_append (D nv : Nat) (l₁ l₂ : KPoly C) :
     rw [ih]
     grind
 
-private theorem denote_mergeF (hφ : AlgPoly.IsRingHom φ) (D nv : Nat)
+theorem denote_mergeF (hφ : AlgPoly.IsRingHom φ) (D nv : Nat)
     (fuel : Nat) (l₁ l₂ : KPoly C) :
     denote φ ctx D nv (mergeF fuel l₁ l₂) =
       denote φ ctx D nv l₁ + denote φ ctx D nv l₂ := by
@@ -289,11 +293,11 @@ private theorem denote_mergeF (hφ : AlgPoly.IsRingHom φ) (D nv : Nat)
           rw [ih, hφ.map_add, ← hk]
           grind
 
-private theorem denote_addK (hφ : AlgPoly.IsRingHom φ) {D nv : Nat} (l₁ l₂ : KPoly C) :
+theorem denote_addK (hφ : AlgPoly.IsRingHom φ) {D nv : Nat} (l₁ l₂ : KPoly C) :
     denote φ ctx D nv (addK l₁ l₂) = denote φ ctx D nv l₁ + denote φ ctx D nv l₂ :=
   denote_mergeF φ ctx hφ D nv mergeFuel l₁ l₂
 
-private theorem denote_scaleK? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
+theorem denote_scaleK? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
     (nv : Nat) (t : Nat × C) (l : KPoly C) :
     ∀ r : KPoly C, scaleK? D nv t l = some r →
       denote φ ctx D nv r = φ t.2 * monDenote D ctx nv 0 t.1 * denote φ ctx D nv l := by
@@ -325,7 +329,7 @@ private theorem denote_scaleK? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom �
         rw [ih r' hs, hφ.map_mul, monDenote_mul hD ctx hg]
         grind
 
-private theorem denote_mulCore? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
+theorem denote_mulCore? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
     (nv : Nat) (l₁ l₂ : KPoly C) :
     ∀ r : KPoly C, mulCore? D nv l₁ l₂ = some r →
       denote φ ctx D nv r = denote φ ctx D nv l₁ * denote φ ctx D nv l₂ := by
@@ -353,7 +357,7 @@ private theorem denote_mulCore? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom 
           denote φ ctx D nv l₂
         grind
 
-private theorem denote_mulK? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
+theorem denote_mulK? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
     (nv : Nat) (l₁ l₂ : KPoly C) :
     ∀ r : KPoly C, mulK? D nv l₁ l₂ = some r →
       denote φ ctx D nv r = denote φ ctx D nv l₁ * denote φ ctx D nv l₂ := by
@@ -366,7 +370,7 @@ private theorem denote_mulK? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
     rw [denote_mulCore? φ ctx hD hφ nv l₂ l₁ r h]
     exact CommSemiring.mul_comm _ _
 
-private theorem denote_powK? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
+theorem denote_powK? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
     (nv : Nat) (l : KPoly C) (k : Nat) :
     ∀ r : KPoly C, powK? D nv l k = some r →
       denote φ ctx D nv r = denote φ ctx D nv l ^ k := by
@@ -388,7 +392,7 @@ private theorem denote_powK? {D : Nat} (hD : 0 < D) (hφ : AlgPoly.IsRingHom φ)
       rw [denote_mulK? φ ctx hD hφ nv l r' r h, ih r' hp, Semiring.pow_succ]
       exact CommSemiring.mul_comm _ _
 
-private theorem denote_negK (hφ : AlgPoly.IsRingHom φ) (D nv : Nat) (l : KPoly C) :
+theorem denote_negK (hφ : AlgPoly.IsRingHom φ) (D nv : Nat) (l : KPoly C) :
     denote φ ctx D nv (negK l) = -denote φ ctx D nv l := by
   induction l with
   | nil =>
@@ -400,7 +404,7 @@ private theorem denote_negK (hφ : AlgPoly.IsRingHom φ) (D nv : Nat) (l : KPoly
     rw [ih, hφ.map_neg]
     grind
 
-private theorem denote_canon (hφ : AlgPoly.IsRingHom φ) (D nv : Nat) (l : KPoly C) :
+theorem denote_canon (hφ : AlgPoly.IsRingHom φ) (D nv : Nat) (l : KPoly C) :
     denote φ ctx D nv (canon l) = denote φ ctx D nv l := by
   induction l with
   | nil => rfl
@@ -420,7 +424,7 @@ private theorem denote_canon (hφ : AlgPoly.IsRingHom φ) (D nv : Nat) (l : KPol
       rw [ih, h0, hφ.map_zero]
       grind
 
-private theorem beqK_sound : ∀ l₁ l₂ : KPoly C, beqK l₁ l₂ = true → l₁ = l₂
+theorem beqK_sound : ∀ l₁ l₂ : KPoly C, beqK l₁ l₂ = true → l₁ = l₂
   | [], [], _ => rfl
   | [], _ :: _, h => by simp [beqK] at h
   | _ :: _, [], h => by simp [beqK] at h
@@ -476,7 +480,7 @@ variable {A : Type v} [Lean.Grind.CommRing A]
 
 open Lean.Grind
 
-private theorem denote_toKPoly? (φ : C → A) (ctx : Context A)
+theorem denote_toKPoly? (φ : C → A) (ctx : Context A)
     (hφ : AlgPoly.IsRingHom φ) {D : Nat} (hD : 1 < D) (nv : Nat) (e : AlgExpr C) :
     ∀ r : KPoly C, e.toKPoly? D nv = some r →
       KPoly.denote φ ctx D nv r = e.denote φ ctx := by
@@ -624,7 +628,7 @@ variable {A : Type v} [Lean.Grind.CommRing A]
 
 open Lean.Grind
 
-private theorem denote_sumLinComb? (φ : C → A) (ctx : Context A)
+theorem denote_sumLinComb? (φ : C → A) (ctx : Context A)
     (hφ : AlgPoly.IsRingHom φ) {D : Nat} (hD : 1 < D) (nv : Nat)
     (pairs : List (KPoly C × AlgExpr C)) (hz : ZeroGens φ ctx pairs) :
     ∀ acc : KPoly C, sumLinComb? D nv pairs = some acc →
@@ -731,3 +735,5 @@ theorem eq_of_toKPoly_eq {C : Type u} {A : Type v}
 end AlgExpr
 
 end Macaulean
+
+end
