@@ -23,14 +23,14 @@ is inside GMP.  That is a liability, because Lean's Linux binaries shipped GMP
 in Lean v4.33.1): a reflective certificate whose truth is one big computation
 should not rest on GMP.
 
-(To be precise about the motivating example: on the explicit-unirational
-tower-B certificates the exact-integer coefficients happen to stay below about
-`2^40`, so that path does not actually reach GMP *there*.  But it does not say
-so — the bound is a fact about those particular polynomials, not something the
-proof term establishes — and the margin shrinks as certificates grow.)
+(To be precise about the motivating example: on the six explicit-unirational
+tower-B certificates the bound this module *certifies* is at most `2^50`, so
+the exact-integer path does not in fact reach GMP there.  But it does not say
+so — that is a fact about those particular polynomials, not something its proof
+term establishes — and the margin shrinks as certificates grow.)
 
-This module replaces the unbounded integer arithmetic by a **single-pass CRT**: the
-same normalization is run once with coefficients in `ModVec ms`, i.e. as a
+This module replaces the unbounded integer arithmetic by a **single-pass CRT**:
+the same normalization is run once with coefficients in `ModVec ms`, i.e. as a
 vector of residues modulo each `mᵢ ∈ ms`, with every `mᵢ` in `[2^30, 2^31)`.
 If all residues of every coefficient of `e₁ - e₂` vanish, then every `mᵢ`
 divides that coefficient, hence (pairwise coprimality) `∏ mᵢ` does; and an a
