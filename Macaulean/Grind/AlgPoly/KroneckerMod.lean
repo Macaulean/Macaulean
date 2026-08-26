@@ -19,8 +19,8 @@ kernel normalize both sides with **exact integer** coefficients.  Nothing in
 that certificate bounds the integers the kernel then computes with: they are
 whatever normalization produces, and the moment one exceeds `2^63` the kernel
 is inside GMP.  That is a liability, because Lean's Linux binaries shipped GMP
-6.1.2, whose `mpn_sec_powm` bug was exploitable for a proof of `False` (fixed
-in Lean v4.33.1): a reflective certificate whose truth is one big computation
+6.1.2, which has a known bug that was exploitable for a proof of `False`
+(fixed in Lean v4.33.1): a reflective certificate whose truth is one big computation
 should not rest on GMP.
 
 (To be precise about the motivating example: on the six explicit-unirational
