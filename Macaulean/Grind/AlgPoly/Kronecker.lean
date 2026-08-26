@@ -20,17 +20,24 @@ pre-built as `Expr`s), the cons-list route costs 0.5 s / 9.6 s / 64 s /
 252 s at 41 / 296 / 755 / 1350 monomials of expanded product.
 
 This module provides a second normal form for the same `AlgExpr` syntax
-that replaces those traversals with single GMP operations; on the same
-benchmarks the pipeline drops to 0.25 s / 2.7 s / 15 s / 37 s — a 2–7×
-speedup that grows with size.
+that replaces those traversals with single kernel steps on `Nat` literals; on
+the same benchmarks the pipeline drops to 0.25 s / 2.7 s / 15 s / 37 s — a
+2–7× speedup that grows with size.
 Monomials are packed into a single `Nat` key by Kronecker substitution
 
     x₀^e₀ * x₁^e₁ * ⋯ * xₙ^eₙ  ↦  e₀ + e₁·D + e₂·D² + ⋯ + eₙ·Dⁿ
 
 for a base `D` larger than any exponent that can occur.  Key comparison and
-monomial multiplication (`k₁ + k₂`) are then single GMP operations in the
-kernel, which is what makes kernel-side normalization feasible at the
-1000-monomial scale.
+monomial multiplication (`k₁ + k₂`) then become single kernel steps on `Nat`
+literals, replacing the O(nv) structural recursion that a cons-list `Mon`
+needs for each comparison and each product; that is what makes kernel-side
+normalization feasible at the 1000-monomial scale.
+
+No GMP is involved: callers are expected to keep `D ^ nv < 2^62` (the tactic
+checks this), so every key is a boxed scalar and every key operation
+(`Nat.blt`, `+`, `%`, `/` in `mulKeyOk`) runs on the inline scalar path of
+`lean.h`.  The packing therefore adds no trust beyond the scalar `Nat`
+arithmetic that the coefficients already use.
 
 Two parameters are chosen by the caller (in practice: the tactic):
 
@@ -134,12 +141,26 @@ def powK? (D nv : Nat) (l : KPoly C) : Nat → Option (KPoly C)
 def negK (l : KPoly C) : KPoly C :=
   l.map fun t => (t.1, -t.2)
 
+/-- `D ^ i` as a multiplication loop.  `Nat.pow` is an out-of-line,
+GMP-backed primitive; this definition uses only `Nat.mul`, which has an inline
+scalar fast path, so a kernel evaluation of `toKPoly?` never leaves that path
+(callers keep `D ^ nv < 2^62`). -/
+def powNat (D : Nat) : Nat → Nat
+  | 0 => 1
+  | i + 1 => D * powNat D i
+
+theorem powNat_eq (D : Nat) : ∀ i, powNat D i = D ^ i
+  | 0 => (Nat.pow_zero D).symm
+  | i + 1 => by
+    show D * powNat D i = D ^ (i + 1)
+    rw [powNat_eq D i, Nat.pow_succ, Nat.mul_comm]
+
 /-- Strip zero coefficients (cancellation leaves them behind). -/
 def canon : KPoly C → KPoly C
   | [] => []
   | t :: l => bif t.2 == 0 then canon l else t :: canon l
 
-/-- Structural equality; keys compare with GMP-backed `Nat.beq`. -/
+/-- Structural equality; keys compare with `Nat.beq` (scalar fast path). -/
 def beqK : KPoly C → KPoly C → Bool
   | [], [] => true
   | t₁ :: l₁, t₂ :: l₂ => t₁.1.beq t₂.1 && t₁.2 == t₂.2 && beqK l₁ l₂
@@ -454,7 +475,7 @@ open KPoly
 overflow a digit — the guards that make the packing sound-by-construction. -/
 def toKPoly? (D nv : Nat) : AlgExpr C → Option (KPoly C)
   | .coeff k => some [(0, k)]
-  | .var i => bif i.blt nv then some [(D ^ i, 1)] else none
+  | .var i => bif i.blt nv then some [(KPoly.powNat D i, 1)] else none
   | .add a b =>
     match a.toKPoly? D nv, b.toKPoly? D nv with
     | some ra, some rb => some (addK ra rb)
@@ -503,8 +524,8 @@ theorem denote_toKPoly? (φ : C → A) (ctx : Context A)
       simp only [cond_true, Option.some.injEq] at h
       subst h
       have hi : i < nv := Nat.blt_eq.mp hb
-      show φ 1 * KPoly.monDenote D ctx nv 0 (D ^ i) + 0 = Var.denote ctx i
-      rw [hφ.map_one, KPoly.monDenote_var hD ctx hi 0, Nat.zero_add]
+      show φ 1 * KPoly.monDenote D ctx nv 0 (KPoly.powNat D i) + 0 = Var.denote ctx i
+      rw [KPoly.powNat_eq, hφ.map_one, KPoly.monDenote_var hD ctx hi 0, Nat.zero_add]
       grind
   | add a b iha ihb =>
     intro r h
