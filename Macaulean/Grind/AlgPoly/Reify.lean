@@ -132,29 +132,56 @@ structure State where
 
 abbrev ReifyM := StateT State MetaM
 
+/-- Find an already-registered atom that is *definitionally* equal to `e`.
+
+Syntactic equality is not enough.  The same mathematical atom routinely reaches
+the reifier in several syntactic forms: `MvPolynomial.X (0 : Fin 3)` elaborated
+in two different files can carry two different `NeZero` proofs inside
+`Fin.instOfNat`, and instance paths differ between hand-written source and
+`Expr`-level definition builders.  Splitting one atom into several variables
+does not make the tactic unsound — the normal forms simply differ and the
+certificate check fails — but it makes it *fail*, and the failure then falls
+through to the expensive `simp`/`grind` fallbacks.  A defeq scan over the (very
+few) registered atoms costs nothing and keeps the atom set minimal. -/
+def findDefEqAtom (atoms : Array Expr) (e : Expr) : MetaM (Option Nat) := do
+  for h : i in [0 : atoms.size] do
+    if ← isDefEq atoms[i] e then
+      return some i
+  return none
+
 def mkCoeffVar (e : Expr) : ReifyM Nat := do
   let s ← get
   match s.coeffVarMap[e]? with
   | some idx => pure idx
   | none =>
-    let idx := s.coeffVars.size
-    modify fun s => { s with
-      coeffVars := s.coeffVars.push e
-      coeffVarMap := s.coeffVarMap.insert e idx
-    }
-    pure idx
+    match ← liftM (findDefEqAtom s.coeffVars e) with
+    | some idx =>
+      modify fun s => { s with coeffVarMap := s.coeffVarMap.insert e idx }
+      pure idx
+    | none =>
+      let idx := s.coeffVars.size
+      modify fun s => { s with
+        coeffVars := s.coeffVars.push e
+        coeffVarMap := s.coeffVarMap.insert e idx
+      }
+      pure idx
 
 def mkAmbientVar (e : Expr) : ReifyM Nat := do
   let s ← get
   match s.ambientVarMap[e]? with
   | some idx => pure idx
   | none =>
-    let idx := s.ambientVars.size
-    modify fun s => { s with
-      ambientVars := s.ambientVars.push e
-      ambientVarMap := s.ambientVarMap.insert e idx
-    }
-    pure idx
+    match ← liftM (findDefEqAtom s.ambientVars e) with
+    | some idx =>
+      modify fun s => { s with ambientVarMap := s.ambientVarMap.insert e idx }
+      pure idx
+    | none =>
+      let idx := s.ambientVars.size
+      modify fun s => { s with
+        ambientVars := s.ambientVars.push e
+        ambientVarMap := s.ambientVarMap.insert e idx
+      }
+      pure idx
 
 def mkCoeffVarExpr (idx : Nat) : Expr :=
   mkCoeffExprCtor ``Lean.Grind.CommRing.Expr.var #[mkRawNatLit idx]
