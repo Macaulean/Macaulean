@@ -47,9 +47,8 @@ private theorem RArray_get_ofArray (h : i < arr.size) : (RArray.ofArray arr len_
   rw [RArray.ofArray, RArray.get_ofFn]
   simp
 
-example {x y : Rat} (f : 1/2*x + 1/2*y = 0) (g : 1/2*x + 1/2*y = 0) : (x + y)^2 = 0 := by
+example {x y : Rat} (f : 1/2*x + 1/2*y = 0) : (x + y)^2 = 0 := by
   m2idealmem +grind [f]
-
 
 example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
   m2idealmem +grind [f,g]
@@ -108,5 +107,4 @@ instance : Std.Commutative (α := R) (.+.) := ⟨Semiring.add_comm⟩
 example {x y z : Rat} (f : 2*x = 0) (g : y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
   m2idealmem -grind [f, g, h]
   clear f g h
-  simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray]
   grind
