@@ -98,10 +98,10 @@ info: {"data":
 
 /--
 info: {"data":
- [[["2", "1"], [2, 0, 4]],
-  [["1", "1"], [1, 1, 5]],
-  [["2", "1"], [2, 1, 2]],
-  [["1", "1"], [1, 2, 3]]],
+ [[["2", "1"], ["2", "0", "4"]],
+  [["1", "1"], ["1", "1", "5"]],
+  [["2", "1"], ["2", "1", "2"]],
+  [["1", "1"], ["1", "2", "3"]]],
  "_type": {"params": "Rat", "name": "Polynomial"},
  "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.29.1"]}}
 -/
@@ -132,10 +132,12 @@ example : (Macaulean.Polynomial.mk [
   decide +kernel
 
 /--
-info: { terms := [{ coefficient := 2, monomial := { powers := [1, 0, 1, 0], powers_length := _ } },
-            { coefficient := 2, monomial := { powers := [0, 1, 1, 0], powers_length := _ } },
-            { coefficient := 1, monomial := { powers := [1, 0, 0, 1], powers_length := _ } },
-            { coefficient := 1, monomial := { powers := [0, 1, 0, 1], powers_length := _ } }] }
+ info: {
+  terms :=
+    [{ coefficient := 2, monomial := { powers := [1, 0, 1, 0], powers_length := ⋯ } },
+      { coefficient := 2, monomial := { powers := [0, 1, 1, 0], powers_length := ⋯ } },
+      { coefficient := 1, monomial := { powers := [1, 0, 0, 1], powers_length := ⋯ } },
+      { coefficient := 1, monomial := { powers := [0, 1, 0, 1], powers_length := ⋯ } }] }
 -/
 #guard_msgs in
 #eval ((Macaulean.Polynomial.mk (n := 4) [
@@ -146,12 +148,14 @@ info: { terms := [{ coefficient := 2, monomial := { powers := [1, 0, 1, 0], powe
       ⟨(1/2 : Rat), Macaulean.Mon.ofPowers [0,0,0,1]⟩]))
 
 /--
-info: { terms := [{ coefficient := 2, monomial := { powers := [2, 0, 0, 0], powers_length := _ } },
-            { coefficient := 2, monomial := { powers := [1, 1, 0, 0], powers_length := _ } },
-            { coefficient := 3, monomial := { powers := [1, 0, 1, 0], powers_length := _ } },
-            { coefficient := 3, monomial := { powers := [0, 1, 1, 0], powers_length := _ } },
-            { coefficient := 1, monomial := { powers := [1, 0, 0, 1], powers_length := _ } },
-            { coefficient := 1, monomial := { powers := [0, 1, 0, 1], powers_length := _ } }] }
+info: {
+  terms :=
+    [{ coefficient := 2, monomial := { powers := [2, 0, 0, 0], powers_length := ⋯ } },
+      { coefficient := 2, monomial := { powers := [1, 1, 0, 0], powers_length := ⋯ } },
+      { coefficient := 3, monomial := { powers := [1, 0, 1, 0], powers_length := ⋯ } },
+      { coefficient := 3, monomial := { powers := [0, 1, 1, 0], powers_length := ⋯ } },
+      { coefficient := 1, monomial := { powers := [1, 0, 0, 1], powers_length := ⋯ } },
+      { coefficient := 1, monomial := { powers := [0, 1, 0, 1], powers_length := ⋯ } }] }
 -/
 #guard_msgs in
 #eval (((Macaulean.Polynomial.mk (n := 4) [
