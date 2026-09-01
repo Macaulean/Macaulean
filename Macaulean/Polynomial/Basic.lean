@@ -196,7 +196,7 @@ instance : @Trans (Mon n) _ _ Grevlex Grevlex Grevlex := by
   intro a b c hab hbc
   simp [Grevlex] at *
   cases hab
-  case trans.inl h1 =>
+  case inl h1 =>
     cases hbc
     case inl h2 =>
       left
@@ -205,7 +205,7 @@ instance : @Trans (Mon n) _ _ Grevlex Grevlex Grevlex := by
       left
       simp [h2.1] at h1
       trivial
-  case trans.inr h1 =>
+  case inr h1 =>
     simp [h1.1] at ⊢ hbc
     cases hbc
     case inl =>
