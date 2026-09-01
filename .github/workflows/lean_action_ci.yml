@@ -13,4 +13,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y curl
       - uses: leanprover/lean-action@v1
