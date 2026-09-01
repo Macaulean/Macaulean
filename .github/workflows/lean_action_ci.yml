@@ -8,11 +8,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/macaulay2/testbot
 
     steps:
-      - run: |
-          sudo add-apt-repository ppa:macaulay2/macaulay2
-          sudo apt update
-          sudo apt-get install macaulay2
       - uses: actions/checkout@v7
       - uses: leanprover/lean-action@v1
