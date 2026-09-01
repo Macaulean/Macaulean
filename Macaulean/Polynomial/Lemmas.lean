@@ -201,6 +201,7 @@ theorem denote_unit (ctx : Context R) : unit.denote (n := n) ctx = 1 := by
   case zero => trivial
   case succ ih => simp [List.replicate_succ', Semiring.pow_zero, ih]
 
+set_option backward.isDefEq.respectTransparency false in
 theorem denote_fromVarPower (ctx : Context R) (i : Fin n) (k : Nat)
   : denote ctx (.fromVarPower i k) = (ctx[i])^k := by
   unfold denote fromVarPower

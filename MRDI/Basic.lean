@@ -194,12 +194,14 @@ instance : FromJson Mrdi where
       let dataPart ← fromJson? json
       let refs : Std.TreeMap String MrdiData ←
         fromJson? <| entries.getD "_refs" (.obj .empty)
-      let parsedRefs : Std.TreeMap Uuid MrdiData  ←
-        .ofArray (cmp := Ord.compare) <$>
-        refs.toArray.mapM (fun (k,v) =>
+      let convertUuid : String × MrdiData → Except String (Uuid × MrdiData) :=
+        fun ((k : String), (v : MrdiData)) =>
           match toUuid? k with
             | .some u => .ok (u,v)
-            | .none => .error "Invalid UUID")
+            | .none => .error "Invalid UUID"
+      let parsedRefs : Std.TreeMap Uuid MrdiData  ←
+        .ofArray (cmp := Ord.compare) <$>
+        refs.toArray.mapM convertUuid
       pure {
         toMrdiData := dataPart
         refs := parsedRefs

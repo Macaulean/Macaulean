@@ -58,7 +58,7 @@ def test : Poly :=
 /--
 info: {"data": [["3", []], ["5", [["2", "3"]]], ["0", []]],
  "_type": "Lean.Grind.CommRing.Poly",
- "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.29.1"]}}
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.33.1"]}}
 -/
 #guard_msgs in
 #eval (Lean.toJson <$> toMrdi (m := Id) test).run' .empty
@@ -88,7 +88,7 @@ info: {"data":
     ["1", [["0", "1"], ["1", "2"]]],
     ["1", []]],
    "_type": "Lean.Grind.CommRing.Poly"}},
- "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.29.1"]}}
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.33.1"]}}
 -/
 #guard_msgs in
 #eval (do
@@ -103,7 +103,7 @@ info: {"data":
   [["2", "1"], ["2", "1", "2"]],
   [["1", "1"], ["1", "2", "3"]]],
  "_type": {"params": "Rat", "name": "Polynomial"},
- "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.29.1"]}}
+ "_ns": {"Lean": ["https://github.com/leanprover/lean4", "4.33.1"]}}
 -/
 #guard_msgs in
 #eval runMrdiIO (m := IO) <| do
