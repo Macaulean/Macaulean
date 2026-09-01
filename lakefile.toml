@@ -1,6 +1,7 @@
 name = "Macaulean"
 version = "0.1.0"
 defaultTargets = ["macaulean"]
+testDriver = "MacauleanTest"
 
 [[lean_lib]]
 name = "Macaulean"
