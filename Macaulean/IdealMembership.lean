@@ -2,6 +2,7 @@ import Lean
 import MRDI.Basic
 import MRDI.Poly
 import Macaulean.Macaulay2
+import Macaulean.Polynomial
 open Lean Grind Elab Parser Tactic Meta
 
 structure VariableState where
@@ -117,25 +118,6 @@ structure ExprPoly where
   coefficients : Std.TreeMap Nat Expr
   deriving Inhabited, Repr
 
-unsafe def serializePoly [Macaulay2Ring R] (p : ExprPoly)
-  : MrdiT MetaM (Option Mrdi) := OptionT.run do
-  let convertedCoefficients : List (Nat × R) ←
-    p.coefficients.toList.mapM (fun (i,x) => do
-      let x' ← OptionT.mk <| Macaulay2Ring.fromLitExpr? x
-      pure (i, x'))
-  let concretePoly : ConcretePoly R := {
-    poly := p.poly
-    coefficients :=  Std.TreeMap.ofList convertedCoefficients }
-  OptionT.lift <| toMrdi concretePoly
-
-unsafe def deserializePoly [ToExpr R] [Macaulay2Ring R] (polyMrdi : Mrdi)
-  : MrdiT MetaM (Except String ExprPoly) := ExceptT.run do
-  let poly : ConcretePoly R ← fromMrdi? polyMrdi
-  let exprCoefficients  := poly.coefficients.map (fun _ x => toExpr x)
-  pure {
-    poly := poly.poly
-    coefficients := exprCoefficients
-  }
 
 --inspired by Grind.Arith.CommRing.reify?
 partial def toCommRingExpr?
@@ -169,6 +151,29 @@ partial def toCommRingExpr?
       let varName ← modifyGet (
         fun varState => varState.mapCoefficient x)
       pure <| .var varName
+
+partial def toPolynomialExpr?
+  (variables : FVarIdMap Nat) (ring : Expr) (x : Lean.Expr) : MetaM Lean.Expr := do
+  match_expr x with
+  | HAdd.hAdd _ _ _ _ a b =>
+    mkAdd (← toPolynomialExpr? variables ring a) (← toPolynomialExpr? variables ring b)
+  | HSub.hSub _ _ _ _ a b =>
+    mkSub (← toPolynomialExpr? variables ring a) (← toPolynomialExpr? variables ring b)
+  | HMul.hMul _ _ _ _ a b =>
+    mkMul (← toPolynomialExpr? variables ring a) (← toPolynomialExpr? variables ring b)
+  | HPow.hPow _ _ _ _ a b =>
+    mkAppM ``HPow.hPow #[(← toPolynomialExpr? variables ring a), b]
+  | _ =>
+    match x with
+    | .fvar varId =>
+      let .some varName := variables.get? varId | throwError "Unexected variable"
+      mkAppOptM ``Macaulean.Polynomial.ofVar #[
+        ring, none, none,
+        ← mkAppOptM ``Fin.ofNat #[toExpr variables.size, none, toExpr varName]]
+    | _ =>
+      -- TODO in this case we should check that x doesn't contain any variables
+      -- and we should check that the expression is a "constant", whatever that means
+      mkAppOptM ``Macaulean.Polynomial.ofConst #[ring, toExpr variables.size, x]
 
 def toExprPoly (p : CommRing.Poly) : StateT VariableState MetaM (ExprPoly) := do
   let state ← get
@@ -263,6 +268,32 @@ end Macaulean.IdealMembership
 
 open Macaulean
 
+unsafe def serializePoly [Macaulay2Ring R] (p : Macaulean.Polynomial R n)
+  : MrdiT MetaM (Option Mrdi) := do
+  .some <$> toMrdi p
+
+unsafe def deserializePoly (n : Nat) [ToExpr R] [Macaulay2Ring R] (polyMrdi : Mrdi)
+  : MrdiT MetaM (Except String Lean.Expr) := ExceptT.run do
+  let poly : Polynomial R n ← fromMrdi? polyMrdi
+  pure <| toExpr poly
+
+abbrev SeralizationPair := (Expr → MrdiT MetaM (Option Mrdi)) × (Mrdi → MrdiT MetaM (Except String Lean.Expr))
+
+unsafe def makePolynomialSerializationPair (ring : Expr) (n : Nat) : MetaM SeralizationPair := do
+  let doDeserializationExpr ← liftM <| mkAppOptM ``deserializePoly #[ring, toExpr n, none, none]
+  let deserializationExprType ← liftM <| inferType doDeserializationExpr
+  let doDeserialization ← liftM <|
+    evalExpr (Mrdi → MrdiT MetaM (Except String Lean.Expr)) deserializationExprType doDeserializationExpr DefinitionSafety.unsafe
+  pure (
+    fun e => do
+      let doSerializationExpr ← liftM <| mkAppOptM ``serializePoly #[ring, none, none, e]
+      let exprType ← liftM <| inferType doSerializationExpr
+      let doSerialization ← liftM <| evalExpr (MrdiT MetaM (Option Mrdi)) exprType doSerializationExpr DefinitionSafety.unsafe
+      doSerialization
+    ,
+    doDeserialization
+  )
+
 /--
 This function implements the core of the tactic, serializing and deserializing
 the polynomials to Macaulay2. `ring` should be an expression for the ring
@@ -273,61 +304,32 @@ coefficients such that the product with the generators in idealExprs gives polyE
 unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
   : MetaM (List Expr × Expr) := do
   dbg_trace "M2IdealMem Start"
-  --parse a expression into a polynomial, checking that the ring matches using isDefEq
-  let getPoly (expectedRing : Expr) (pExpr : Expr) : StateT VariableState MetaM ExprPoly := do
-    let some poly ← toCommRingExpr? pExpr
-      | throwTacticEx `m2idealmem goal "Expected polynomials over the same base ring"
-    toExprPoly poly.toPoly
-  let getPolys := do
-    let some poly ← toCommRingExpr? polyExpr
-      | throwTacticEx `m2idealmem goal "Expected a polynomial equality"
-    let exprPoly ← toExprPoly poly.toPoly
-    let genPolys ← idealExprs.mapM (getPoly ring)
-    pure <| some (genPolys, exprPoly)
-  let (some (idealGens, poly), vars) ← getPolys.run .empty | throwTacticEx `m2idealmem goal "Expected a polynomial expression"
-  let varTable := List.map (fun (v, fvarId) => (v, Expr.fvar fvarId)) <|
-    vars.varTable.toList.map Prod.swap
 
-  -- try to build the serializer and deserializer pair, if it fails
-  -- try to universalize to ZZ
-  let intExpr := mkConst ``Int
-  let (serializerExpr,universal) ←
-    try
-      let expr ← mkAppOptM ``serializePoly #[ring, none]
-      pure (expr, false)
-    catch _ =>
-      let funcExpr ← mkAppOptM ``serializePoly #[intExpr, none]
-      pure (funcExpr,true)
-  let serializationRing := if universal then intExpr else ring
-  let castInstance ← mkAppOptM ``Ring.intCast #[ring,none]
-  let incExpr ←
-    if universal
-    then mkAppOptM ``IntCast.intCast #[ring,castInstance]
-    else mkAppOptM ``id #[ring]
-  let serializerType ← inferType serializerExpr
-  let serializer ← evalExpr (ExprPoly → MrdiT MetaM (Option Mrdi)) serializerType serializerExpr DefinitionSafety.unsafe
+  --TODO reimplement universalization in a more systematic way
 
-  let deserializerExpr ← mkAppOptM ``deserializePoly #[serializationRing, none, none]
-  let deserializerType ← inferType deserializerExpr
-  let deserializer ← evalExpr (Mrdi → MrdiT MetaM (Except String ExprPoly)) deserializerType deserializerExpr DefinitionSafety.unsafe
+  let (_,varsInfo) ← (
+    do
+      polyExpr.collectFVars
+      _ ← idealExprs.mapM (Expr.collectFVars)
+    ).run Inhabited.default
+  let fvarsSorted := varsInfo.fvarSet.toList -- .mergeSort (le := fun a b => a.name.toString ≥ b.name.toString)
+  let vars : FVarIdMap Nat := .ofArray (cmp := _) <| fvarsSorted.toArray.mapIdx (fun a b => (b,a))
+  let polyExprPoly ← toPolynomialExpr? vars ring polyExpr
+  let idealExprsPolys ← idealExprs.mapM (toPolynomialExpr? vars ring)
+  let varContextExpr ← mkAppM ``RArray.ofArray
+    #[← mkArrayLit ring <| Array.toList <| varsInfo.fvarSet.toArray.map .fvar,
+      ← mkAppM ``Nat.succ_pos #[toExpr (varsInfo.fvarSet.size - 1)]]
 
-  let liftedDeserializer (m : Mrdi) : MrdiT MetaM (Except String ExprPoly) := do
-    match ← deserializer m with
-    | .ok poly =>
-      let liftedCoefficients := poly.coefficients.map (fun _ x => mkApp incExpr x)
-      pure <| .ok {
-        poly := poly.poly
-        coefficients := liftedCoefficients
-      }
-    | e => pure e
+  let (serializer,deserializer) ← makePolynomialSerializationPair ring vars.size
+
   let s ← IO.rand 0 (2^64-1)
   --I should be able to use the runMrdiIO variant
   -- but I can't get it to infer the right MonadLift instance
   runMrdiWithSeed s do
     --serialize the polynomials
-    let some serializedPoly ← serializer poly
+    let some serializedPoly ← serializer polyExprPoly
       | throwTacticEx `m2idealmem goal "Unable to serialize polynomial"
-    let serializedGens : Array (Option Mrdi) ← (idealGens.mapM serializer)
+    let serializedGens : Array (Option Mrdi) ← (idealExprsPolys.mapM serializer)
     let some serializedGens := serializedGens.mapM id
       | throwTacticEx `m2idealmem goal "Unable to serialize ideal generators"
     --run Macaulay2
@@ -337,13 +339,14 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
     dbg_trace "Coefficients Returned"
     --deserialize the result
     let deserializedCoefficients ← ExceptT.run do
-      let coefficients ← result.quotient.mapM liftedDeserializer
-      coefficients.mapM (liftM ∘ exprFromPoly ring (.ofList varTable))
+      result.quotient.mapM deserializer
     let deserializedRemainder ← ExceptT.run do
-      let remainder ← liftedDeserializer result.remainder
-      exprFromPoly ring (.ofList varTable) remainder
+      deserializer result.remainder
     match deserializedCoefficients, deserializedRemainder with
-    | .ok c, .ok r  => pure (c, r)
+    | .ok c, .ok r  => pure (
+      ← c.mapM fun x =>
+          mkAppM ``Macaulean.Polynomial.denote #[varContextExpr, x],
+      ← mkAppM ``Macaulean.Polynomial.denote #[varContextExpr, r])
     | .error e, _ => throwTacticEx `m2idealmem goal e
     | _, .error e => throwTacticEx `m2idealmem goal e
 
@@ -352,8 +355,22 @@ theorem helper [CommRing R] (a b c d : R) (h1 : a = d) (h2 : b = 0) : a+c*b = d 
   rewrite [h1,h2]
   simp [Semiring.mul_zero,Semiring.add_zero]
 
+--this theorem really should be proven elsewhere
+private theorem RArray_get_ofArray (h : i < arr.size) : (RArray.ofArray arr len_hyp).get i = arr[i] := by
+  have irw : i = ↑(Fin.mk i h) := by simp
+  conv =>
+    left
+    right
+    rw [irw]
+  rw [RArray.ofArray, RArray.get_ofFn]
+  simp
+
+--as should this one
+private theorem Semiring_zero_add [Semiring R] (a : R) : 0 + a = a := by grind
+
+set_option stderrAsMessages false
+
 -- factor out the core tactic to make the code a bit simpler
--- this only reduces down the the polynomial equality step
 unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name) (goal : MVarId) (target : Expr) (genHyps : Array Expr) : TacticM Unit := do
   let genProps ←  genHyps.mapM (fun genH => inferType genH)
   let some (targetRing,targetLhs,targetRhs) := target.eq? |
@@ -383,10 +400,14 @@ unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name
   then
     dbg_trace "New Goal Created"
     pushGoals [eqGoalMVar.mvarId!]
+    let (newGoals,_) ←
+      runTactic (← getMainGoal) (← `(tactic|simp (maxSteps:=100000) [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+    setGoals newGoals
   else
     tacticError "Failed to show vanishing"
   where
     tacticError {α} (x := none) : TacticM α := throwTacticEx tacName goal x
+
 
 /--
   This expects goal to be a proposition of the type `g = h` over some ring
@@ -404,7 +425,7 @@ unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Nam
     if (← isDefEq targetRing ring) && (← isDefEq rhs zeroExpr)
     then pure <| lhs
     else tacticError "Expected equalities to zero over the same ring")
-  let (coeffs,_) ← m2QuotientRemainderImpl goal targetRing genPolys targetLhs
+  let (coeffs,remainder) ← m2QuotientRemainderImpl goal targetRing genPolys targetLhs
   dbg_trace "Coefficients Read"
   let startingExpr ← mkEqRefl targetRhs
   let remainderProof ← (coeffs.zip genHyps.toList).foldlM
@@ -414,11 +435,19 @@ unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Nam
   let remainderProofType ← inferType remainderProof
   let some (_,expectedTarget,_) := remainderProofType.eq?
     | tacticError "Impossible"
-  let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs expectedTarget)
+  let eqGoalMVar ← mkFreshExprMVar (← mkEq targetLhs (← mkAdd expectedTarget remainder))
+  let remainderZeroGoal ← mkFreshExprMVar (← mkEq remainder zeroExpr)
   if ← goal.checkedAssign (← mkEqTrans eqGoalMVar remainderProof)
   then
     dbg_trace "New Goal Created"
     pushGoals [eqGoalMVar.mvarId!]
+    let (newGoals,_) ←
+      runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+    setGoals newGoals
+    pushGoals [remainderZeroGoal.mvarId!]
+    let (newGoals2,_) ←
+      runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+    pushGoals newGoals2
   else
     tacticError "Failed to show remainder"
   where
