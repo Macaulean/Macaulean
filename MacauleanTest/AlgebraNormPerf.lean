@@ -27,6 +27,29 @@ measures exactly what the tactic pipeline costs: reify + bridges + native
 check + kernel `decide` (reported as "tactic"), and the final kernel
 typecheck of the produced proof at `addDecl` (reported as "kernel").
 
+Measured on an M2 (Lean 4.33.1, `set_option Elab.async false`), where
+"tactic" is reify + kernel certificate + bridges and "kernel" is the final
+`addDecl` typecheck of the assembled proof:
+
+| identity          | monomials | tactic ms | kernel ms | peak RSS |
+|-------------------|-----------|-----------|-----------|----------|
+| perf_hess_sq      |        41 |       271 |        12 |          |
+| perf_redH2_sq     |       296 |      6768 |        63 |          |
+| perf_redH3_sq     |       755 |     38513 |       160 |          |
+| perf_theta3_step  |      1350 |    114446 |       341 |  34.5 GB |
+
+Essentially all of "tactic" is the `decide +kernel` certificate (114017 of
+114446 ms on the largest one); the two denotation bridges cost 398 ms there,
+because they are `Eq.refl` handed to the *kernel* via `mkAuxLemma` rather
+than proved by `Meta.isDefEq`.
+
+The kernel cost is dominated by `Mon.grevlex`: on a synthetic 100x100-term
+product (1015 monomials of output) the same pipeline takes 15.0 s with
+`Mon.grevlex`, 11.3 s with a fused list-free reimplementation of it, and
+4.0 s with a single packed-`Nat` monomial key -- against 2.3 s for a
+Kronecker-packed `List (Nat x Int)` representation.  Comparing three-element
+exponent lists, rather than one machine word, is the whole gap.
+
 This file is not part of the `MacauleanTest` root (same convention as the
 other speed-test files); run it directly:
 
