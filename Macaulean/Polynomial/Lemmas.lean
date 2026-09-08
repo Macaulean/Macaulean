@@ -485,20 +485,93 @@ theorem insertTerm_cons_grevlex_rev (x y : PolyTerm R n) (ys : List (PolyTerm R 
   simp [Mon.grevlex_iff_grevlex_gt, ← Ordering.swap_eq_lt, Mon.grevlex_swap] at h
   simp [insertTerm, h]
 
-/-! ## Simp Lemmas for mergeTerms -/
+/-! ## Simp Lemmas for mergeTerms
+
+`mergeTerms` is `mergeTermsF` at a large constant fuel, and `mergeTermsF` is
+structurally recursive so the kernel can evaluate it.  Since the fuel-0 case
+falls back on `mergeTermsSpec`, the two agree at *every* fuel, so none of the
+lemmas below carries a fuel side condition.
+-/
+
+theorem mergeTermsSpec_nil_right (xs : List (PolyTerm R n)) :
+    mergeTermsSpec xs [] = xs := by
+  cases xs
+  case nil => simp [mergeTermsSpec]
+  case cons head tail => simp [mergeTermsSpec, mergeTermsSpec.takeTillGE]
+
+/-- The three-way defining equation of the reference merge. -/
+theorem mergeTermsSpec_cons_cons (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) :
+    mergeTermsSpec (x :: xs) (y :: ys) =
+      match x.monomial.grevlex y.monomial with
+      | .gt => x :: mergeTermsSpec xs (y :: ys)
+      | .eq => ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTermsSpec xs ys
+      | .lt => y :: mergeTermsSpec (x :: xs) ys := by
+  cases h : x.monomial.grevlex y.monomial <;>
+    simp only [h, mergeTermsSpec, mergeTermsSpec.takeTillGE]
+
+theorem mergeTermsF_cons_cons (f : Nat) (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) :
+    mergeTermsF (f + 1) (x :: xs) (y :: ys) =
+      match x.monomial.grevlex y.monomial with
+      | .gt => x :: mergeTermsF f xs (y :: ys)
+      | .eq => ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTermsF f xs ys
+      | .lt => y :: mergeTermsF f (x :: xs) ys := rfl
+
+/-- Fuel is irrelevant: at every amount, `mergeTermsF` computes the reference
+merge. -/
+theorem mergeTermsF_eq_spec (f : Nat) :
+    ∀ xs ys : List (PolyTerm R n), mergeTermsF f xs ys = mergeTermsSpec xs ys := by
+  induction f with
+  | zero => intro xs ys; rfl
+  | succ f ih =>
+    intro xs ys
+    match xs, ys with
+    | [], ys => simp [mergeTermsF, mergeTermsSpec]
+    | x :: xs, [] =>
+      rw [show mergeTermsF (f + 1) (x :: xs) [] = x :: xs from rfl,
+        mergeTermsSpec_nil_right]
+    | x :: xs, y :: ys =>
+      rw [mergeTermsF_cons_cons, ih xs (y :: ys), ih xs ys, ih (x :: xs) ys,
+        mergeTermsSpec_cons_cons]
+
+theorem mergeTerms_eq_spec (xs ys : List (PolyTerm R n)) :
+    mergeTerms xs ys = mergeTermsSpec xs ys := mergeTermsF_eq_spec _ xs ys
+
 @[simp]
 theorem mergeTerms_nil_left (xs : List (PolyTerm R n)) :
-    mergeTerms [] xs = xs := by simp [mergeTerms]
+    mergeTerms [] xs = xs := by simp [mergeTerms_eq_spec, mergeTermsSpec]
 
 @[simp]
 theorem mergeTerms_nil_right (xs : List (PolyTerm R n)) :
     mergeTerms xs [] = xs := by
-  cases xs
-  case nil =>
-    simp
-  case cons head tail =>
-    unfold mergeTerms mergeTerms.takeTillGE
-    simp
+  rw [mergeTerms_eq_spec, mergeTermsSpec_nil_right]
+
+/-- The three-way defining equation of the merge, stated for `mergeTerms`. -/
+theorem mergeTerms_cons_cons (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) :
+    mergeTerms (x :: xs) (y :: ys) =
+      match x.monomial.grevlex y.monomial with
+      | .gt => x :: mergeTerms xs (y :: ys)
+      | .eq => ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTerms xs ys
+      | .lt => y :: mergeTerms (x :: xs) ys := by
+  simp only [mergeTerms_eq_spec]
+  exact mergeTermsSpec_cons_cons x y xs ys
+
+@[simp]
+theorem mergeTerms_cons_cons_grevlex (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) (h : x.monomial.Grevlex y.monomial) :
+    mergeTerms (x :: xs) (y :: ys) = x :: mergeTerms xs (y :: ys) := by
+  simp [Mon.grevlex_iff_grevlex_gt] at h
+  rw [mergeTerms_cons_cons, h]
+
+@[simp]
+theorem mergeTerms_cons_cons_rev_grevlex (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) (h : y.monomial.Grevlex x.monomial) :
+    mergeTerms (x :: xs) (y :: ys) = y :: mergeTerms (x :: xs) ys := by
+  simp [Mon.grevlex_iff_grevlex_gt, ← Mon.grevlex_flip] at h
+  rw [mergeTerms_cons_cons, h]
+
+@[simp]
+theorem mergeTerms_cons_cons_eq (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) (h : y.monomial = x.monomial) :
+    mergeTerms (x :: xs) (y :: ys) = ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTerms xs ys := by
+  have h' : x.monomial.grevlex y.monomial = .eq := by simp [h]
+  rw [mergeTerms_cons_cons, h']
 
 theorem mergeTerms_symm (xs ys : List (PolyTerm R n)) : mergeTerms xs ys = mergeTerms ys xs := by
   induction xs generalizing ys
@@ -509,16 +582,21 @@ theorem mergeTerms_symm (xs ys : List (PolyTerm R n)) : mergeTerms xs ys = merge
     case nil =>
       simp
     case cons yhead ytail ih2 =>
-      unfold mergeTerms mergeTerms.takeTillGE
-      simp
       cases h : head.monomial.grevlex yhead.monomial
       case lt =>
-        simp [Mon.grevlex_flip.mp h, ← ih2, mergeTerms]
+        have h' : yhead.monomial.Grevlex head.monomial := by
+          simp [Mon.grevlex_iff_grevlex_gt, ← Mon.grevlex_flip, h]
+        rw [mergeTerms_cons_cons_rev_grevlex _ _ _ _ h',
+          mergeTerms_cons_cons_grevlex _ _ _ _ h', ih2]
       case eq =>
         simp at h
+        rw [mergeTerms_cons_cons_eq _ _ _ _ h.symm, mergeTerms_cons_cons_eq _ _ _ _ h]
         simp [h, Semiring.add_comm, ih]
       case gt =>
-        simp [Mon.grevlex_flip.mpr h, ih, mergeTerms]
+        have h' : head.monomial.Grevlex yhead.monomial := by
+          simp [Mon.grevlex_iff_grevlex_gt, h]
+        rw [mergeTerms_cons_cons_grevlex _ _ _ _ h',
+          mergeTerms_cons_cons_rev_grevlex _ _ _ _ h', ih]
 
 @[simp]
 theorem mergeTerms_singleton_left (x : PolyTerm R n) (ys : List (PolyTerm R n)) :
@@ -527,35 +605,27 @@ theorem mergeTerms_singleton_left (x : PolyTerm R n) (ys : List (PolyTerm R n)) 
   case nil =>
     simp
   case cons head tail ih =>
-    unfold mergeTerms insertTerm
-    simp [mergeTerms.takeTillGE]
-    congr
-    funext
-    congr
-    simp [← ih, mergeTerms]
+    cases h : x.monomial.grevlex head.monomial
+    case lt =>
+      have h' : head.monomial.Grevlex x.monomial := by
+        simp [Mon.grevlex_iff_grevlex_gt, ← Mon.grevlex_flip, h]
+      rw [mergeTerms_cons_cons_rev_grevlex _ _ _ _ h', ih,
+        insertTerm_cons_grevlex_rev _ _ _ h']
+    case eq =>
+      simp at h
+      rw [mergeTerms_cons_cons_eq _ _ _ _ h.symm, insertTerm_cons_eq _ _ _ h]
+      simp
+    case gt =>
+      have h' : x.monomial.Grevlex head.monomial := by
+        simp [Mon.grevlex_iff_grevlex_gt, h]
+      rw [mergeTerms_cons_cons_grevlex _ _ _ _ h', insertTerm_cons_grevlex _ _ _ h']
+      simp
 
 @[simp]
 theorem mergeTerms_singleton_right (y : PolyTerm R n) (xs : List (PolyTerm R n)) :
     mergeTerms xs [y] = insertTerm y xs := by
   rw [mergeTerms_symm]
   simp
-
-@[simp]
-theorem mergeTerms_cons_cons_grevlex (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) (h : x.monomial.Grevlex y.monomial) :
-    mergeTerms (x :: xs) (y :: ys) = x :: mergeTerms xs (y :: ys) := by
-  simp [Mon.grevlex_iff_grevlex_gt] at h
-  simp [mergeTerms, mergeTerms.takeTillGE, h]
-
-@[simp]
-theorem mergeTerms_cons_cons_rev_grevlex (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) (h : y.monomial.Grevlex x.monomial) :
-    mergeTerms (x :: xs) (y :: ys) = y :: mergeTerms (x :: xs) ys := by
-  simp [Mon.grevlex_iff_grevlex_gt, ← Mon.grevlex_flip] at h
-  simp [mergeTerms, mergeTerms.takeTillGE, h]
-
-@[simp]
-theorem mergeTerms_cons_cons_eq (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) (h : y.monomial = x.monomial) :
-    mergeTerms (x :: xs) (y :: ys) = ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTerms xs ys := by
-  simp [mergeTerms, mergeTerms.takeTillGE, h]
 
 theorem mergeTerms_mon_mem {xs ys : List (PolyTerm R n)} (tmem : t ∈ mergeTerms xs ys) :
     (∃ x ∈ xs, t.monomial = x.monomial) ∨ (∃ y ∈ ys, t.monomial = y.monomial) := by
@@ -621,7 +691,7 @@ theorem mergeTerms_nil_iff_nil (xs ys : List (PolyTerm R n)) :
       cases ys with
       | nil => simp at mergeH
       | cons =>
-        simp [mergeTerms, mergeTerms.takeTillGE] at mergeH
+        rw [mergeTerms_cons_cons] at mergeH
         split at mergeH
         all_goals
           simp at mergeH
@@ -1206,13 +1276,11 @@ theorem denoteTerms_mergeTerms (ctx : Context R) (xs ys : List (PolyTerm R n)) :
   induction xs generalizing ys
   case nil => simp [zero_add']
   case cons head tail ih1 =>
-    simp
-    unfold mergeTerms
     induction ys
     case nil =>
-      simp [Semiring.add_zero, mergeTerms.takeTillGE]
-    case cons ih2 =>
-      unfold mergeTerms.takeTillGE
+      simp [Semiring.add_zero]
+    case cons yhead ytail ih2 =>
+      rw [mergeTerms_cons_cons]
       split
       case h_1 =>
         simp [ih1]

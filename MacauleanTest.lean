@@ -4,3 +4,4 @@ import MacauleanTest.Benchmarks
 import MacauleanTest.Factorization
 import MacauleanTest.IdealMembership
 import MacauleanTest.TestGB5Pts
+import MacauleanTest.PolyKernel

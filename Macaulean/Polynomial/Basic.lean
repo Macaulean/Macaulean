@@ -359,7 +359,16 @@ def addTerm [Grind.CommRing R]
    (q : PolyTerm R n) (p : Polynomial R n) : Polynomial R n :=
   ⟨insertTerm q p.terms⟩
 
-def mergeTerms [Grind.CommRing R]
+/--
+Reference merge of two grevlex-descending term lists, adding coefficients on
+equal monomials.
+
+This is the mathematical specification only: Lean compiles it with
+`WellFounded.fix`, which the *kernel* cannot unfold, so `decide +kernel` gets
+stuck on it.  `mergeTerms` below is the kernel-evaluable version; everything
+downstream uses that one, and `mergeTerms_eq_spec` says the two agree.
+-/
+def mergeTermsSpec [Grind.CommRing R]
     (xs ys : List (PolyTerm R n))
  : List (PolyTerm R n) :=
   match xs with
@@ -373,35 +382,42 @@ def mergeTerms [Grind.CommRing R]
       | [] => x :: xs
       | t :: ts' =>
         match x.monomial.grevlex t.monomial with
-        | .gt => x :: mergeTerms xs ys
+        | .gt => x :: mergeTermsSpec xs ys
         | .eq =>
           let c := x.coefficient + t.coefficient
-          ⟨c, x.monomial⟩ :: mergeTerms xs ts'
+          ⟨c, x.monomial⟩ :: mergeTermsSpec xs ts'
         | .lt => t :: (takeTillGE x xs ts')
 
--- retaining this because this is reducible where as the other definition
--- is irredicible, this might matter for some stuff
-@[reducible]
-def mergeTerms_old [Grind.CommRing R]
-    (xs ys : List (PolyTerm R n))
- : List (PolyTerm R n) :=
-  match xs with
-  | [] => ys
-  | x :: xs' =>
-    takeTillGE x ys (mergeTerms_old xs')
-  where
-    takeTillGE (x : PolyTerm R n) (ts : List (PolyTerm R n))
-      (tailFunc : List (PolyTerm R n) → List (PolyTerm R n))
-      : (List (PolyTerm R n)) :=
-      match ts with
-      | [] => x :: tailFunc []
-      | t :: ts' =>
-        match x.monomial.grevlex t.monomial with
-        | .gt => x :: tailFunc ts
-        | .eq =>
-          let c := x.coefficient + t.coefficient
-          ⟨c, x.monomial⟩ :: tailFunc ts'
-        | .lt => t :: (takeTillGE x ts' tailFunc)
+/-- Recursion budget for `mergeTermsF`.  Fuel only bounds the recursion depth
+actually taken, so a huge literal costs nothing (the kernel decrements a `Nat`
+literal, which is a GMP subtraction, not a unary step). -/
+def mergeFuel : Nat := 1000000000
+
+/--
+Fuel-indexed merge: the same function as `mergeTermsSpec`, but structurally
+recursive, hence unfoldable by the kernel (which is what `decide +kernel`
+needs).
+
+The fuel-0 fallback is `mergeTermsSpec` itself, so `mergeTermsF f = mergeTermsSpec`
+for *every* `f` and no lemma downstream carries a fuel side-condition.  With
+`mergeFuel` the fallback is unreachable in practice; if it were ever reached the
+kernel would simply get stuck (a tactic failure, never an unsound proof).
+-/
+def mergeTermsF [Grind.CommRing R] :
+    Nat → List (PolyTerm R n) → List (PolyTerm R n) → List (PolyTerm R n)
+  | 0, xs, ys => mergeTermsSpec xs ys
+  | _ + 1, [], ys => ys
+  | _ + 1, x :: xs, [] => x :: xs
+  | fuel + 1, x :: xs, y :: ys =>
+    match x.monomial.grevlex y.monomial with
+    | .gt => x :: mergeTermsF fuel xs (y :: ys)
+    | .eq => ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTermsF fuel xs ys
+    | .lt => y :: mergeTermsF fuel (x :: xs) ys
+
+/-- Merge two grevlex-descending term lists, coalescing equal monomials. -/
+def mergeTerms [Grind.CommRing R]
+    (xs ys : List (PolyTerm R n)) : List (PolyTerm R n) :=
+  mergeTermsF mergeFuel xs ys
 
 @[simp]
 def add [Grind.CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
