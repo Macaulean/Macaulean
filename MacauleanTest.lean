@@ -5,3 +5,5 @@ import MacauleanTest.Factorization
 import MacauleanTest.IdealMembership
 import MacauleanTest.TestGB5Pts
 import MacauleanTest.PolyKernel
+import MacauleanTest.PolyDef
+import MacauleanTest.AlgebraNorm

@@ -7,3 +7,6 @@ import Macaulean.IdealMembership
 import Macaulean.Polynomial
 import Macaulean.Grind.AlgPoly.Expr
 import Macaulean.Grind.AlgPoly.PolyEval
+import Macaulean.Grind.AlgPoly.Reify
+import Macaulean.Grind.AlgPoly.Tactic
+import Macaulean.PolyDef
