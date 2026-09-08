@@ -5,3 +5,5 @@ import Macaulean.Macaulay2
 import Macaulean.Factorization
 import Macaulean.IdealMembership
 import Macaulean.Polynomial
+import Macaulean.Grind.AlgPoly.Expr
+import Macaulean.Grind.AlgPoly.PolyEval
