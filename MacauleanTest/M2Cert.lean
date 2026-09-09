@@ -1,0 +1,149 @@
+/-
+Copyright (c) 2026 Macaulean contributors. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+-/
+
+import Macaulean.M2Cert
+
+/-!
+# Tests for `m2cert` / `m2cert?`
+
+These **run Macaulay2**: the tactic starts the `m2/macaulean.m2` server the
+same way `m2idealmem` does, so `M2` has to be on the path and `lake` has to be
+run from the repository root.  The Macaulay2-free half of the story --
+`poly_cert` on committed cofactors, including the exact text `m2cert?` prints
+below -- is in `MacauleanTest/PolyCert.lean`, which imports none of this.
+
+`stderrAsMessages` is off because the Macaulay2 plumbing traces its progress
+with `dbg_trace`; without this the traces would land in `#guard_msgs`.
+-/
+
+set_option stderrAsMessages false
+
+namespace MacauleanTest.M2Cert
+
+/-! ## S1: divisibility, `g ∣ f` -/
+
+/-- A cubic generator and a quadratic quotient: Macaulay2 has to divide, not
+just recognise a factor. -/
+theorem dvd_cubic (x y z : Int) :
+    (x ^ 3 + y * z - 2) ∣ ((x ^ 3 + y * z - 2) * (x * y + 3 * z ^ 2 - 1)) := by
+  m2cert
+
+/-- The same divisibility with the product already expanded, so that nothing
+about the goal's *shape* gives the quotient away. -/
+theorem dvd_expanded (x y z : Int) :
+    (x ^ 3 + y * z - 2) ∣
+      (x ^ 4 * y + 3 * x ^ 3 * z ^ 2 - x ^ 3 + x * y ^ 2 * z + 3 * y * z ^ 3
+        - y * z - 2 * x * y - 6 * z ^ 2 + 2) := by
+  m2cert
+
+/-! ## S2: ideal membership, `p = r` from `hᵢ : gᵢ = 0` -/
+
+theorem mem_two_gens (x y z : Rat) (h1 : x * y - z = 0) (h2 : y ^ 2 - x = 0) :
+    x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  m2cert [h1, h2]
+
+/-- The `p = 0` special case, i.e. what `m2idealmem` does, with a determinantal
+ideal of six generators. -/
+theorem mem_six_gens (a b c d e f : Rat)
+    (f1 : e ^ 2 - d * f = 0) (f2 : c * e - b * f = 0) (f3 : c * d - b * e = 0)
+    (f4 : c ^ 2 - a * f = 0) (f5 : b * c - a * e = 0) (f6 : b ^ 2 - a * d = 0) :
+    c ^ 2 * d - 2 * b * c * e + a * e ^ 2 + b ^ 2 * f - a * d * f = 0 := by
+  m2cert [f1, f2, f3, f4, f5, f6]
+
+/-! ## What `m2cert?` prints
+
+The variables are indexed by their user names, so the `in [...]` clause and the
+exponent positions are the same on every run; the monomials are in Macaulay2's
+own (grevlex) emission order.
+-/
+
+/--
+info: Try this:
+  [apply] poly_cert ["1.1.0.1 0.0.1.2 0.0.0.-3"] in [x, y, z]
+  (the cofactors are Macaulay2's, in its emission order; pasting this keeps Macaulay2 out of the build)
+-/
+#guard_msgs in
+theorem suggest_dvd (x y z : Int) :
+    (x ^ 2 * y - z + 1) ∣ ((x ^ 2 * y - z + 1) * (x * y + 2 * z - 3)) := by
+  m2cert?
+
+/--
+info: Try this:
+  [apply] poly_cert ["2.0.0.1 0.0.1.1", "0.0.0.0"] in [x, y, z] using [h1, h2]
+  (the cofactors are Macaulay2's, in its emission order; pasting this keeps Macaulay2 out of the build)
+-/
+#guard_msgs in
+theorem suggest_mem (x y z : Rat) (h1 : x * y - z = 0) (h2 : y ^ 2 - x = 0) :
+    x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  m2cert? [h1, h2]
+
+/-! ## `+native` is opt-in, explicit, and loud -/
+
+/--
+warning: the reflective certificate is checked by `decide +native`: the proof depends on `Lean.ofReduceBool` -- which this toolchain records as a generated `._native.decide.ax` axiom -- so the Lean compiler and its runtime are part of its trusted base.  Drop `+native` to have the kernel check it.
+-/
+#guard_msgs in
+theorem mem_native (x y z : Rat) (h1 : x * y - z = 0) (h2 : y ^ 2 - x = 0) :
+    x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  m2cert +native [h1, h2]
+
+-- The flag is carried into the printed replacement, so pasting it does not
+-- silently change what checks the certificate.
+/--
+warning: the reflective certificate is checked by `decide +native`: the proof depends on `Lean.ofReduceBool` -- which this toolchain records as a generated `._native.decide.ax` axiom -- so the Lean compiler and its runtime are part of its trusted base.  Drop `+native` to have the kernel check it.
+---
+info: Try this:
+  [apply] poly_cert +native ["2.0.0.1 0.0.1.1", "0.0.0.0"] in [x, y, z] using [h1, h2]
+  (the cofactors are Macaulay2's, in its emission order; pasting this keeps Macaulay2 out of the build)
+-/
+#guard_msgs in
+theorem suggest_native (x y z : Rat) (h1 : x * y - z = 0) (h2 : y ^ 2 - x = 0) :
+    x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  m2cert? +native [h1, h2]
+
+/-! ## Axioms
+
+The kernel path adds nothing beyond Lean's own three; `+native` adds the
+generated native-evaluation axiom, which is what makes it worth refusing by
+default.
+-/
+
+/-- info: 'MacauleanTest.M2Cert.dvd_cubic' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms dvd_cubic
+
+/-- info: 'MacauleanTest.M2Cert.mem_two_gens' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms mem_two_gens
+
+/-- info: 'MacauleanTest.M2Cert.mem_six_gens' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms mem_six_gens
+
+/--
+info: 'MacauleanTest.M2Cert.mem_native' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ mem_native._native.decide.ax_1_1]
+-/
+#guard_msgs in
+#print axioms mem_native
+
+/-! ## Failure -/
+
+-- The generators do not put `p - r` in the ideal, and the tactic says so rather
+-- than leaving a goal behind.
+/--
+error: Tactic `m2cert` failed: the remainder modulo the given generators is not zero, so the goal does not follow from them
+
+x y z : Rat
+h1 : x * y - z = 0
+⊢ x ^ 3 * y + x * y * z + 5 = 0
+-/
+#guard_msgs in
+example (x y z : Rat) (h1 : x * y - z = 0) : x ^ 3 * y + x * y * z + 5 = 0 := by
+  m2cert [h1]
+
+end MacauleanTest.M2Cert

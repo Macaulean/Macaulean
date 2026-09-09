@@ -7,3 +7,5 @@ import MacauleanTest.TestGB5Pts
 import MacauleanTest.PolyKernel
 import MacauleanTest.PolyDef
 import MacauleanTest.AlgebraNorm
+import MacauleanTest.PolyCert
+import MacauleanTest.M2Cert
