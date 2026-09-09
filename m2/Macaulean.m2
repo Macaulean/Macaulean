@@ -44,10 +44,6 @@ export {
 LeanGrindCommRingPoly = new SelfInitializingType of List
 ConcretePoly = new SelfInitializingType of HashTable
 
-toLean = method()
-toLean ZZ := identity
-toLean QQ := x -> {numerator x, denominator x}
-
 leanRings = hashTable {
     QQ => "Rat",
     ZZ => "Int",
@@ -70,10 +66,6 @@ new ConcretePoly from RingElement := (T, f) -> (
 	    "coefficients" => apply(pairs coeffmap, (a, i) -> {i, a}),
 	    "params" => leanRings#(coefficientRing R)})
 
-fromLean = method(Dispatch => Type)
-fromLean QQ := R -> x -> x#0 / x#1
-fromLean ZZ := R -> identity
-
 value ConcretePoly := f -> (
     kk := M2Rings#(f#"params");
     coeffmap := hashTable f#"coefficients";
@@ -94,23 +86,26 @@ value ConcretePoly := f -> (
 addNamespace("Macaulean", "https://github.com/Macaulean/Macaulean",
     (options Macaulean).Version)
 
+addSaveMethod(Ring, Name => R -> leanRings#R, Namespace => "Macaulean")
+
+addSaveMethod(ZZ, toString, Name => "Int", Namespace => "Macaulean")
+addSaveMethod(QQ,
+              x -> toString \ {numerator x, denominator x},
+              Name => "Rat",
+              Namespace => "Macaulean")
+
 addSaveMethod(RingElement,
     f -> leanRings#(coefficientRing ring f),
-    f -> apply(listForm f, (m, c) -> {toLean c, m}),
+    f -> apply(listForm f, (m, c) -> {OnlyData {c}, m}),
     Name => "Polynomial",
     Namespace => "Macaulean")
-
--- eventually replace fromLean w/ this
-fromLean2 = method(Dispatch => Type)
-fromLean2 QQ := R -> x -> value x#0 / value x#1
-fromLean2 ZZ := R -> value
 
 addLoadMethod("Polynomial",
     (params, data) -> (
 	if #data == 0 then return 0;
-	kk := M2Rings#params;
+	kk := M2Rings#(params.Type);
 	R := kk[vars(0..<#last first data)];
-	sum(data, cm -> (fromLean2 kk) cm#0 * product(#cm#1,
+	sum(data, cm -> params.Instance cm#0 * product(#cm#1,
 		i -> R_i^(value cm#1#i)))),
     Namespace => "Macaulean")
 
@@ -121,29 +116,32 @@ addSaveMethod(LeanGrindCommRingPoly,
     UseID => true)
 
 addSaveMethod(ConcretePoly,
-    f -> f#"params",
-    f -> hashTable {
-	"poly" => f#"poly",
-	"coefficients" => f#"coefficients"},
-    Namespace => "Macaulean")
+              f ->  f#"params",
+              f -> hashTable {
+                  "poly" => f#"poly",
+                  "coefficients" => apply(f#"coefficients",
+                                          coeff -> {coeff#0, OnlyData {coeff#1}})},
+              Namespace => "Macaulean")
 
 addLoadMethod("Lean.Grind.CommRing.Poly",
-    (params, data) -> LeanGrindCommRingPoly apply(data, term -> {
-	    value term#0,
-	    apply(term#1, varpow -> value \ varpow)}),
-    Namespace => "Macaulean")
+              (params, data) -> LeanGrindCommRingPoly apply(data, term -> {
+                  value term#0,
+                  apply(term#1, varpow -> value \ varpow)}),
+              Namespace => "Macaulean")
 
-loadCoefficient = R -> x -> (
-    if R == "Rat" then {value x#0, value x#1}
-    else if R == "Int" then value x
-    else error("unknown ring: ", R))
+addLoadMethod("Int",
+              (params, data) -> value data,
+              Namespace => "Macaulean")
+addLoadMethod("Rat",
+              (params, data) -> value data#0 / value data#1,
+              Namespace => "Macaulean")
 
 addLoadMethod("ConcretePoly",
     (params, data) -> ConcretePoly {
 	"poly" => data#"poly",
 	"coefficients" => apply(toSequence \ data#"coefficients",
-	    (i, coeff) -> {value i, (loadCoefficient params) coeff}),
-	"params" => params},
+	    (i, coeff) -> {value i, params.Instance coeff}),
+	"params" => params.Type},
     Namespace => "Macaulean")
 
 
@@ -703,7 +701,7 @@ R = QQ[x,y]
 cp = new ConcretePoly from 1/2*x^2 + 3*y
 assert Equation(cp#"params", "Rat")
 -- 1/2 becomes variable 2, just past y, stored as {numerator, denominator}
-assert Equation(cp#"coefficients", {{2, {1, 2}}})
+assert Equation(cp#"coefficients", {{2, 1/2}})
 assert Equation(sort toList cp#"poly",
     sort {{1, {{0, 2}, {2, 1}}}, {3, {{1, 1}}}})
 
