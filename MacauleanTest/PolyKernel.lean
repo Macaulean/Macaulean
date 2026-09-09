@@ -14,9 +14,9 @@ open Macaulean Macaulean.Polynomial
 
 set_option maxRecDepth 10000
 
-def x : Mon 3 := ⟨[1, 0, 0], rfl⟩
-def y : Mon 3 := ⟨[0, 1, 0], rfl⟩
-def z : Mon 3 := ⟨[0, 0, 1], rfl⟩
+def x : Mon 3 := Mon.ofPowersN 3 [1, 0, 0]
+def y : Mon 3 := Mon.ofPowersN 3 [0, 1, 0]
+def z : Mon 3 := Mon.ofPowersN 3 [0, 0, 1]
 
 /-- `2x + 3y + 5z`, in grevlex-descending order. -/
 def p : Polynomial Int 3 := ⟨[⟨2, x⟩, ⟨3, y⟩, ⟨5, z⟩]⟩

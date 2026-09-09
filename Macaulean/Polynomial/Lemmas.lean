@@ -6,15 +6,19 @@ namespace Macaulean
 
 namespace Mon
 
+/-! ## Lemmas about grevlex
 
-/-! ## Lemmas about grevlex -/
+`grevlex` is now a single `compare` of the packed keys, so the order-theoretic
+facts are exactly the ones for `Nat`.  That the resulting order really is
+grevlex is `Mon.grevlex_eq_grevlexSpec`.
+-/
 @[simp]
 theorem eq_of_grevlex {m1 m2 : Mon n} : (m1.grevlex m2 = .eq) ↔ m1 = m2 := by
   constructor
   case mp =>
     exact Std.LawfulEqCmp.eq_of_compare (cmp := Mon.grevlex)
   case mpr =>
-    simp
+    rintro rfl; simp [grevlex_eq_compare]
 
 @[simp]
 theorem grevlex_rfl {m : Mon n} : m.grevlex m = .eq :=
@@ -22,26 +26,8 @@ theorem grevlex_rfl {m : Mon n} : m.grevlex m = .eq :=
 
 theorem grevlex_trans {m1 m2 m3 : Mon n} (h1 : m1.grevlex m2 = .gt) (h2 : m2.grevlex m3 = .gt) :
     m1.grevlex m3 = .gt := by
-  simp [Mon.grevlex, Ordering.then_eq_gt] at *
-  cases h1
-  case inl hdeg1=>
-    cases h2
-    case inl hdeg2 =>
-      left
-      exact Std.TransCmp.gt_trans hdeg1 hdeg2
-    case inr heq =>
-      left
-      simp [heq.1] at hdeg1
-      trivial
-  case inr heq =>
-    simp [heq.1]
-    cases h2
-    case inl hdeg2 =>
-      left
-      trivial
-    case inr heq2 =>
-      simp [heq2.1]
-      exact Std.TransCmp.lt_trans heq.2 heq2.2
+  rw [grevlex_eq_compare, Nat.compare_eq_gt] at *
+  omega
 
 theorem grevlex_swap (m₁ m₂ : Mon n) :
     (Mon.grevlex m₁ m₂).swap = Mon.grevlex m₂ m₁ :=
@@ -49,139 +35,81 @@ theorem grevlex_swap (m₁ m₂ : Mon n) :
 
 theorem grevlex_flip {m₁ m₂ : Mon n} :
   m₁.grevlex m₂ = .lt ↔ m₂.grevlex m₁ = .gt := by
-  constructor
-  case mp =>
-    intro h
-    have := grevlex_swap m₁ m₂; rw [h] at this; simpa using this.symm
-  case mpr =>
-    intro h
-    have := grevlex_swap m₂ m₁; rw [h] at this; simpa using this.symm
+  rw [grevlex_eq_compare, grevlex_eq_compare, Nat.compare_eq_lt, Nat.compare_eq_gt]
 
-private theorem degree_mul {m1 m2 : Mon n} : (m1.mul m2).degree = m1.degree + m2.degree := by
-  simp [Mon.mul, Mon.degree]
-  generalize h1 : m1.powers = m1p, h2 : m2.powers = m2p
-  have lengthHyp : m1p.length = m2p.length := by
-    rw [← h1, ← h2]
-    simp [m1.powers_length, m2.powers_length]
-  clear h1 h2
-  induction m1p generalizing m2p
-  case nil =>
-    symm at lengthHyp
-    simp [List.length_eq_zero_iff] at lengthHyp
-    simp [lengthHyp]
-  case cons head1 tail1 ih =>
-    cases m2p
-    case nil => contradiction
-    case cons head2 tail2 =>
-      simp [List.length_cons] at lengthHyp
-      simp [ih, lengthHyp]
-      ac_nf
-
-/-- Monotonicity of grevlex under monomial multiplication -/
+/-- Monotonicity of grevlex under monomial multiplication: multiplication is
+addition of keys, so this is monotonicity of `Nat.add`. -/
 theorem grevlex_mul_mono_left {m₁ m₂ m : Mon n}
     : m₁.Grevlex m₂ ↔ (m.mul m₁).Grevlex (m.mul m₂) := by
-  simp [Mon.Grevlex, degree_mul]
-  constructor
-  case mp =>
-    intro h
-    cases h
-    case inl hdeg =>
-      left
-      trivial
-    case inr hNext =>
-      right
-      simp [hNext, Mon.mul]
-      have m1length := m₁.powers_length
-      have m2length := m₂.powers_length
-      have mlength := m.powers_length
-      have hNext' := hNext.right
-      clear hNext
-      simp [List.reverse_zipWith, m1length, m2length, mlength]
-      rw [← List.length_reverse] at m1length m2length mlength
-      generalize m₁.powers.reverse = m1powers,m₂.powers.reverse = m2powers,m.powers.reverse = mpowers at *
-      clear m₁ m₂ m
-      induction mpowers generalizing n m1powers m2powers
-      case nil =>
-        simp
-        simp at mlength
-        simp [← mlength] at m1length m2length
-        simp [m1length, m2length] at hNext'
-      case cons head tail ih =>
-        simp at mlength
-        simp [← mlength] at m1length m2length
-        have m1head::m1tail := m1powers
-        have m2head::m2tail := m2powers
-        simp at m1length m2length
-        simp [List.cons_lt_cons_iff] at ⊢ hNext'
-        cases hNext' with
-        | inl h => simp [h]
-        | inr h =>
-          specialize ih (n := tail.length) m1tail m2tail m1length m2length rfl h.right
-          simp [h,ih]
-  case mpr =>
-    intro h
-    cases h with
-    | inl => left; trivial
-    | inr h=>
-      right
-      have ⟨degH,powersH⟩ := h
-      simp [degH]
-      clear degH h
-      simp [Mon.mul] at powersH
-      have m1length := m₁.powers_length
-      have m2length := m₂.powers_length
-      have mlength := m.powers_length
-      simp [List.reverse_zipWith, m1length, m2length, mlength] at powersH
-      rw [← List.length_reverse] at m1length m2length mlength
-      generalize m₁.powers.reverse = m1powers,m₂.powers.reverse = m2powers,m.powers.reverse = mpowers at *
-      clear m₁ m₂ m
-      induction mpowers generalizing n m1powers m2powers
-      case nil =>
-        simp at powersH
-      case cons head tail ih =>
-        simp at mlength
-        simp [← mlength] at m1length m2length
-        have m1head::m1tail := m1powers
-        have m2head::m2tail := m2powers
-        simp at m1length m2length
-        simp [List.cons_lt_cons_iff] at ⊢ powersH
-        cases powersH with
-        | inl h => simp [h]
-        | inr h =>
-          specialize ih m1tail m2tail m1length m2length rfl h.right
-          simp [h,ih]
+  simp only [Grevlex, mul_key]
+  omega
 
 instance : @Std.Commutative (Mon n) Mon.mul where
   comm a b := by
-    simp [mul]
-    exact List.zipWith_comm_of_comm Nat.add_comm
+    have h : a.key + b.key = b.key + a.key := Nat.add_comm _ _
+    simp only [mul, h]
 
 theorem grevlex_mul_mono_right {m₁ m₂ m : Mon n}
     : m₁.Grevlex m₂ ↔ (m₁.mul m).Grevlex (m₂.mul m) := by
-  conv =>
-    right
-    congr
-    all_goals
-      rw [Mon.instCommutativeMul.comm]
-  exact grevlex_mul_mono_left
+  simp only [Grevlex, mul_key]
+  omega
 
--- instance : @Std.Associative (Mon n) Mon.mul where
---   assoc a b c := by
---     simp [mul]
+/-! ## Exponent vectors of packed monomials -/
+
+theorem sum_zipWith_add : ∀ (p q : List Nat), p.length = q.length →
+    (List.zipWith (· + ·) p q).sum = p.sum + q.sum := by
+  intro p
+  induction p with
+  | nil => intro q hq; cases q <;> simp_all
+  | cons e es ih =>
+    intro q hq
+    cases q with
+    | nil => simp at hq
+    | cons f fs =>
+      have := ih fs (by simpa using hq)
+      simp only [List.zipWith_cons_cons, List.sum_cons, this]
+      omega
+
+/-- The exponent vector of a product is the sum of the exponent vectors, as
+long as the degrees still fit in one digit. -/
+theorem powers_mul {m1 m2 : Mon n} (h1 : m1.WF) (h2 : m2.WF)
+    (hlt : m1.degree + m2.degree < base n) :
+    (m1.mul m2).powers = List.zipWith (· + ·) m1.powers m2.powers := by
+  have hkey : (m1.mul m2).key
+      = encodeKey (base n) (List.zipWith (· + ·) m1.powers m2.powers) := by
+    rw [mul_key, h1.2, h2.2]
+    exact encodeKey_add _ _ _ (by simp)
+  show decodeKey (base n) n (m1.mul m2).key = _
+  rw [hkey]
+  refine decodeKey_encodeKey _ (base_pos n) _ n (by simp) ?_
+  rw [sum_zipWith_add _ _ (by simp)]
+  exact hlt
+
+theorem degree_mul {m1 m2 : Mon n} (h1 : m1.WF) (h2 : m2.WF)
+    (hlt : m1.degree + m2.degree < base n) :
+    (m1.mul m2).degree = m1.degree + m2.degree := by
+  rw [degree, powers_mul h1 h2 hlt, sum_zipWith_add _ _ (by simp)]
+  rfl
+
+theorem wf_mul {m1 m2 : Mon n} (h1 : m1.WF) (h2 : m2.WF)
+    (hlt : m1.degree + m2.degree < base n) : (m1.mul m2).WF := by
+  refine ⟨?_, ?_⟩
+  · rw [← degree]; rw [degree_mul h1 h2 hlt]; exact hlt
+  · rw [powers_mul h1 h2 hlt, mul_key, h1.2, h2.2, encodeKey_add _ _ _ (by simp)]
 
 /-! ## Denotational Lemmas for monomials -/
-theorem degree_unit_iff (m : Mon n) : m.degree = 0 ↔ m = unit := by
+theorem degree_unit_iff (m : Mon n) (h : m.WF) : m.degree = 0 ↔ m = unit := by
   constructor
   case mp =>
-    simp [degree,List.sum_eq_zero_iff_forall_eq_nat]
-    intro elemHyp
-    suffices h : m.powers = List.replicate m.powers.length 0 by
-      rw [m.powers_length] at h
-      simp [unit,← h]
-    apply List.eq_replicate_of_mem elemHyp
+    intro hd
+    rw [degree, List.sum_eq_zero_iff_forall_eq_nat] at hd
+    have hz : m.powers = List.replicate n 0 := by
+      have := List.eq_replicate_of_mem hd
+      rwa [m.powers_length] at this
+    rw [← key_eq_iff_eq, h.2, hz, encodeKey_replicate_zero, unit_key]
   case mpr =>
-    intro h
-    simp [h,unit,degree]
+    rintro rfl
+    simp [degree, powers_unit]
 
 variable {R : Type} [CommRing R]
 
@@ -196,15 +124,71 @@ theorem denote_unit (ctx : Context R) : unit.denote (n := n) ctx = 1 := by
       case succ ih =>
         simp [List.replicate_succ, Semiring.mul_one]
         apply ih
-  simp [unit]
+  rw [powers_unit]
   induction n
   case zero => trivial
   case succ ih => simp [List.replicate_succ', Semiring.pow_zero, ih]
 
+/-! ### One-hot exponent vectors -/
+
+private theorem sum_ofFn_zero (m : Nat) : (List.ofFn (fun _ : Fin m => (0:Nat))).sum = 0 := by
+  induction m with
+  | zero => rfl
+  | succ m ih => rw [List.ofFn_succ]; simpa using ih
+
+theorem sum_ofFn_oneHot : ∀ (m : Nat) (i : Fin m) (k : Nat),
+    (List.ofFn (fun j : Fin m => if j == i then k else 0)).sum = k := by
+  intro m
+  induction m with
+  | zero => intro i; exact absurd i.isLt (by omega)
+  | succ m ih =>
+    intro i k
+    rw [List.ofFn_succ, List.sum_cons]
+    rcases i with ⟨iv, hiv⟩
+    cases iv with
+    | zero =>
+      have hf : (fun (j : Fin m) => if j.succ == (⟨0, hiv⟩ : Fin (m+1)) then k else 0)
+          = (fun _ : Fin m => (0:Nat)) := by
+        funext j
+        have hb : (j.succ == (⟨0, hiv⟩ : Fin (m+1))) = false := by
+          simp [Fin.ext_iff, Fin.val_succ]
+        rw [hb]
+        rfl
+      have h0 : ((0 : Fin (m+1)) == (⟨0, hiv⟩ : Fin (m+1))) = true := by
+        simp
+      rw [hf, sum_ofFn_zero, h0]
+      show k + 0 = k
+      omega
+    | succ iv =>
+      have hlt : iv < m := by omega
+      have h0 : ((0 : Fin (m+1)) == (⟨iv+1, hiv⟩ : Fin (m+1))) = false := by
+        simp [Fin.ext_iff]
+      have hf : (fun (j : Fin m) => if j.succ == (⟨iv+1, hiv⟩ : Fin (m+1)) then k else 0)
+          = (fun j : Fin m => if j == (⟨iv, hlt⟩ : Fin m) then k else 0) := by
+        funext j
+        by_cases hj : j.val = iv
+        · have e1 : j.succ = (⟨iv+1, hiv⟩ : Fin (m+1)) := by
+            apply Fin.ext; simp [Fin.val_succ, hj]
+          have e2 : j = (⟨iv, hlt⟩ : Fin m) := by apply Fin.ext; simp [hj]
+          rw [if_pos (by simpa using e1), if_pos (by simpa using e2)]
+        · have e1 : ¬ (j.succ = (⟨iv+1, hiv⟩ : Fin (m+1))) := by
+            intro he
+            exact hj (by have := congrArg Fin.val he; simp [Fin.val_succ] at this; omega)
+          have e2 : ¬ (j = (⟨iv, hlt⟩ : Fin m)) := fun he => hj (by rw [he])
+          rw [if_neg (by simpa using e1), if_neg (by simpa using e2)]
+      rw [h0, hf, ih ⟨iv, hlt⟩ k]
+      show (0:Nat) + k = k
+      omega
+
+theorem powers_fromVarPower (i : Fin n) (k : Nat) (hk : k < base n) :
+    (fromVarPower i k).powers = List.ofFn (fun j => if j == i then k else 0) :=
+  powers_ofPowersN (by simp) (by rw [sum_ofFn_oneHot]; exact hk)
+
 set_option backward.isDefEq.respectTransparency false in
-theorem denote_fromVarPower (ctx : Context R) (i : Fin n) (k : Nat)
+theorem denote_fromVarPower (ctx : Context R) (i : Fin n) (k : Nat) (hk : k < base n)
   : denote ctx (.fromVarPower i k) = (ctx[i])^k := by
-  unfold denote fromVarPower
+  rw [denote, powers_fromVarPower i k hk]
+  clear hk
   rw [List.mapFinIdx_eq_ofFn]
   simp [List.ofFn, Fin.foldr_eq_finRange_foldr, List.foldl_map]
   induction n
@@ -237,21 +221,24 @@ theorem denote_fromVarPower (ctx : Context R) (i : Fin n) (k : Nat)
 theorem denote_fromVar (ctx : Context R) (i : Fin n)
   : denote ctx (.fromVar i) = ctx[i] := by
   unfold fromVar
-  rw [denote_fromVarPower]
+  rw [denote_fromVarPower _ _ _ (one_lt_base n)]
   simp [Semiring.pow_one]
 
-theorem denote_mul {ctx : Context R} {m1 m2 : Mon n}
-  : (m1.mul m2).denote ctx = m1.denote ctx * m2.denote ctx := by
-  simp only [Mon.mul, Mon.denote]
-  have m1length := m1.powers_length
-  have m2length := m2.powers_length
-  generalize m1.powers = m1powers, m2.powers = m2powers at *
-  clear m1 m2
-  induction n generalizing m1powers m2powers
-  case zero =>
-    simp at m1length m2length
-    simp [m1length, m2length, Semiring.one_mul]
-  case succ n' ih =>
+private theorem denote_zipWith (ctx : Context R) : ∀ (m : Nat) (p q : List Nat),
+    p.length = m → q.length = m →
+      ((List.zipWith (· + ·) p q).mapFinIdx (fun i k _ => (ctx.get i ^ k))).foldl (.*.) 1
+        = (((p.mapFinIdx (fun i k _ => (ctx.get i ^ k))).foldl (.*.) 1)
+            * ((q.mapFinIdx (fun i k _ => (ctx.get i ^ k))).foldl (.*.) 1)) := by
+  intro m
+  induction m with
+  | zero =>
+    intro p q hp hq
+    simp only [List.length_eq_zero_iff] at hp hq
+    subst hp; subst hq
+    show (1:R) = 1 * 1
+    rw [Semiring.one_mul]
+  | succ m ih =>
+    intro m1powers m2powers m1length m2length
     specialize ih m1powers.dropLast m2powers.dropLast
     simp [m1length, m2length] at ih
     have m1structure : m1powers ≠ [] := by grind
@@ -265,69 +252,53 @@ theorem denote_mul {ctx : Context R} {m1 m2 : Mon n}
     grind
     simp [m1length, m2length]
 
+/-- Multiplying monomials denotes as a product, as long as the packed degrees
+do not overflow a digit.  The check is `Polynomial.mulOk`. -/
+theorem denote_mul {ctx : Context R} {m1 m2 : Mon n}
+    (h1 : m1.WF) (h2 : m2.WF) (hlt : m1.degree + m2.degree < base n)
+  : (m1.mul m2).denote ctx = m1.denote ctx * m2.denote ctx := by
+  simp only [denote]
+  rw [powers_mul h1 h2 hlt]
+  exact denote_zipWith ctx n m1.powers m2.powers (by simp) (by simp)
+
 theorem denote_mulVarPower (ctx : Context R) (m : Mon n) (i : Fin n) (k : Nat)
-  : denote (n := n) ctx (m.mulVarPower i k) = (ctx[i])^k * m.denote (n := n) ctx:= by
+    (hk : k < base n) (hm : m.WF) (hlt : k + m.degree < base n)
+  : denote (n := n) ctx (m.mulVarPower i k) = (ctx[i])^k * m.denote (n := n) ctx := by
   unfold mulVarPower
-  rw [denote_mul, denote_fromVarPower]
-
-example : [1,2,3].length = 3 := Eq.refl 3
-
-simproc_decl mon_mul_simproc (Mon.mul ⟨_,_⟩ ⟨_,_⟩) := fun e => do
-  let_expr Mon.mul _ m1 m2 ← e | return .continue
-  let_expr Mon.mk _ p1 _ ← m1 | return .continue
-  let_expr Mon.mk _ p2 _ ← m2 | return .continue
-  let .some p1Exprs ← getListLit? p1 | return .continue
-  let .some p2Exprs ← getListLit? p2 | return .continue
-  let .some sumExprs ← Array.mapM id <$> Array.zipWithM (fun aExpr bExpr => do
-    let .some a ← getNatValue? aExpr | return none
-    let .some b ← getNatValue? bExpr | return none
-    pure <| some <| mkNatLit (a + b)
-    ) p1Exprs p2Exprs | return .continue
-  let sum ← mkListLit Nat.mkType sumExprs.toList
-  let nExpr := mkNatLit sumExprs.size
-  let sumLenExpr ← mkAppM ``List.length #[sum]
-  let lenProof ← mkEqRefl nExpr
-  let lenProof := mkExpectedPropHint lenProof (← mkEq sumLenExpr nExpr)
-  let mon ← mkAppOptM ``Mon.mk #[nExpr, sum, lenProof]
-  pure <| .visit {expr := mon}
-
--- simproc mon_denote_array_context_simproc (Macaulean.Mon.denote _ ⟨_,_⟩) := fun e => do
---   let_expr Macaulean.Mon.denote R n inst ctx m ← e | return .continue
---   let_expr Mon.mk _ p _ ← m | return .continue
---   let_expr RArray.ofArray _ arr _ ← ctx | return .continue
---   let .some powExprs ← getListLit? p | return .continue
---   let .some arrExprs ← getArrayLit? arr | return .continue
---   if h1 : powExprs.size = arrExprs.size
---   then
---     let powers ← powExprs.mapFinIdxM (fun i d h2 => mkAppM ``HPow.hPow #[arrExprs[i],d])
---     let mon ← powers.foldlM (fun a b => mkMul a b) (← mkAppOptM ``OfNat.ofNat #[R, mkRawNatLit 1, none])
---     pure <| .visit {expr := mon}
---   else
---     pure .continue
-
-example : (Mon.fromVar (n:=3) (Fin.mk 1 (by grind))).mul (Mon.fromVar (n:=3) (Fin.mk 2 (by simp))) = Mon.ofPowers [0,1,1] := by
-  simp [Mon.fromVar,Mon.fromVarPower,mon_mul_simproc]
-  trivial
+  have hwf : (fromVarPower i k).WF :=
+    wf_ofPowersN (by simp) (by rw [sum_ofFn_oneHot]; exact hk)
+  have hdeg : (fromVarPower i k).degree = k := by
+    rw [degree, powers_fromVarPower i k hk, sum_ofFn_oneHot]
+  rw [denote_mul hwf hm (by rw [hdeg]; exact hlt), denote_fromVarPower _ _ _ hk]
 
 @[simp]
 theorem mul_unit (m1 : Mon n) : m1.mul unit = m1 := by
-  simp [mul, unit,← powers_eq_iff_eq]
-  simp only [← m1.powers_length]
-  induction m1.powers
-  case nil =>
-    trivial
-  case cons ih =>
-    simp [List.replicate_succ, ih]
+  rw [← key_eq_iff_eq, mul_key, unit_key]
+  omega
 
 @[simp]
 theorem unit_mul (m1 : Mon n) : unit.mul m1 = m1 := by
-  simp [mul, unit,← powers_eq_iff_eq]
-  simp only [← m1.powers_length]
-  induction m1.powers
-  case nil =>
-    trivial
-  case cons ih =>
-    simp [List.replicate_succ, ih]
+  rw [← key_eq_iff_eq, mul_key, unit_key]
+  omega
+
+/-- Compute `Mon.powers` on a literal key, so that `simp [Mon.denote]` can
+still unfold the denotation of a concrete monomial. -/
+simproc_decl mon_powers_simproc (Mon.powers ⟨_⟩) := fun e => do
+  let_expr Mon.powers nExpr m ← e | return .continue
+  let .some n ← getNatValue? (← whnf nExpr) | return .continue
+  let_expr Mon.mk _ keyExpr ← (← whnf m) | return .continue
+  let .some key ← getNatValue? (← whnf keyExpr) | return .continue
+  let b := 2 ^ (max 8 (62 / max 1 n))
+  let mut k := key
+  let mut prev := 0
+  let mut out : Array Lean.Expr := #[]
+  for _ in [0:n] do
+    let d := k % b
+    out := out.push (mkNatLit (d - prev))
+    prev := d
+    k := k / b
+  let lst ← mkListLit Nat.mkType out.toList
+  pure <| .visit {expr := lst}
 
 end Mon
 
@@ -1308,40 +1279,104 @@ theorem denoteTerms_map_smul (ctx : Context R) (c : R) (ts : List (PolyTerm R n)
 theorem denote_smul (ctx : Context R) (c : R) (p : Polynomial R n) :
     denote ctx (smul c p) = c * denote ctx p := by simp [smul, denote, denoteTerms_map_smul, denoteTerms_removeZeros]
 
-omit beq lawfulbeq in
-theorem denoteTerms_map_mulMon (ctx : Context R) (c : R) (m : Mon n) (ts : List (PolyTerm R n)) :
-    denoteTerms ctx (ts.map fun t => ⟨c * t.coefficient, m.mul t.monomial⟩) =
-    c * m.denote ctx * denoteTerms ctx ts := by
+/--
+Every monomial of `ts` is packed faithfully and has total degree at most `d`.
+This is what `Polynomial.mulOk` checks, and what the product denotation lemmas
+below need: it is exactly the region on which packed multiplication is
+faithful.
+-/
+def TermsOk (d : Nat) (ts : List (PolyTerm R n)) : Prop :=
+  ∀ t ∈ ts, t.monomial.WF ∧ t.monomial.degree ≤ d
+
+omit beq lawfulbeq inst in
+theorem TermsOk.tail {d : Nat} {t : PolyTerm R n} {ts : List (PolyTerm R n)}
+    (h : TermsOk d (t :: ts)) : TermsOk d ts := fun u hu => h u (by simp [hu])
+
+omit beq lawfulbeq inst in
+theorem TermsOk.head {d : Nat} {t : PolyTerm R n} {ts : List (PolyTerm R n)}
+    (h : TermsOk d (t :: ts)) : t.monomial.WF ∧ t.monomial.degree ≤ d := h t (by simp)
+
+omit beq lawfulbeq inst in
+/-- The kernel's `Bool` check implies the propositional side condition. -/
+theorem termsOk_of_monWFB : ∀ {ts : List (PolyTerm R n)}, monWFB ts = true →
+    TermsOk (monDegBound ts) ts := by
+  intro ts
   induction ts with
-  | nil => simp [mul_zero]
+  | nil => intro _ t ht; simp at ht
   | cons t ts ih =>
-    simp only [List.map_cons, denoteTerms_cons, ih]
+    intro h u hu
+    simp only [monWFB, Bool.and_eq_true] at h
+    rcases List.mem_cons.mp hu with rfl | hu
+    · exact ⟨Mon.wf_iff.mp h.1, by simp only [monDegBound]; omega⟩
+    · have hrec := ih h.2 u hu
+      refine ⟨hrec.1, ?_⟩
+      have : monDegBound (t :: ts) = max t.monomial.degree (monDegBound ts) := rfl
+      omega
+
+omit beq lawfulbeq in
+theorem denoteTerms_map_mulMon (ctx : Context R) (c : R) (m : Mon n)
+    {d₁ d₂ : Nat} (hm : m.WF) (hmd : m.degree ≤ d₁) (hlt : d₁ + d₂ < Mon.base n) :
+    ∀ (ts : List (PolyTerm R n)), TermsOk d₂ ts →
+      denoteTerms ctx (ts.map fun t => ⟨c * t.coefficient, m.mul t.monomial⟩) =
+        c * m.denote ctx * denoteTerms ctx ts := by
+  intro ts
+  induction ts with
+  | nil => intro _; simp [mul_zero]
+  | cons t ts ih =>
+    intro hts
+    have ht := hts.head
+    simp only [List.map_cons, denoteTerms_cons, ih hts.tail]
     rw [left_distrib, mul_assoc, mul_assoc]; congr 1
     ac_nf
     congr
-    apply Macaulean.Mon.denote_mul
+    exact Macaulean.Mon.denote_mul hm ht.1 (by have := ht.2; omega)
 
 omit beq lawfulbeq in
-theorem denoteTerms_mulMonTerms (ctx : Context R) (c : R) (m : Mon n) (p : List (PolyTerm R n)) :
+theorem denoteTerms_mulMonTerms (ctx : Context R) (c : R) (m : Mon n)
+    (p : List (PolyTerm R n)) {d₁ d₂ : Nat} (hm : m.WF) (hmd : m.degree ≤ d₁)
+    (hp : TermsOk d₂ p) (hlt : d₁ + d₂ < Mon.base n) :
     denoteTerms ctx (mulMonTerms c m p) = c * m.denote ctx * denoteTerms ctx p := by
-  simp [mulMonTerms, denoteTerms_map_mulMon]
+  simp only [mulMonTerms]
+  exact denoteTerms_map_mulMon ctx c m hm hmd hlt p hp
 
 omit beq lawfulbeq in
-theorem denoteTerms_mulTerms (ctx : Context R) (xs ys : List (PolyTerm R n)) :
-    denoteTerms ctx (mulTerms xs ys) = denoteTerms ctx xs * denoteTerms ctx ys := by
-  fun_induction mulTerms
-  case case1 => simp [Semiring.zero_mul]
-  case case2 ysEmpty => simp [ysEmpty,denoteTerms_nil,Semiring.mul_zero]
-  case case3 xs' _ _ ys' ysCons ih =>
-    simp [denoteTerms_mergeTerms, denoteTerms_mulMonTerms, Mon.denote_mul]
-    simp [ih,← ysCons,Semiring.right_distrib]
-    simp [ysCons,Semiring.left_distrib]
-    ac_nf
+theorem denoteTerms_mulTerms (ctx : Context R) {d₁ d₂ : Nat} (hlt : d₁ + d₂ < Mon.base n) :
+    ∀ (xs ys : List (PolyTerm R n)), TermsOk d₁ xs → TermsOk d₂ ys →
+      denoteTerms ctx (mulTerms xs ys) = denoteTerms ctx xs * denoteTerms ctx ys := by
+  intro xs
+  induction xs with
+  | nil => intro ys _ _; simp [Semiring.zero_mul]
+  | cons x xs ih =>
+    intro ys hx hy
+    cases ys with
+    | nil => simp [Semiring.mul_zero]
+    | cons y ys =>
+      have hxx := hx.head
+      have hyy := hy.head
+      rw [mulTerms_cons_cons]
+      simp only [denoteTerms_cons, denoteTerms_mergeTerms]
+      rw [denoteTerms_mulMonTerms ctx x.coefficient x.monomial ys hxx.1 hxx.2 hy.tail hlt,
+        ih (y :: ys) hx.tail hy,
+        Mon.denote_mul hxx.1 hyy.1 (by have := hxx.2; have := hyy.2; omega)]
+      simp only [denoteTerms_cons, Semiring.right_distrib, Semiring.left_distrib]
+      ac_nf
 
-theorem denote_mul (ctx : Context R) (p q : Polynomial R n) :
+theorem denote_mul (ctx : Context R) (p q : Polynomial R n) {d₁ d₂ : Nat}
+    (hp : TermsOk d₁ p.terms) (hq : TermsOk d₂ q.terms) (hlt : d₁ + d₂ < Mon.base n) :
     denote ctx (mul p q) = denote ctx p * denote ctx q := by
-    unfold denote Polynomial.mul
-    simp [denoteTerms_mulTerms, denoteTerms_removeZeros]
+  unfold denote Polynomial.mul
+  simp only [denoteTerms_removeZeros]
+  exact denoteTerms_mulTerms ctx hlt p.terms q.terms hp hq
+
+theorem denote_mulChecked (ctx : Context R) {p q r : Polynomial R n}
+    (h : mulChecked p q = some r) : denote ctx r = denote ctx p * denote ctx q := by
+  unfold mulChecked at h
+  split at h
+  · rename_i hok
+    cases h
+    simp only [mulOk, Bool.and_eq_true, decide_eq_true_eq] at hok
+    exact denote_mul ctx p q (termsOk_of_monWFB hok.1.1) (termsOk_of_monWFB hok.1.2) hok.2
+  · exact absurd h (by simp)
 
 omit beq lawfulbeq in
 theorem denote_singleton (ctx : Context R) (i : Fin n)
@@ -1398,15 +1433,18 @@ private theorem foil (a b c d : R) :
 
 theorem mul_leadTerm_expand (ctx : Context R)
     (tf : PolyTerm R n) (f' : List (PolyTerm R n))
-    (tg : PolyTerm R n) (g' : List (PolyTerm R n)) :
+    (tg : PolyTerm R n) (g' : List (PolyTerm R n))
+    {d₁ d₂ : Nat} (hf : TermsOk d₁ (tf :: f')) (hg : TermsOk d₂ (tg :: g'))
+    (hlt : d₁ + d₂ < Mon.base n) :
     denote ctx (mul ⟨tf :: f'⟩ ⟨tg :: g'⟩) =
       tf.coefficient * tg.coefficient * (tf.monomial.mul tg.monomial).denote ctx
       + tf.coefficient * tf.monomial.denote ctx * denoteTerms ctx g'
       + denoteTerms ctx f' * tg.coefficient * tg.monomial.denote ctx
       + denoteTerms ctx f' * denoteTerms ctx g' := by
-  rw [denote_mul]; simp only [denote_mk, denoteTerms_cons]; rw [foil]
+  rw [denote_mul ctx _ _ hf hg hlt]; simp only [denote_mk, denoteTerms_cons]; rw [foil]
   ac_nf
-  simp [Mon.denote_mul]
+  simp [Mon.denote_mul hf.head.1 hg.head.1
+    (by have := hf.head.2; have := hg.head.2; omega)]
 
 end Theorems
 end Polynomial

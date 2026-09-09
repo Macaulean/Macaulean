@@ -23,8 +23,8 @@ def decodeMon? : Json → MrdiDecodeM (Except String (Mon n))
     | .ok powers =>
       match powers.mapM String.toNat? with
       | .some powers =>
-        if h : powers.length = n
-        then pure <| .ok <| Mon.mk powers h
+        if powers.length = n
+        then pure <| .ok <| Mon.ofPowersN n powers
         else pure <| .error s!"Expected an array of length {n}"
       | _ => pure <| .error s!"Expected an array of Naturals as powers"
     | .error s => pure <| .error s

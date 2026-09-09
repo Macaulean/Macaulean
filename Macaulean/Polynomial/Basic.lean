@@ -6,22 +6,47 @@
 -/
 import Lean
 import MRDI
+import Macaulean.Polynomial.Key
 open Lean Grind CommRing
 namespace Macaulean
 
--- TODO we should probably replicate what Vector Nat n does and
--- store the hypotheses that the length of powers
+/--
+A monomial in `n` variables: the exponent vector packed into a single `Nat`.
+
+The digits of `key`, in base `Mon.base n`, are the partial sums of the
+exponents, most significant digit first the total degree
+(`Macaulean/Polynomial/Key.lean`).  So multiplying monomials is one `Nat.add`
+and comparing them in grevlex order is one `Nat.blt` -- which is the whole
+point: the kernel spends its time in `mergeTerms`, comparing monomials.
+
+`Mon.powers` reads the exponent vector back out.  It is a faithful inverse of
+the packing exactly on `Mon.WF` monomials, i.e. while the total degree stays
+below `Mon.base n`; the reflective checker verifies that with `Nat.blt` before
+using a product (`Polynomial.mulOk`).
+-/
 structure Mon (n : Nat) where
-  powers : List Nat -- Vector Nat n
-  powers_length : powers.length = n
-  deriving Repr, BEq, ReflBEq, LawfulBEq
+  key : Nat
+  deriving Repr, BEq, ReflBEq, LawfulBEq, DecidableEq
 
 instance : ToExpr (Mon n) where
-  toExpr m :=
-    mkApp3 (.const ``Mon.mk []) (toExpr n) (toExpr m.powers) (mkApp2 (.const ``Eq.refl [1]) (.const ``Nat []) (toExpr n))
+  toExpr m := mkApp2 (.const ``Mon.mk []) (toExpr n) (toExpr m.key)
   toTypeExpr := mkApp (.const ``Mon []) <| toExpr n
 
-instance : Inhabited (Mon n) := ⟨List.replicate n 0, by simp⟩
+instance : Inhabited (Mon n) := ⟨⟨0⟩⟩
+
+/-- The exponent vector this key stands for. -/
+def Mon.powers (m : Mon n) : List Nat := Mon.decodeKey (Mon.base n) n m.key
+
+@[simp] theorem Mon.powers_length (m : Mon n) : m.powers.length = n := by
+  simp [Mon.powers]
+
+/-- Pack an exponent vector into a monomial in `n` variables. -/
+def Mon.ofPowersN (n : Nat) (p : List Nat) : Mon n := ⟨Mon.encodeKey (Mon.base n) p⟩
+
+def Mon.ofPowers (p : List Nat) : Mon p.length := Mon.ofPowersN p.length p
+
+@[simp] theorem Mon.key_eq_iff_eq {m1 m2 : Mon n} : m1.key = m2.key ↔ m1 = m2 := by
+  cases m1; cases m2; simp
 
 structure PolyTerm (R : Type) (n : Nat) where
   coefficient : R
@@ -43,9 +68,10 @@ inductive Expr (R : Type) (n : Nat) where
 end Polynomial
 
 -- Coersions to higher numbers of variables
+set_option linter.unusedVariables false in
 @[coe]
 def Mon.liftVars {h : n ≤ m} (mon : Mon n) : Mon m :=
-  ⟨mon.powers.rightpad m 0, by simp [mon.powers_length,h]⟩
+  Mon.ofPowersN m (mon.powers.rightpad m 0)
 instance : Coe (Mon n) (Mon (n + k)) := ⟨Mon.liftVars (h := by simp)⟩
 
 @[coe]
@@ -75,75 +101,113 @@ Basic declarations for monomials
 -/
 namespace Mon
 
-def ofPowers (powers : List Nat) : Mon powers.length := ⟨powers,rfl⟩
+/--
+A monomial is *well formed* when its key really is the packing of its own
+exponent vector, and its total degree is below the digit base.
+
+Packing is faithful exactly on well-formed monomials: `Mon.powers` inverts
+`Mon.ofPowersN` there, `Mon.mul` (a key addition) agrees with adding exponent
+vectors there, and `Mon.grevlex` (a key comparison) is the classical grevlex
+order there.  Nothing here is a soundness assumption: the reflective checker
+computes `Mon.wf` and the degree bound with the kernel before it uses a
+product (`Polynomial.mulOk`).
+-/
+def WF (m : Mon n) : Prop :=
+  m.powers.sum < base n ∧ m.key = encodeKey (base n) m.powers
+
+/-- Decidable form of `Mon.WF`. -/
+def wf (m : Mon n) : Bool :=
+  decide (m.powers.sum < base n) && (m.key == encodeKey (base n) m.powers)
+
+theorem wf_iff {m : Mon n} : m.wf = true ↔ m.WF := by
+  simp [wf, WF]
+
+theorem powers_ofPowersN {p : List Nat} (hlen : p.length = n) (hsum : p.sum < base n) :
+    (ofPowersN n p).powers = p :=
+  decodeKey_encodeKey _ (base_pos n) p n hlen hsum
+
+theorem wf_ofPowersN {p : List Nat} (hlen : p.length = n) (hsum : p.sum < base n) :
+    (ofPowersN n p).WF := by
+  refine ⟨?_, ?_⟩ <;> rw [powers_ofPowersN hlen hsum]
+  · exact hsum
+  · rfl
 
 def degree (m : Mon n) : Nat := m.powers.sum
 
+/-! ### The order -/
+
+/--
+Grevlex, as a single comparison of the packed keys.
+
+Spelled with `Nat.beq`/`Nat.ble` and `cond` rather than `compare`: `compare`
+goes through `Decidable` instances, so in the kernel every monomial comparison
+would build -- and the whnf cache would then retain -- a `Nat.le` proof term.
+`mergeTerms` does essentially nothing but compare monomials, so this is the
+hot path.  `Mon.grevlex_eq_compare` says the two agree.
+-/
 def grevlex (m1 m2 : Mon n) : Ordering :=
-  let d1 := m1.degree
-  let d2 := m2.degree
-  (compare d1 d2).then (
-    (compare m1.powers.reverse m2.powers.reverse).swap)
+  bif Nat.beq m1.key m2.key then .eq
+  else bif Nat.ble m1.key m2.key then .lt else .gt
 
-def Grevlex (m1 m2 : Mon n) : Prop :=
-  m1.degree > m2.degree ∨ (m1.degree = m2.degree ∧ m1.powers.reverse < m2.powers.reverse)
+private theorem beq_eq_false_of_ne {a b : Nat} (h : a ≠ b) : Nat.beq a b = false :=
+  Bool.eq_false_iff.mpr (fun hh => absurd (Nat.eq_of_beq_eq_true hh) h)
 
--- TODO: Think about whether this simp lemma should be reversed
-@[simp]
-theorem powers_eq_iff_eq {m1 m2 : Mon n} : m1.powers = m2.powers ↔ m1 = m2 := by
-  have ⟨p1,_⟩ := m1
-  have ⟨p2,_⟩ := m2
-  simp
+private theorem ble_eq_false_of_lt {a b : Nat} (h : b < a) : Nat.ble a b = false :=
+  Bool.eq_false_iff.mpr (fun hh => absurd (Nat.le_of_ble_eq_true hh) (by omega))
 
--- seems like this should be a theorem in List
-private theorem list_nat_lt_iff_compare  (l1 l2 : List Nat) : (compare l1 l2) = .lt ↔ (l1 < l2) := by
-  induction l1 generalizing l2
-  case nil =>
-    cases l2
-    case nil => simp
-    case cons => simp
-  case cons ih =>
-    cases l2
-    case nil => simp
-    case cons l2head l2tail =>
-      simp [Ordering.then_eq_lt, Nat.compare_eq_lt, List.cons_lt_cons_iff]
-      simp [ih l2tail]
+theorem grevlex_eq_compare (m1 m2 : Mon n) : m1.grevlex m2 = compare m1.key m2.key := by
+  show (bif Nat.beq m1.key m2.key then Ordering.eq
+        else bif Nat.ble m1.key m2.key then Ordering.lt else Ordering.gt) = _
+  rcases Nat.lt_trichotomy m1.key m2.key with h | h | h
+  · rw [beq_eq_false_of_ne (by omega), Nat.ble_eq_true_of_le (Nat.le_of_lt h)]
+    exact (Nat.compare_eq_lt.mpr h).symm
+  · rw [h, Nat.beq_refl]
+    exact (Nat.compare_eq_eq.mpr rfl).symm
+  · rw [beq_eq_false_of_ne (by omega), ble_eq_false_of_lt h]
+    exact (Nat.compare_eq_gt.mpr h).symm
 
-theorem grevlex_iff_grevlex_gt : Grevlex m1 m2 ↔ grevlex m1 m2 = .gt := by
-  simp [Grevlex,grevlex, Ordering.then_eq_gt, Nat.compare_eq_gt, list_nat_lt_iff_compare]
+def Grevlex (m1 m2 : Mon n) : Prop := m2.key < m1.key
 
-theorem grevlex_or_eq_iff_grevlex_ge : (Grevlex m1 m2 ∨ m1 = m2) ↔ (grevlex m1 m2).isGE = true := by
-  simp [Grevlex, grevlex, ← Ordering.isLE_swap, Ordering.swap_then, Ordering.isLE_then_iff_or]
-  simp [Ordering.isLE_iff_eq_lt_or_eq_eq, Nat.compare_eq_gt, list_nat_lt_iff_compare]
-  simp [_root_.or_assoc]
-  rw [iff_eq,and_or_right]
-  congr 3
-  simp
-  intro h
-  simp [h]
+/-- The classical definition of grevlex, on exponent vectors: total degree
+first, then reverse-lexicographic with the swap. -/
+def grevlexSpec (m1 m2 : Mon n) : Ordering :=
+  (compare m1.degree m2.degree).then ((compare m1.powers.reverse m2.powers.reverse).swap)
+
+/-- **The order is unchanged.**  Comparing packed keys agrees with the
+classical grevlex comparison of exponent vectors, on well-formed monomials. -/
+theorem grevlex_eq_grevlexSpec {m1 m2 : Mon n} (h1 : m1.WF) (h2 : m2.WF) :
+    m1.grevlex m2 = m1.grevlexSpec m2 := by
+  obtain ⟨hs1, hk1⟩ := h1
+  obtain ⟨hs2, hk2⟩ := h2
+  rw [grevlex_eq_compare, grevlexSpec, hk1, hk2, degree, degree]
+  exact compare_encodeKey (base n) _ _ (by simp) hs1 hs2
+
+theorem grevlex_iff_grevlex_gt {m1 m2 : Mon n} : Grevlex m1 m2 ↔ grevlex m1 m2 = .gt := by
+  simp [Grevlex, grevlex_eq_compare, Nat.compare_eq_gt]
+
+theorem grevlex_or_eq_iff_grevlex_ge {m1 m2 : Mon n} :
+    (Grevlex m1 m2 ∨ m1 = m2) ↔ (grevlex m1 m2).isGE = true := by
+  constructor
+  · rintro (h | rfl)
+    · rw [grevlex_eq_compare, Nat.compare_eq_gt.mpr h]; rfl
+    · rw [grevlex_eq_compare, Nat.compare_eq_eq.mpr rfl]; rfl
+  · intro h
+    rcases hc : compare m1.key m2.key with _ | _ | _
+    · rw [grevlex_eq_compare, hc] at h; exact absurd h (by simp)
+    · exact .inr (key_eq_iff_eq.mp (Nat.compare_eq_eq.mp hc))
+    · exact .inl (Nat.compare_eq_gt.mp hc)
 
 /--
   Grevlex is decidable
 -/
 instance : @DecidableRel (Mon n) (Mon n) Grevlex :=
-  fun m1 m2 => match h : grevlex m1 m2 with
-  | .gt => .isTrue (by simp [h, grevlex_iff_grevlex_gt])
-  | .eq => .isFalse (by simp [h, grevlex_iff_grevlex_gt])
-  | .lt => .isFalse (by simp [h, grevlex_iff_grevlex_gt])
+  fun m1 m2 => inferInstanceAs (Decidable (m2.key < m1.key))
 
 /--
   Grevlex is asymmetric
 -/
 instance : @Std.Asymm (Mon n) Grevlex where
-  asymm a b abh := by
-    simp [Grevlex] at abh
-    cases abh
-    case inl h =>
-      simp [Grevlex, h, Nat.le_iff_lt_or_eq]
-      intro h2
-      simp [h2] at h
-    case inr h =>
-      simp [Grevlex, h, List.le_iff_lt_or_eq]
+  asymm _a _b abh := by simp only [Grevlex] at *; omega
 
 /--
   Grevlex is irreflexive
@@ -156,66 +220,25 @@ instance : @Std.Irrefl (Mon n) Grevlex where
 -/
 instance : @Std.Trichotomous (Mon n) Grevlex where
   trichotomous a b abh bah := by
-    simp [Grevlex] at abh bah
-    have degEqH := Nat.eq_of_le_of_le a.degree b.degree abh.left bah.left
-    simp [degEqH] at abh bah
-    have powersEqH := List.le_antisymm abh bah
-    symm
-    simp at powersEqH
-    trivial
-
-/--
-  Equality is decidable for monomials
--/
-instance : DecidableEq (Mon n) :=
-  fun ⟨p1,_⟩ ⟨p2,_⟩ =>
-    let d := (inferInstance : DecidableEq _) p1 p2
-    match d with
-    | .isTrue h => .isTrue (by simp [h])
-    | .isFalse h => .isFalse (by simp [h])
+    simp only [Grevlex, Nat.not_lt] at abh bah
+    exact key_eq_iff_eq.mp (by omega)
 
 deriving instance DecidableEq for PolyTerm, Polynomial
 
---this is the same as grevlex_swap
-instance {n : Nat} : Std.OrientedCmp (grevlex (n := n)) := by
-  constructor
-  intro a b
-  simp only [Mon.grevlex, Ordering.swap_then,
-    ← Std.OrientedCmp.eq_swap]
+instance {n : Nat} : Std.OrientedCmp (grevlex (n := n)) where
+  eq_swap := by
+    intro a b
+    simp only [grevlex_eq_compare]
+    exact Std.OrientedCmp.eq_swap
 
-instance : Std.LawfulEqCmp (grevlex (n := n)) := by
-  constructor
-  intro ⟨a,_⟩ ⟨b,_⟩
-  simp [
-    Mon.grevlex,
-    Ordering.then_eq_eq,
-    Ordering.swap_eq_eq]
+instance : Std.LawfulEqCmp (grevlex (n := n)) where
+  eq_of_compare {a b} h :=
+    key_eq_iff_eq.mp (Nat.compare_eq_eq.mp (by rwa [grevlex_eq_compare] at h))
 
-instance : @Trans (Mon n) _ _ Grevlex Grevlex Grevlex := by
-  constructor
-  intro a b c hab hbc
-  simp [Grevlex] at *
-  cases hab
-  case inl h1 =>
-    cases hbc
-    case inl h2 =>
-      left
-      apply Trans.trans h2 h1
-    case inr h2 =>
-      left
-      simp [h2.1] at h1
-      trivial
-  case inr h1 =>
-    simp [h1.1] at ⊢ hbc
-    cases hbc
-    case inl =>
-      left
-      trivial
-    case inr h2 =>
-      right
-      constructor
-      · apply h2.1
-      · apply Trans.trans h1.2 h2.2
+instance : @Trans (Mon n) _ _ Grevlex Grevlex Grevlex where
+  trans hab hbc := by simp only [Grevlex] at *; omega
+
+/-! ### Operations -/
 
 /--
   Denotation for monomials, `ctx` provides the substitutions for the variables
@@ -223,16 +246,18 @@ instance : @Trans (Mon n) _ _ Grevlex Grevlex Grevlex := by
 def denote [Grind.CommRing R] (ctx : Context R) (m : Mon n) : R :=
   (m.powers.mapFinIdx (fun i k _ => (ctx.get i ^ k))).foldl (.*.) 1
 
-def mul (m1 m2 : Mon n) : Mon n :=
-  ⟨m1.powers.zipWith (· + ·) m2.powers,
-  by simp [m1.powers_length, m2.powers_length]⟩
+/-- Multiplying monomials is adding keys: one kernel `Nat.add`.  Faithful while
+the degrees stay below `Mon.base n` (`Mon.denote_mul`). -/
+def mul (m1 m2 : Mon n) : Mon n := ⟨m1.key + m2.key⟩
 
-def pow (m : Mon n) (a : Nat) : Mon n :=
-  ⟨m.powers.map (a * ·), by simp [m.powers_length]⟩
+@[simp] theorem mul_key (m1 m2 : Mon n) : (m1.mul m2).key = m1.key + m2.key := rfl
+
+/-- Raising a monomial to a power scales every partial sum, hence the key. -/
+def pow (m : Mon n) (a : Nat) : Mon n := ⟨a * m.key⟩
 
 @[reducible]
 def fromVarPower (i : Fin n) (k : Nat) : Mon n :=
-  ⟨List.ofFn (fun j => if j == i then k else 0), by simp⟩
+  ofPowersN n (List.ofFn (fun j => if j == i then k else 0))
 
 @[reducible]
 def fromVar (i : Fin n) : Mon n := fromVarPower i 1
@@ -240,7 +265,15 @@ def fromVar (i : Fin n) : Mon n := fromVarPower i 1
 def mulVarPower (i : Fin n) (k : Nat) (m : Mon n) : Mon n :=
   (fromVarPower i k).mul m
 
-def unit : Mon n := ⟨List.replicate n 0, by simp⟩
+def unit : Mon n := ⟨0⟩
+
+@[simp] theorem unit_key : (unit : Mon n).key = 0 := rfl
+
+theorem powers_unit : (unit : Mon n).powers = List.replicate n 0 :=
+  decodeFrom_zero_key (base n) n
+
+theorem wf_unit : (unit : Mon n).WF := by
+  refine ⟨?_, ?_⟩ <;> simp [powers_unit, encodeKey_replicate_zero, base_pos n]
 
 def fromGrindMon (m : CommRing.Mon) : Mon (numVarsMon m) :=
   match h : m with
@@ -255,7 +288,6 @@ def fromGrindMon (m : CommRing.Mon) : Mon (numVarsMon m) :=
     let rest : Mon (numVarsMon m) :=
       Mon.liftVars (h := m'Thm) (fromGrindMon m')
     (rest.mulVarPower ⟨v,vThm⟩ k).liftVars (h := by simp [h])
---    ⟨(rest.powers.set v ((rest.powers.get ⟨v, vThm⟩) + k)).cast (congrArg _ h)⟩
 
 end Mon
 
@@ -475,6 +507,41 @@ def pow [BEq R] [CommRing R] (p : Polynomial R n) (m : Nat) : Polynomial R n := 
   | .succ m' => p.mul (pow p m')
 
 instance [CommRing R] [BEq R] : NatPow (Polynomial R n) := ⟨pow⟩
+
+/-! ### Guarded multiplication
+
+Packing exponents into one machine word is faithful only while no digit
+overflows.  `mul` itself stays total -- it just adds keys -- and `mulOk` is the
+kernel-checkable side condition saying that both factors are packed faithfully
+and that the degrees of the product still fit in a digit.  `toPoly` consults it
+and answers `none` when it fails, so soundness of the reflective checker needs
+no degree hypothesis anywhere; only completeness does.
+-/
+
+/-- An upper bound for the total degree of the monomials of a term list. -/
+def monDegBound : List (PolyTerm R n) → Nat
+  | [] => 0
+  | t :: ts => max t.monomial.degree (monDegBound ts)
+
+/-- Every monomial of the list is packed faithfully. -/
+def monWFB : List (PolyTerm R n) → Bool
+  | [] => true
+  | t :: ts => t.monomial.wf && monWFB ts
+
+/-- The side condition for `mul`: both factors are packed faithfully, and the
+degrees of the product still fit below `Mon.base n`. -/
+def mulOk (p q : Polynomial R n) : Bool :=
+  monWFB p.terms && monWFB q.terms &&
+    decide (monDegBound p.terms + monDegBound q.terms < Mon.base n)
+
+/-- `mul`, refusing to answer when the packing would overflow. -/
+def mulChecked [CommRing R] [BEq R] (p q : Polynomial R n) : Option (Polynomial R n) :=
+  if mulOk p q then some (p.mul q) else none
+
+/-- `pow`, refusing to answer when the packing would overflow. -/
+def powChecked [CommRing R] [BEq R] (p : Polynomial R n) : Nat → Option (Polynomial R n)
+  | 0 => some ⟨[⟨1, .unit⟩]⟩
+  | k + 1 => (powChecked p k).bind (mulChecked p)
 
 instance [CommRing R] [BEq R] : SMul R (Polynomial R n) := ⟨smul⟩
 

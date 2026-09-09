@@ -114,6 +114,17 @@ def solveGoal : TacticM Unit := withMainContext do
   let ctx ← Reify.mkContextExpr A reified.atoms
   let nvE := mkRawNatLit nv
   trace[macaulean.reflect] "reified {nv} atoms"
+  -- Monomials are packed into a single `Nat` key in base `Mon.base nv`
+  -- (`Macaulean/Polynomial/Key.lean`).  Check natively, before handing anything
+  -- to the kernel, that a whole key still fits in Lean's small-`Nat` range:
+  -- past that the kernel falls off the GMP fast path and the certificate gets
+  -- slow rather than wrong.
+  let bits := max 8 (62 / max 1 nv)
+  unless (2 ^ bits) ^ nv < 2 ^ 62 do
+    logWarning m!"algebra_norm_reflect: {nv} variables need a {bits * nv}-bit \
+      monomial key, past the kernel's small-`Nat` range; the certificate will \
+      still be checked, but slowly."
+  trace[macaulean.reflect] "monomial key base 2^{bits}, {bits * nv} bits"
   -- 1. The certificate, checked by the kernel.
   let checkTerm := mkAppN (mkConst ``Macaulean.AlgExpr.checkPolyEq)
     #[nvE, reified.lhsReified, reified.rhsReified]

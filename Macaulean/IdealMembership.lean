@@ -401,7 +401,7 @@ unsafe def m2IdealMemTacticRunner (cfg : IdealMembership.Config) (tacName : Name
     dbg_trace "New Goal Created"
     pushGoals [eqGoalMVar.mvarId!]
     let (newGoals,_) ←
-      runTactic (← getMainGoal) (← `(tactic|simp (maxSteps:=100000) [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+      runTactic (← getMainGoal) (← `(tactic|simp (maxSteps:=100000) [Macaulean.Polynomial.denote, Macaulean.Mon.denote, Macaulean.Mon.mon_powers_simproc, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
     setGoals newGoals
   else
     tacticError "Failed to show vanishing"
@@ -442,11 +442,11 @@ unsafe def m2RemainderTacticRunner (cfg : IdealMembership.Config) (tacName : Nam
     dbg_trace "New Goal Created"
     pushGoals [eqGoalMVar.mvarId!]
     let (newGoals,_) ←
-      runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+      runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, Macaulean.Mon.mon_powers_simproc, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
     setGoals newGoals
     pushGoals [remainderZeroGoal.mvarId!]
     let (newGoals2,_) ←
-      runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
+      runTactic (← getMainGoal) (← `(tactic|simp [Macaulean.Polynomial.denote, Macaulean.Mon.denote, Macaulean.Mon.mon_powers_simproc, RArray_get_ofArray, Semiring_zero_add, Semiring.add_zero]))
     pushGoals newGoals2
   else
     tacticError "Failed to show remainder"

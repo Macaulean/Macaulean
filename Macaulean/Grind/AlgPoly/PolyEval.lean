@@ -19,8 +19,10 @@ namespace AlgExpr
 /--
 Evaluate a reified expression to a polynomial in `nv` variables.
 
-`none` means the expression mentions a variable index `≥ nv`, which the tactic
-never produces; making it explicit keeps `toPoly` total.
+`none` means either that the expression mentions a variable index `≥ nv` --
+which the tactic never produces -- or that a product's exponents would overflow
+the packed monomial key (`Polynomial.mulChecked`).  Making both explicit keeps
+`toPoly` total and keeps soundness free of degree side conditions.
 -/
 def toPoly (nv : Nat) : AlgExpr Int → Option (Polynomial Int nv)
   | .coeff k => some ⟨Polynomial.removeZeros [⟨k, Mon.unit⟩]⟩
@@ -35,10 +37,10 @@ def toPoly (nv : Nat) : AlgExpr Int → Option (Polynomial Int nv)
     | _, _ => none
   | .mul a b =>
     match toPoly nv a, toPoly nv b with
-    | some p, some q => some (p.mul q)
+    | some p, some q => p.mulChecked q
     | _, _ => none
   | .neg a => (toPoly nv a).map Polynomial.neg
-  | .pow a k => (toPoly nv a).map (Polynomial.pow · k)
+  | .pow a k => (toPoly nv a).bind (Polynomial.powChecked · k)
 
 /-- The certificate the kernel checks: both sides evaluate, and to the same
 normal form. -/
@@ -95,8 +97,7 @@ theorem denote_toPoly (nv : Nat) :
     simp only [toPoly] at hp
     split at hp
     · rename_i pa pb ha hb
-      cases hp
-      rw [Polynomial.denoteWith_mul hφ, iha _ ha, ihb _ hb]; rfl
+      rw [Polynomial.denoteWith_mulChecked hφ ctx hp, iha _ ha, ihb _ hb]; rfl
     · exact absurd hp (by simp)
   | neg a iha =>
     intro p hp
@@ -105,9 +106,9 @@ theorem denote_toPoly (nv : Nat) :
     rw [Polynomial.denoteWith_neg hφ, iha _ ha]; rfl
   | pow a k iha =>
     intro p hp
-    simp only [toPoly, Option.map_eq_some_iff] at hp
-    obtain ⟨pa, ha, rfl⟩ := hp
-    rw [Polynomial.denoteWith_pow hφ, iha _ ha]; rfl
+    simp only [toPoly, Option.bind_eq_some_iff] at hp
+    obtain ⟨pa, ha, hp⟩ := hp
+    rw [Polynomial.denoteWith_powChecked hφ ctx pa k p hp, iha _ ha]; rfl
 
 /--
 **Soundness of the reflective check.**

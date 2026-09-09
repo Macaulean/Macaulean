@@ -139,27 +139,53 @@ theorem denoteWith_sub {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Context A)
     denoteWith φ ctx (p.sub q) = denoteWith φ ctx p - denoteWith φ ctx q := by
   rw [Polynomial.sub, denoteWith_add hφ, denoteWith_neg hφ, Ring.sub_eq_add_neg]
 
-theorem denoteWith_mul {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Context A)
-    (p q : Polynomial C n) :
-    denoteWith φ ctx (p.mul q) = denoteWith φ ctx p * denoteWith φ ctx q := by
-  show denoteTerms ctx (mapCoeffTerms φ (removeZeros (mulTerms p.terms q.terms))) = _
-  rw [denoteTerms_mapCoeffTerms_removeZeros hφ, mapCoeffTerms_mulTerms hφ,
-    denoteTerms_mulTerms]
-  rfl
+/-- `TermsOk` only constrains monomials, which `mapCoeffTerms` leaves alone. -/
+theorem termsOk_mapCoeffTerms {d : Nat} {φ : C → A} {ts : List (PolyTerm C n)}
+    (h : TermsOk d ts) : TermsOk d (mapCoeffTerms φ ts) := by
+  intro t ht
+  simp only [mapCoeffTerms, List.mem_map] at ht
+  obtain ⟨u, hu, rfl⟩ := ht
+  exact h u hu
+
+/-- Multiplication, through the coefficient map, when the packing check passed. -/
+theorem denoteWith_mulChecked {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Context A)
+    {p q r : Polynomial C n} (h : mulChecked p q = some r) :
+    denoteWith φ ctx r = denoteWith φ ctx p * denoteWith φ ctx q := by
+  unfold mulChecked at h
+  split at h
+  · rename_i hok
+    cases h
+    simp only [mulOk, Bool.and_eq_true, decide_eq_true_eq] at hok
+    show denoteTerms ctx (mapCoeffTerms φ (removeZeros (mulTerms p.terms q.terms))) = _
+    rw [denoteTerms_mapCoeffTerms_removeZeros hφ, mapCoeffTerms_mulTerms hφ,
+      denoteTerms_mulTerms ctx hok.2 _ _
+        (termsOk_mapCoeffTerms (termsOk_of_monWFB hok.1.1))
+        (termsOk_mapCoeffTerms (termsOk_of_monWFB hok.1.2))]
+    rfl
+  · exact absurd h (by simp)
 
 theorem denoteWith_one {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Context A) :
     denoteWith φ ctx (⟨[⟨1, Mon.unit⟩]⟩ : Polynomial C n) = 1 := by
   show φ 1 * Mon.unit.denote ctx + denoteTerms ctx [] = 1
   rw [hφ.map_one, Mon.denote_unit, Semiring.mul_one, denoteTerms_nil, Semiring.add_zero]
 
-theorem denoteWith_pow {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Context A)
-    (p : Polynomial C n) (k : Nat) :
-    denoteWith φ ctx (p.pow k) = denoteWith φ ctx p ^ k := by
+/-- Powers, through the coefficient map, when every packing check passed. -/
+theorem denoteWith_powChecked {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Context A)
+    (p : Polynomial C n) :
+    ∀ (k : Nat) (r : Polynomial C n), powChecked p k = some r →
+      denoteWith φ ctx r = denoteWith φ ctx p ^ k := by
+  intro k
   induction k with
-  | zero => rw [Semiring.pow_zero]; exact denoteWith_one hφ ctx
+  | zero =>
+    intro r h
+    cases h
+    rw [Semiring.pow_zero]
+    exact denoteWith_one hφ ctx
   | succ k ih =>
-    rw [Polynomial.pow, denoteWith_mul hφ, ih, Semiring.pow_succ,
-      CommSemiring.mul_comm]
+    intro r h
+    simp only [powChecked, Option.bind_eq_some_iff] at h
+    obtain ⟨s, hs, hr⟩ := h
+    rw [denoteWith_mulChecked hφ ctx hr, ih s hs, Semiring.pow_succ, CommSemiring.mul_comm]
 
 theorem denoteWith_ofVar {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Context A) (i : Fin n) :
     denoteWith φ ctx (ofVar i) = ctx.get i := by

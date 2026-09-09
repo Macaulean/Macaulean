@@ -134,10 +134,10 @@ example : (Macaulean.Polynomial.mk [
 /--
  info: {
   terms :=
-    [{ coefficient := 2, monomial := { powers := [1, 0, 1, 0], powers_length := ⋯ } },
-      { coefficient := 2, monomial := { powers := [0, 1, 1, 0], powers_length := ⋯ } },
-      { coefficient := 1, monomial := { powers := [1, 0, 0, 1], powers_length := ⋯ } },
-      { coefficient := 1, monomial := { powers := [0, 1, 0, 1], powers_length := ⋯ } }] }
+    [{ coefficient := 2, monomial := { key := 70370891694081 } },
+      { coefficient := 2, monomial := { key := 70370891694080 } },
+      { coefficient := 1, monomial := { key := 70369817952257 } },
+      { coefficient := 1, monomial := { key := 70369817952256 } }] }
 -/
 #guard_msgs in
 #eval ((Macaulean.Polynomial.mk (n := 4) [
@@ -150,12 +150,12 @@ example : (Macaulean.Polynomial.mk [
 /--
 info: {
   terms :=
-    [{ coefficient := 2, monomial := { powers := [2, 0, 0, 0], powers_length := ⋯ } },
-      { coefficient := 2, monomial := { powers := [1, 1, 0, 0], powers_length := ⋯ } },
-      { coefficient := 3, monomial := { powers := [1, 0, 1, 0], powers_length := ⋯ } },
-      { coefficient := 3, monomial := { powers := [0, 1, 1, 0], powers_length := ⋯ } },
-      { coefficient := 1, monomial := { powers := [1, 0, 0, 1], powers_length := ⋯ } },
-      { coefficient := 1, monomial := { powers := [0, 1, 0, 1], powers_length := ⋯ } }] }
+    [{ coefficient := 2, monomial := { key := 70370891726850 } },
+      { coefficient := 2, monomial := { key := 70370891726849 } },
+      { coefficient := 3, monomial := { key := 70370891694081 } },
+      { coefficient := 3, monomial := { key := 70370891694080 } },
+      { coefficient := 1, monomial := { key := 70369817952257 } },
+      { coefficient := 1, monomial := { key := 70369817952256 } }] }
 -/
 #guard_msgs in
 #eval (((Macaulean.Polynomial.mk (n := 4) [
