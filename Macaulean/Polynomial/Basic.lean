@@ -115,12 +115,35 @@ product (`Polynomial.mulOk`).
 def WF (m : Mon n) : Prop :=
   m.powers.sum < base n ∧ m.key = encodeKey (base n) m.powers
 
-/-- Decidable form of `Mon.WF`. -/
-def wf (m : Mon n) : Bool :=
-  decide (m.powers.sum < base n) && (m.key == encodeKey (base n) m.powers)
+/--
+Decidable form of `Mon.WF`: one walk down the digits of the key, checking that
+they are non-decreasing and that there are no more than `n` of them.
+
+Deliberately *not* `decide (m.powers.sum < base n) && m.key == encodeKey …`:
+that decodes the key into a list, sums the list and re-encodes it, three walks
+and two list allocations, and the reflective checker runs it on every factor of
+every product.  `Mon.wf_iff` says the two agree.
+-/
+def wf (m : Mon n) : Bool := wfFrom (base n) n 0 m.key
+
+/-- The total degree, read off the same digit walk as `Mon.wf` -- the last
+digit of a packed key is its total degree.  Agrees with `Mon.degree` on
+well-formed monomials (`Mon.degree_eq_degB`), which is where it is used. -/
+def degB (m : Mon n) : Nat := topFrom (base n) n 0 m.key
 
 theorem wf_iff {m : Mon n} : m.wf = true ↔ m.WF := by
-  simp [wf, WF]
+  constructor
+  · intro h
+    refine ⟨?_, ?_⟩
+    · have hs := sum_decodeFrom_eq_topFrom (base n) n 0 m.key h
+      have hlt := topFrom_lt (base n) (base_pos n) n 0 m.key (base_pos n)
+      show (decodeFrom (base n) n 0 m.key).sum < base n
+      omega
+    · exact (encodeFrom_decodeFrom (base n) (base_pos n) n 0 m.key h).symm
+  · intro ⟨hsum, hkey⟩
+    show wfFrom (base n) n 0 m.key = true
+    rw [hkey]
+    exact wfFrom_encodeFrom (base n) (base_pos n) m.powers n 0 (by simp) (by omega)
 
 theorem powers_ofPowersN {p : List Nat} (hlen : p.length = n) (hsum : p.sum < base n) :
     (ofPowersN n p).powers = p :=
@@ -133,6 +156,12 @@ theorem wf_ofPowersN {p : List Nat} (hlen : p.length = n) (hsum : p.sum < base n
   · rfl
 
 def degree (m : Mon n) : Nat := m.powers.sum
+
+/-- On a well-formed monomial the cheap degree is the degree. -/
+theorem degree_eq_degB {m : Mon n} (h : m.wf = true) : m.degree = m.degB := by
+  have := sum_decodeFrom_eq_topFrom (base n) n 0 m.key h
+  show (decodeFrom (base n) n 0 m.key).sum = topFrom (base n) n 0 m.key
+  omega
 
 /-! ### The order -/
 
@@ -540,10 +569,13 @@ and answers `none` when it fails, so soundness of the reflective checker needs
 no degree hypothesis anywhere; only completeness does.
 -/
 
-/-- An upper bound for the total degree of the monomials of a term list. -/
+/-- An upper bound for the total degree of the monomials of a term list, read
+off the packed keys (`Mon.degB`) rather than the decoded exponent vectors.  It
+is only ever used together with `monWFB`, where the two agree
+(`Mon.degree_eq_degB`). -/
 def monDegBound : List (PolyTerm R n) → Nat
   | [] => 0
-  | t :: ts => max t.monomial.degree (monDegBound ts)
+  | t :: ts => max t.monomial.degB (monDegBound ts)
 
 /-- Every monomial of the list is packed faithfully. -/
 def monWFB : List (PolyTerm R n) → Bool

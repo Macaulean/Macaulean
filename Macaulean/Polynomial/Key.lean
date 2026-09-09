@@ -183,6 +183,107 @@ theorem decodeKey_encodeKey (b : Nat) (hb : 0 < b) (p : List Nat) (len : Nat)
     decodeKey b len (encodeKey b p) = p :=
   decodeFrom_encodeFrom b hb p len 0 hlen (by omega)
 
+/-! ## Checking a key without decoding it
+
+Whether a key really is the packing of its own exponent vector is a property of
+its *digits*: they must be non-decreasing (partial sums are), and there must be
+no more than `len` of them.  `wfFrom` checks exactly that with one walk down the
+key -- `len` GMP divisions and comparisons, no list -- where decoding and
+re-encoding costs three walks and allocates two lists.  `topFrom` reads off the
+same walk's last digit, which is the monomial's total degree.
+
+The reflective checker runs both at every product (`Polynomial.mulOk`), so they
+are on the hot path; `wfFrom_iff_encodeFrom` and `sum_decodeFrom_eq_topFrom`
+say they agree with the decoding definitions.
+-/
+
+/-- `k` is the packing of `len` further exponents, the partial sums starting
+from `prev`. -/
+def wfFrom (b : Nat) : Nat → Nat → Nat → Bool
+  | 0, _, k => Nat.beq k 0
+  | len + 1, prev, k => Nat.ble prev (k % b) && wfFrom b len (k % b) (k / b)
+
+/-- The last digit of the same walk: the total degree of the packed monomial. -/
+def topFrom (b : Nat) : Nat → Nat → Nat → Nat
+  | 0, prev, _ => prev
+  | len + 1, _, k => topFrom b len (k % b) (k / b)
+
+@[simp] theorem wfFrom_zero (b prev k : Nat) : wfFrom b 0 prev k = Nat.beq k 0 := rfl
+
+@[simp] theorem wfFrom_succ (b len prev k : Nat) :
+    wfFrom b (len + 1) prev k = (Nat.ble prev (k % b) && wfFrom b len (k % b) (k / b)) := rfl
+
+@[simp] theorem topFrom_zero (b prev k : Nat) : topFrom b 0 prev k = prev := rfl
+
+@[simp] theorem topFrom_succ (b len prev k : Nat) :
+    topFrom b (len + 1) prev k = topFrom b len (k % b) (k / b) := rfl
+
+/-- The walk's last digit is a digit, so it is below the base. -/
+theorem topFrom_lt (b : Nat) (hb : 0 < b) :
+    ∀ (len prev k : Nat), prev < b → topFrom b len prev k < b := by
+  intro len
+  induction len with
+  | zero => intro prev k h; exact h
+  | succ len ih => intro prev k _; exact ih _ _ (Nat.mod_lt _ hb)
+
+/-- On a key the walk accepts, the decoded exponents sum to the last digit --
+that is, the total degree is the top digit, without decoding. -/
+theorem sum_decodeFrom_eq_topFrom (b : Nat) :
+    ∀ (len prev k : Nat), wfFrom b len prev k = true →
+      prev + (decodeFrom b len prev k).sum = topFrom b len prev k := by
+  intro len
+  induction len with
+  | zero => intro prev k _; simp
+  | succ len ih =>
+    intro prev k h
+    rw [wfFrom_succ, Bool.and_eq_true] at h
+    have hle : prev ≤ k % b := Nat.le_of_ble_eq_true h.1
+    rw [decodeFrom_succ, topFrom_succ, List.sum_cons, ← ih _ _ h.2]
+    omega
+
+/-- On a key the walk accepts, re-encoding the decoded exponents gives the key
+back: the walk is exactly the faithfulness of the packing. -/
+theorem encodeFrom_decodeFrom (b : Nat) (hb : 0 < b) :
+    ∀ (len prev k : Nat), wfFrom b len prev k = true →
+      encodeFrom b prev (decodeFrom b len prev k) = k := by
+  intro len
+  induction len with
+  | zero =>
+    intro prev k h
+    simp only [wfFrom_zero] at h
+    rw [decodeFrom_zero, encodeFrom_nil]
+    exact (Nat.eq_of_beq_eq_true h).symm
+  | succ len ih =>
+    intro prev k h
+    rw [wfFrom_succ, Bool.and_eq_true] at h
+    have hle : prev ≤ k % b := Nat.le_of_ble_eq_true h.1
+    have hprev : prev + (k % b - prev) = k % b := by omega
+    rw [decodeFrom_succ, encodeFrom_cons, hprev, ih _ _ h.2]
+    exact Nat.mod_add_div k b
+
+/-- Conversely, the walk accepts every faithfully packed key. -/
+theorem wfFrom_encodeFrom (b : Nat) (hb : 0 < b) :
+    ∀ (p : List Nat) (len prev : Nat), p.length = len → prev + p.sum < b →
+      wfFrom b len prev (encodeFrom b prev p) = true := by
+  intro p
+  induction p with
+  | nil => intro len prev hlen _; cases len <;> simp_all
+  | cons e es ih =>
+    intro len prev hlen hlt
+    cases len with
+    | zero => simp at hlen
+    | succ len =>
+      have hlen' : es.length = len := by simpa using hlen
+      have hsum : prev + e + es.sum < b := by simp [List.sum_cons] at hlt; omega
+      have hpe : prev + e < b := by omega
+      have hmod : ((prev + e) + b * encodeFrom b (prev + e) es) % b = prev + e := by
+        rw [Nat.add_mul_mod_self_left]; exact Nat.mod_eq_of_lt hpe
+      have hdiv : ((prev + e) + b * encodeFrom b (prev + e) es) / b
+          = encodeFrom b (prev + e) es := by
+        rw [Nat.add_mul_div_left _ _ hb, Nat.div_eq_of_lt hpe]; omega
+      rw [encodeFrom_cons, wfFrom_succ, hmod, hdiv, ih len (prev + e) hlen' hsum]
+      simp [Nat.ble_eq_true_of_le (Nat.le_add_right prev e)]
+
 /-! ## Comparing keys is grevlex -/
 
 theorem compare_add_right (a c k : Nat) : compare (a + k) (c + k) = compare a c := by

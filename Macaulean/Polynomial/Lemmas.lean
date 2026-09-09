@@ -1315,12 +1315,13 @@ theorem termsOk_of_monWFB : ∀ {ts : List (PolyTerm R n)}, monWFB ts = true →
   | cons t ts ih =>
     intro h u hu
     simp only [monWFB, Bool.and_eq_true] at h
+    have hb : monDegBound (t :: ts) = max t.monomial.degB (monDegBound ts) := rfl
     rcases List.mem_cons.mp hu with rfl | hu
-    · exact ⟨Mon.wf_iff.mp h.1, by simp only [monDegBound]; omega⟩
-    · have hrec := ih h.2 u hu
-      refine ⟨hrec.1, ?_⟩
-      have : monDegBound (t :: ts) = max t.monomial.degree (monDegBound ts) := rfl
+    · refine ⟨Mon.wf_iff.mp h.1, ?_⟩
+      rw [Mon.degree_eq_degB h.1, hb]
       omega
+    · have hrec := ih h.2 u hu
+      exact ⟨hrec.1, by omega⟩
 
 omit beq lawfulbeq in
 theorem denoteTerms_map_mulMon (ctx : Context R) (c : R) (m : Mon n)
