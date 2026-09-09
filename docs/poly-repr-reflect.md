@@ -4,7 +4,8 @@
 one kind of goal: a polynomial identity `A * B = Q * G + R` in a commutative
 ring, at the size a computer-algebra certificate actually has (hundreds to
 thousands of monomials in the expanded product).  The whole certificate is
-checked by the Lean **kernel** -- never `native_decide`, never `+native` -- so
+checked by the Lean **kernel** by default -- never `native_decide`, and
+`+native` only when the caller writes it out (see "`m2cert`" below) -- so
 everything on the path has to be something the kernel can unfold, and cheaply.
 
 This note records what the representation is, what the kernel does with it, and
@@ -126,6 +127,10 @@ for.
 `#print axioms` on `AlgExpr.eq_of_checkPolyEq` and on every benchmark theorem:
 `[propext, Classical.choice, Quot.sound]`.
 
+Step 2 is the only place a caller can change the trusted base:
+`algebra_norm_reflect +native` runs it as `decide +native` instead.  That is
+opt-in, warns, and is described under "`m2cert`" below.
+
 ## Measured: kbench across the branch
 
 `MacauleanTest/AlgebraNormPerf.lean`, `set_option Elab.async false`, four
@@ -197,6 +202,117 @@ Measured and **rejected**:
   same.  Balancing only pays when the summands are *singletons*, which is
   exactly the sum-of-monomials case that `AlgExpr.rebalance` handles.
 
+## `m2cert`: getting the certificate from Macaulay2
+
+The tactic above proves an identity it is *handed*.  Finding the identity --
+the quotients `Qᵢ` of a division, the remainder -- is what Macaulay2 is for.
+`Macaulean/M2Cert.lean` joins the two.
+
+`m2idealmem` and `m2remainder` already did the Macaulay2 half; what they did
+afterwards was `simp` on `Macaulean.Polynomial`'s denotation, and that is the
+step that does not finish at certificate scale.  `m2cert` keeps the round trip
+and replaces the closing step with the kernel certificate.
+
+### The two goal shapes
+
+```lean
+-- divisibility: one generator, no hypotheses
+example (x y z : Int) :
+    (x ^ 3 + y * z - 2) ∣ ((x ^ 3 + y * z - 2) * (x * y + 3 * z ^ 2 - 1)) := by
+  m2cert
+
+-- ideal membership: `hᵢ : gᵢ = 0` as arguments
+example (x y z : Rat) (h1 : x * y - z = 0) (h2 : y ^ 2 - x = 0) :
+    x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  m2cert [h1, h2]
+```
+
+* **`g ∣ f`.**  Macaulay2 divides `f` by `g`.  The remainder has to vanish;
+  then `f = g * q` is proved reflectively and `Exists.intro` finishes, since
+  `g ∣ f` unfolds to `∃ c, f = g * c`.
+* **`p = r` from `hᵢ : gᵢ = 0`.**  Macaulay2 divides `p - r` by the `gᵢ`.  The
+  remainder has to vanish; then `p = r + Σ qᵢ gᵢ` is proved reflectively and the
+  generators are peeled off one at a time with the hypotheses.  `p = 0` is the
+  special case `m2idealmem` handles, and `quotientRemainder` already returns
+  one cofactor per generator, so any number of generators works with no change
+  to `m2/macaulean.m2`.
+
+If the remainder is *not* zero the goal does not follow from the generators,
+and the tactic says so rather than leaving something behind.
+
+The cofactors are rebuilt as terms of the ambient ring by `poly_def`'s
+`PolyBuilder`, so the identity that reaches `algebra_norm_reflect` is
+term-for-term what a committed `poly_def` would have produced.  Coefficients
+have to be integers: the reflective path normalises over `Polynomial Int nv`,
+and there is nowhere to put a denominator.  Over `Rat` that means the
+generators want leading coefficient ±1; a non-integral cofactor is reported,
+not silently rounded.
+
+### `m2cert?` and keeping Macaulay2 out of the build
+
+`m2cert?` closes the goal *and* prints the invocation that closes it again
+without Macaulay2:
+
+```
+Try this:
+  poly_cert ["2.0.0.1 0.0.1.1", "0.0.0.0"] in [x, y, z] using [h1, h2]
+```
+
+The strings are `poly_def`'s `e₁.….eₙ.k` monomial format -- one exponent per
+listed variable, then an integer coefficient -- in Macaulay2's own emission
+order, and the variables are indexed by their user names so the same goal
+prints the same line every time.  `poly_cert` (`Macaulean/PolyCert.lean`)
+imports neither `Macaulean.Macaulay2` nor `Macaulean.IdealMembership`, so a
+file that has been through this once needs no M2 process, no M2 installation
+and no network: **committing the data and calling `poly_cert` is the
+recommended way to keep a computer algebra system out of a build.**
+`MacauleanTest/PolyCert.lean` is that file for this repository -- its
+`paste_*` theorems are the suggestions above, copied verbatim.
+
+A cofactor may equally well be an ordinary term:
+
+```lean
+poly_cert [x ^ 2 + z, 0] using [h1, h2]
+```
+
+so a certificate that is already a named constant -- from `poly_def`, when the
+ring's variables are constants rather than the goal's bound variables -- goes
+in as `poly_cert [name, …]`.  A `poly_def` *declaration* cannot hold a
+cofactor written in the goal's bound variables, because its body is a closed
+term; that is why the printed suggestion uses the string form, which goes
+through the same builder and yields the same term.
+
+### `+native`: opt-in, and what it costs
+
+```lean
+m2cert +native [h1, h2]        -- also m2cert?, poly_cert, algebra_norm_reflect
+```
+
+`+native` closes the `checkPolyEq … = true` obligation with `decide +native`
+instead of `decide +kernel`.  The Lean **compiler and its runtime** then stand
+where the kernel stood: on this toolchain `#print axioms` grows a generated
+`<thm>._native.decide.ax_1_1` axiom (older toolchains show `Lean.ofReduceBool`
+directly) next to the usual `propext, Classical.choice, Quot.sound`.  Nothing
+selects it automatically, no tactic here ever calls `native_decide`, and using
+it always logs a warning naming the cost.  `m2cert?` carries the flag into what
+it prints, so pasting the suggestion cannot silently change what does the
+checking.
+
+The kernel path adds no axioms at all: `[propext, Classical.choice, Quot.sound]`
+on every `m2cert`/`poly_cert` theorem in `MacauleanTest`.
+
+### The wire
+
+`m2cert` shares the Macaulay2 plumbing with `m2idealmem`:
+`m2QuotientRemainderRaw` (`Macaulean/IdealMembership.lean`) reifies the goal
+polynomials, serialises them as `Macaulean.Polynomial R n` over MRDI, sends one
+`quotientRemainder` request, and hands the reply back untouched;
+`m2cert` reads the monomials straight out of it.  Integer coefficients travel
+as decimal strings, like everything else on this wire -- a bare JSON number is
+unreadable to `MRDI.m2`, whose `fromMRDI` recursion knows hash tables, strings
+and lists only.
+
+
 ## What consumers notice
 
 * `Mon.mk` takes a **key**, not an exponent list.  Build a monomial from
@@ -220,5 +336,16 @@ Measured and **rejected**:
   `none` when a product would overflow the packed key, exactly as an
   out-of-range variable index already did.
 * `algebra_norm_reflect` warns when an `nv`-variable key would exceed `2^62`.
+* `algebra_norm_reflect` and `algebra_norm` take an optional `+native` flag.
+  The kernel is still the default; `+native` warns.
+* `AlgPoly.Tactic.proveEq lhs rhs native` builds the reflective proof of
+  `lhs = rhs` and returns it without touching the goal state.  That is the
+  entry point for tactics that state their own identity (`poly_cert`,
+  `m2cert`); `solveGoal` is `proveEq` plus the assignment.
+* `MrdiType Int` encodes an integer as a decimal *string* (and decodes either
+  form).  A bare JSON number is unreadable to `MRDI.m2`.
+* `m2QuotientRemainderRaw` is the Macaulay2 round trip on its own -- reify,
+  serialise, one `quotientRemainder` request, reply untouched --
+  with `m2QuotientRemainderImpl` the deserialisation that used to follow it.
 * `AlgExpr.checkPolyEq` rebalances its arguments; if you call `toPoly` yourself
   on a hand-built chain and compare, do the same or expect `O(m²)`.

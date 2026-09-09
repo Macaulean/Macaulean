@@ -37,8 +37,10 @@ See the [wiki](https://github.com/Macaulay2/M2/wiki).
 ## Notes
 
 * [`docs/poly-repr-reflect.md`](docs/poly-repr-reflect.md) — the packed
-  monomial representation, the kernel path of `algebra_norm_reflect`, and the
-  measured cost of each change to it.
+  monomial representation, the kernel path of `algebra_norm_reflect`, the
+  measured cost of each change to it, and `m2cert` / `m2cert?` / `poly_cert`:
+  a Macaulay2 certificate the Lean kernel checks, and how to commit the data
+  so that later builds need no Macaulay2.
 
 ##  Tests (Lean)
 
