@@ -160,6 +160,18 @@ partial def toCommRingExpr?
         fun varState => varState.mapCoefficient x)
       pure <| .var varName
 
+/--
+Reify `x`, an expression of the *ambient* ring, as a `Macaulean.Polynomial ring
+n` -- where `ring` is the ring the coefficients travel in, which need not be
+the ambient one (see `m2QuotientRemainderRaw`'s `coeffRing`).
+
+Numerals and unary minus are translated rather than treated as opaque
+constants, which is what lets the two rings differ: a goal over
+`MvPolynomial (Fin 3) ℚ` whose `CertRing` instance says `QQ` sends its
+coefficients as `Rat`.  When the two rings *are* the same -- every caller
+before `m2cert` -- the numeral branch rebuilds the numeral it was given, so
+nothing changes.
+-/
 partial def toPolynomialExpr?
   (variables : FVarIdMap Nat) (ring : Expr) (x : Lean.Expr) : MetaM Lean.Expr := do
   match_expr x with
@@ -171,6 +183,16 @@ partial def toPolynomialExpr?
     mkMul (← toPolynomialExpr? variables ring a) (← toPolynomialExpr? variables ring b)
   | HPow.hPow _ _ _ _ a b =>
     mkAppM ``HPow.hPow #[(← toPolynomialExpr? variables ring a), b]
+  | Neg.neg _ _ a =>
+    mkAppM ``Neg.neg #[← toPolynomialExpr? variables ring a]
+  | OfNat.ofNat _ n _ =>
+    match ← getNatValue? n with
+    | some k =>
+      mkAppOptM ``Macaulean.Polynomial.ofConst
+        #[ring, toExpr variables.size,
+          ← mkAppOptM ``OfNat.ofNat #[ring, mkRawNatLit k, none]]
+    | none =>
+      mkAppOptM ``Macaulean.Polynomial.ofConst #[ring, toExpr variables.size, x]
   | _ =>
     match x with
     | .fvar varId =>
@@ -312,13 +334,19 @@ the reply use.
 expressions; `m2cert` (`Macaulean/M2Cert.lean`) reads the monomials out of it
 directly, to build the certificate in the ambient ring instead.
 
+`coeffRing` is the ring the coefficients are serialised in -- the Macaulay2
+base ring.  It defaults to the ambient ring, which is what every caller wanted
+back when the ambient ring was always `Int` or `Rat`; `m2cert` passes what the
+ambient ring's `Macaulean.CertRing` instance asks for.
+
 With `sortVars` the variables are indexed in the order of their *user* names
 rather than in the order `collectFVars` happens to visit them.  The tactics
 themselves do not care -- any consistent indexing works -- but `m2cert?` prints
 the variable list, and an unpredictable one is no use to a reader.
 -/
 unsafe def m2QuotientRemainderRaw (goal : MVarId) (ring : Expr) (idealExprs : Array Expr)
-  (polyExpr : Expr) (sortVars : Bool := false) : MetaM (Array FVarId × QuotientRemainder) := do
+  (polyExpr : Expr) (sortVars : Bool := false) (coeffRing : Option Expr := none) :
+  MetaM (Array FVarId × QuotientRemainder) := do
   dbg_trace "M2IdealMem Start"
 
   --TODO reimplement universalization in a more systematic way
@@ -336,10 +364,16 @@ unsafe def m2QuotientRemainderRaw (goal : MVarId) (ring : Expr) (idealExprs : Ar
       pure <| (keyed.qsort (fun a b => a.1 < b.1)).map (·.2)
     else pure collected
   let vars : FVarIdMap Nat := .ofArray (cmp := _) <| fvarsSorted.mapIdx (fun a b => (b,a))
-  let polyExprPoly ← toPolynomialExpr? vars ring polyExpr
-  let idealExprsPolys ← idealExprs.mapM (toPolynomialExpr? vars ring)
+  -- The Macaulay2 base ring.  `none` keeps the historical behaviour -- the
+  -- coefficients travel in the ambient ring itself, which is why this used to
+  -- work only for ambient rings that happen to carry a `Macaulay2Ring`
+  -- instance.  `m2cert` passes the ring its `Macaulean.CertRing` instance
+  -- names (`Int` for `ZZ`, `Rat` for `QQ`) instead.
+  let cring := coeffRing.getD ring
+  let polyExprPoly ← toPolynomialExpr? vars cring polyExpr
+  let idealExprsPolys ← idealExprs.mapM (toPolynomialExpr? vars cring)
 
-  let (serializer,_) ← makePolynomialSerializationPair ring vars.size
+  let (serializer,_) ← makePolynomialSerializationPair cring vars.size
 
   let s ← IO.rand 0 (2^64-1)
   --I should be able to use the runMrdiIO variant
