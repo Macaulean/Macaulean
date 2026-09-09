@@ -22,6 +22,7 @@ newPackage(
         {Name => "Jay Yang",
          Email => "jay.k.yang@vanderbilt.edu",
          HomePage => "https://jkyang92.github.io/"}},
+    HomePage => "https://github.com/Macaulean/Macaulean",
     Keywords => {"Interfaces"},
     PackageExports => {"JSONRPC", "MRDI"},
     PackageImports => {"Parsing"})
@@ -311,6 +312,19 @@ doc ///
 	"AI for Math Fund")@ as part of the project
     @HREF("https://www.renaissancephilanthropy.org/bridging-proof-and-computation-a-verified-leanmacaulay2-interface",
 	"Bridging proof and computation: a verified Lean/Macaulay2 interface")@.
+  Citation
+    @unpublished{Ballard2026Macaulay2Lean,
+      author = {Matthew Ballard and
+                Anton Leykin and
+                Michael E. Stillman and
+                Damiano Testa and
+                Douglas A. Torrance and
+                Jay Yang},
+      title  = {A Macaulay2-Lean Interface for Proofs in Lean},
+      note   = {Accepted for publication in Lecture Notes in Computer Science (ICMS 2026)},
+      year   = {2026},
+      url    = {https://icms-conference.org/2026/papers/paper13/main.pdf}
+    }
   Subnodes
     "the Macaulean MRDI namespace"
     ConcretePoly
