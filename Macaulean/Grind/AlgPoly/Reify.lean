@@ -35,6 +35,16 @@ def intLitE (k : Int) : Expr :=
   if k < 0 then mkApp (mkConst ``Int.negSucc) (mkRawNatLit (k.natAbs - 1))
   else mkApp (mkConst ``Int.ofNat) (mkRawNatLit k.toNat)
 
+/-- The inverse of `intLitE`, plus the shapes `Meta.getIntValue?` already
+knows.  `getIntValue?` does *not* read the raw constructor form -- it wants an
+`OfNat`/`Neg` application -- and the constructor form is exactly what the
+tactics build, so both have to be tried. -/
+def intLitValue? (e : Expr) : MetaM (Option Int) := do
+  match_expr e with
+  | Int.ofNat n => pure <| (← getNatValue? n).map Int.ofNat
+  | Int.negSucc n => pure <| (← getNatValue? n).map fun k => Int.negSucc k
+  | _ => getIntValue? e
+
 def mkCtor (declName : Name) (args : Array Expr) : Expr :=
   mkAppN (mkConst declName) (#[intTypeE] ++ args)
 
@@ -125,7 +135,7 @@ partial def reify (e : Expr) : ReifyM Expr := do
     -- the goal's variables only, not in `d`.  Reifying it as a coefficient is
     -- also what makes the denotation bridge `rfl`: the tactic's `φ` is this
     -- very projection.
-    match (← getIntValue? a) with
+    match (← intLitValue? a) with
     | some k => pure <| mkCoeff k
     | none => mkVar <$> mkAtom e
   | NatCast.natCast _ _ a =>

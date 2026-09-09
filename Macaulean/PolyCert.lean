@@ -33,6 +33,7 @@ itself.
 poly_cert [q]                                  -- goal `g ∣ f`
 poly_cert [q₁, …, q_k] using [h₁, …, h_k]      -- goal `p = r`, `hᵢ : gᵢ = 0`
 poly_cert ["1.1.0.1 0.0.1.-3"] in [x, y, z]    -- cofactors as monomial strings
+poly_cert [q₁, q₂] / 6 using [h₁, h₂]          -- cofactors scaled by 6
 poly_cert +native […] …                        -- see below
 ```
 
@@ -41,6 +42,28 @@ constant, say) or a **monomial string** in `poly_def`'s `e₁.….eₙ.k` format
 which case the variables it is written in must be listed after `in`.  The two
 forms produce the same term: the string goes through the same `PolyBuilder`
 that `poly_def` uses.
+
+## Scaled certificates: `/ d`
+
+Cofactors over a `QQ` ring are routinely *not* integral, and the reflective
+check has nowhere to put a denominator: it normalises over
+`Macaulean.Polynomial Int nv`, and `Rat` coefficients would drag `Nat.gcd` --
+an out-of-line GMP call -- into the kernel.  So the certificate is scaled
+instead.  `/ d` says the listed cofactors are `d` times the real ones, i.e.
+that the committed data witnesses
+
+```
+d * (p - r) = q₁' * g₁ + ⋯ + q_k' * g_k        (ideal membership)
+d * f       = g * q'                           (divisibility)
+```
+
+with `qᵢ'` integral.  There is **one** denominator for the whole invocation,
+not one per cofactor: a per-cofactor denominator buys nothing (the integer
+identity has to be scaled by the common multiple anyway) and makes the printed
+line harder to read.  The tactic checks the scaled identity in the kernel and
+then cancels `d` -- which is what `Macaulean.CertRingRat` is for, so the
+ambient ring needs that instance (`Rat` has it; `Int` does not, and does not
+need it, since `ZZ` cofactors are integral).
 
 `+native` closes the reflective certificate with `decide +native` rather than
 `decide +kernel`.  It is never the default and always warns; see
@@ -90,23 +113,63 @@ def elabCofactors (A : Expr) (vars? : Option (Array Expr)) (stxs : Array Term) :
       Term.synthesizeSyntheticMVarsNoPostponing
       instantiateMVars e
 
+/-- `(d : Int) ≠ 0` for a literal `d`, by `decide`.  `d` is a least common
+denominator, so it is small and positive and this costs nothing. -/
+def intNeZeroProof (d : Int) : MetaM Expr := do
+  mkDecideProof (mkApp3 (mkConst ``Ne [1]) (mkConst ``Int)
+    (AlgPoly.Reify.intLitE d) (AlgPoly.Reify.intLitE 0))
+
+/-- The ambient ring's `CertRingRat` instance, or a message saying why the
+scaling path is not available to it. -/
+def certRingRatInst (A : Expr) (denom : Nat) : TacticM Expr := do
+  match ← AlgPoly.Tactic.certRingRatInst? A with
+  | some inst => pure inst
+  | none =>
+    throwError m!"poly_cert: this certificate is scaled by {denom}, which needs \
+      to be cancelled at the end, but{indentExpr A}\nhas no \
+      `Macaulean.CertRingRat` instance.  Either give it one (see \
+      `Macaulean/CertRing.lean`) or supply integral cofactors."
+
 /--
 Close a goal `g ∣ f` with the cofactor `q`: the divisibility unfolds to
 `∃ c, f = g * c`, and `f = g * q` is a polynomial identity.
+
+With `denom = d > 1` the cofactor is scaled: `q` witnesses `d * f = g * q`, the
+kernel checks *that*, and `CertRingRat.dvd_witness` turns it into the witness
+`q/d` the `∃` wants.
 -/
-def closeDvd (native : Bool) (goal : MVarId) (q : Expr) : TacticM Unit := do
+def closeDvd (native : Bool) (goal : MVarId) (q : Expr) (denom : Nat := 1) : TacticM Unit := do
   let target ← instantiateMVars (← goal.getType)
   let existsTy ← whnf target
   let some (α, p) := (match_expr existsTy with
       | Exists α p => some (α, p)
       | _ => none)
     | throwError m!"poly_cert: expected a divisibility goal `g ∣ f`, got{indentExpr target}"
-  let eqTy ← instantiateMVars (p.beta #[q])
-  let some (_, lhs, rhs) := eqTy.eq?
-    | throwError m!"poly_cert: `{target}` does not unfold to an equation in the cofactor"
-  let hEq ← AlgPoly.Tactic.proveEq lhs rhs native
   let u ← getLevel α
-  let proof := mkApp4 (mkConst ``Exists.intro [u]) α p q hEq
+  let (witness, hEq) ←
+    if denom == 1 then
+      let eqTy ← instantiateMVars (p.beta #[q])
+      let some (_, lhs, rhs) := eqTy.eq?
+        | throwError m!"poly_cert: `{target}` does not unfold to an equation in the cofactor"
+      pure (q, ← AlgPoly.Tactic.proveEq lhs rhs native)
+    else
+      let some (g, f) := (match_expr target with
+          | Dvd.dvd _ _ g f => some (g, f)
+          | _ => none)
+        | throwError m!"poly_cert: a scaled divisibility certificate needs a goal of \
+            the shape `g ∣ f`, got{indentExpr target}"
+      let ratInst ← certRingRatInst α denom
+      let crd ← AlgPoly.Tactic.certRingData α
+      let dE := crd.mkOfInt (Int.ofNat denom)
+      -- the kernel checks the *integer* identity `d * f = g * q`
+      let hScaled ← AlgPoly.Tactic.proveEq (← mkMul dE f) (← mkMul g q) native
+      let dLit := AlgPoly.Reify.intLitE (Int.ofNat denom)
+      let inv := mkApp3 (mkConst ``Macaulean.CertRingRat.invOfInt) α ratInst dLit
+      let witness ← mkMul inv q
+      let hd ← intNeZeroProof (Int.ofNat denom)
+      pure (witness, mkAppN (mkConst ``Macaulean.CertRingRat.dvd_witness)
+        #[α, ratInst, dLit, hd, f, g, q, hScaled])
+  let proof := mkApp4 (mkConst ``Exists.intro [u]) α p witness hEq
   unless ← goal.checkedAssign proof do
     throwError m!"poly_cert: the divisibility witness did not typecheck against{indentExpr target}"
 
@@ -115,20 +178,42 @@ Close a goal `p = r` given `hᵢ : gᵢ = 0` and cofactors `qᵢ` with
 `p - r = Σ qᵢ gᵢ`: prove `p = r + Σ qᵢ gᵢ` reflectively, then peel the
 generators off with `gen_step`.
 -/
-def closeEq (native : Bool) (goal : MVarId) (hyps cofactors : Array Expr) : TacticM Unit := do
+def closeEq (native : Bool) (goal : MVarId) (hyps cofactors : Array Expr)
+    (denom : Nat := 1) : TacticM Unit := do
   let target ← instantiateMVars (← goal.getType)
-  let some (_, p, r) := target.eq?
+  let some (A, p, r) := target.eq?
     | throwError m!"poly_cert: expected an equality goal, got{indentExpr target}"
   unless hyps.size == cofactors.size do
     throwError "poly_cert: {cofactors.size} cofactors for {hyps.size} generators"
-  let mut acc ← mkEqRefl r
+  -- Scaled: both sides are multiplied by `d`, the kernel checks
+  -- `d * p = d * r + Σ qᵢ' gᵢ`, and `d` is cancelled at the end.
+  let scaled? ←
+    if denom == 1 then pure none
+    else do
+      let ratInst ← certRingRatInst A denom
+      let crd ← AlgPoly.Tactic.certRingData A
+      pure (some (ratInst, crd.mkOfInt (Int.ofNat denom)))
+  let lhs ← match scaled? with
+    | none => pure p
+    | some (_, dE) => mkMul dE p
+  let rhs ← match scaled? with
+    | none => pure r
+    | some (_, dE) => mkMul dE r
+  let mut acc ← mkEqRefl rhs
   for h : i in [0 : hyps.size] do
     acc ← mkAppOptM ``gen_step
       #[none, none, none, some cofactors[i]!, none, none, some acc, some hyps[i]]
   let some (_, big, _) := (← instantiateMVars (← inferType acc)).eq?
     | throwError "poly_cert: assembling the certificate did not produce an equation"
-  let hRefl ← AlgPoly.Tactic.proveEq p big native
-  let proof ← instantiateMVars (← mkEqTrans hRefl acc)
+  let hRefl ← AlgPoly.Tactic.proveEq lhs big native
+  let scaledEq ← mkEqTrans hRefl acc
+  let proof ← match scaled? with
+    | none => instantiateMVars scaledEq
+    | some (ratInst, _) => do
+      let dLit := AlgPoly.Reify.intLitE (Int.ofNat denom)
+      let hd ← intNeZeroProof (Int.ofNat denom)
+      instantiateMVars <| mkAppN (mkConst ``Macaulean.CertRingRat.cancel)
+        #[A, ratInst, dLit, hd, p, r, scaledEq]
   unless ← goal.checkedAssign proof do
     throwError m!"poly_cert: the certificate did not typecheck against{indentExpr target}"
 
@@ -142,6 +227,9 @@ def goalRing (target : Expr) : MetaM Expr := do
 
 /-- A bracketed, comma-separated list of terms. -/
 syntax certList := " [" term,* "]"
+/-- The global denominator of a scaled certificate: the listed cofactors are
+`d` times the real ones. -/
+syntax certDenom := " /" num
 /-- The variables a monomial-string cofactor is written in. -/
 syntax certVars := " in" certList
 /-- The generator hypotheses `hᵢ : gᵢ = 0` the cofactors go with. -/
@@ -161,14 +249,24 @@ Each cofactor is a term of the ambient ring, or a `poly_def`-style monomial
 string `"e₁.….eₙ.k …"` — in which case the variables have to be listed after
 `in`.  `+native` swaps the kernel check for `decide +native`, and warns.
 
+`poly_cert [q₁, …] / d …` is the scaled form: the listed cofactors are `d`
+times the real ones, the kernel checks the integer identity `d * (p - r) =
+Σ qᵢ' gᵢ` (or `d * f = g * q'`), and `d` is cancelled through the ambient
+ring's `Macaulean.CertRingRat` instance.
+
 This tactic never invokes a computer algebra system; `m2cert?` prints the
 invocation to write here.
 -/
 elab "poly_cert" native:(Macaulean.AlgPoly.Tactic.nativeFlag)? cofs:certList
-    vars:(certVars)? hyps:(certHyps)? : tactic => withMainContext do
+    denom:(certDenom)? vars:(certVars)? hyps:(certHyps)? : tactic => withMainContext do
   let goal ← getMainGoal
   let target ← instantiateMVars (← goal.getType)
   let A ← goalRing target
+  let d := match denom with
+    | none => 1
+    | some s => s.raw[1].toNat
+  if d == 0 then
+    throwError "poly_cert: the certificate's denominator cannot be 0"
   let varEs ← vars.mapM fun v => do
     (listTerms ⟨v.raw[1]⟩).mapM fun t => do
       let e ← Term.elabTerm t (some A)
@@ -179,10 +277,10 @@ elab "poly_cert" native:(Macaulean.AlgPoly.Tactic.nativeFlag)? cofs:certList
   | none =>
     unless cofactors.size == 1 do
       throwError "poly_cert: a divisibility goal takes exactly one cofactor, got {cofactors.size}"
-    closeDvd native.isSome goal cofactors[0]!
+    closeDvd native.isSome goal cofactors[0]! d
   | some h =>
     let hypEs ← (listTerms ⟨h.raw[1]⟩).mapM (elabTerm · none)
-    closeEq native.isSome goal hypEs cofactors
+    closeEq native.isSome goal hypEs cofactors d
   replaceMainGoal []
 
 end Macaulean.PolyCert
