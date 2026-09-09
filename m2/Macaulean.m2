@@ -101,6 +101,7 @@ addSaveMethod(RingElement,
 -- eventually replace fromLean w/ this
 fromLean2 = method(Dispatch => Type)
 fromLean2 QQ := R -> x -> value x#0 / value x#1
+fromLean2 ZZ := R -> value
 
 addLoadMethod("Polynomial",
     (params, data) -> (
@@ -128,6 +129,7 @@ assert(f == (map(R, T, {x, y, z})) h)
 
 addSaveMethod(LeanGrindCommRingPoly,
     toList,
+    Name => "Lean.Grind.CommRing.Poly",
     Namespace => "Lean",
     UseID => true)
 
@@ -146,7 +148,8 @@ addLoadMethod("Lean.Grind.CommRing.Poly",
 
 loadCoefficient = R -> x -> (
     if R == "Rat" then {value x#0, value x#1}
-    else error "unknown ring")
+    else if R == "Int" then value x
+    else error("unknown ring: ", R))
 
 addLoadMethod("ConcretePoly",
     (params, data) -> ConcretePoly {
