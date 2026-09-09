@@ -1172,11 +1172,11 @@ theorem sorted_removeZeros [BEq R] (terms : List (PolyTerm R n)) : Sorted terms 
     rw [sorted_cons] at h
     simp [ih, h]
 
-theorem sorted_add [BEq R] (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.terms) :
-    Sorted (add p q).terms := sorted_removeZeros _ <| sorted_mergeTerms p.terms q.terms hp hq
+theorem sorted_add (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.terms) :
+    Sorted (add p q).terms := sorted_mergeTerms p.terms q.terms hp hq
 
-theorem sorted_mul [BEq R] (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.terms) :
-    Sorted (mul p q).terms := sorted_removeZeros _ <| sorted_mulTerms p.terms q.terms hp hq
+theorem sorted_mul (p q : Polynomial R n) (hp : Sorted p.terms) (hq : Sorted q.terms) :
+    Sorted (mul p q).terms := sorted_mulTerms p.terms q.terms hp hq
 
 /-! ## Denotation theorems -/
 
@@ -1276,7 +1276,7 @@ theorem denoteTerms_mergeTerms (ctx : Context R) (xs ys : List (PolyTerm R n)) :
 theorem denote_add (ctx : Context R) (p q : Polynomial R n) :
     denote ctx (add p q) = denote ctx p + denote ctx q := by
   unfold Polynomial.add denote
-  simp [denoteTerms_removeZeros, denoteTerms_mergeTerms]
+  simp [denoteTerms_mergeTerms]
 
 omit beq lawfulbeq in
 theorem denoteTerms_map_smul (ctx : Context R) (c : R) (ts : List (PolyTerm R n)) :
@@ -1286,7 +1286,7 @@ theorem denoteTerms_map_smul (ctx : Context R) (c : R) (ts : List (PolyTerm R n)
   | cons t ts ih => simp [ih, left_distrib, mul_assoc]
 
 theorem denote_smul (ctx : Context R) (c : R) (p : Polynomial R n) :
-    denote ctx (smul c p) = c * denote ctx p := by simp [smul, denote, denoteTerms_map_smul, denoteTerms_removeZeros]
+    denote ctx (smul c p) = c * denote ctx p := by simp [smul, denote, denoteTerms_map_smul]
 
 /--
 Every monomial of `ts` is packed faithfully and has total degree at most `d`.

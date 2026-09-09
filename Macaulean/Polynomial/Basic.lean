@@ -460,11 +460,23 @@ def mergeTerms [Grind.CommRing R]
     (xs ys : List (PolyTerm R n)) : List (PolyTerm R n) :=
   mergeTermsF mergeFuel xs ys
 
-@[simp]
-def add [Grind.CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
-  ⟨removeZeros <| mergeTerms p.terms q.terms⟩
+/--
+Addition: merge the two grevlex-descending term lists, coalescing equal
+monomials.
 
-instance [Grind.CommRing R] [BEq R] : Add (Polynomial R n) := ⟨add⟩
+Deliberately *not* followed by `removeZeros`.  Cancellation does leave zero
+coefficients behind, but stripping them after every operation costs a full
+traversal of the accumulated polynomial per step, which on a left-nested sum of
+`m` monomials is a second `O(m²)` on top of the merge -- about a quarter of the
+whole reflective check at certificate sizes.  Stripping once at the end is
+enough: `removeZeros` of a sorted list is still sorted, and two sorted lists
+with the same nonzero terms become equal, which is what `checkPolyEq` compares.
+-/
+@[simp]
+def add [Grind.CommRing R] (p q : Polynomial R n) : Polynomial R n :=
+  ⟨mergeTerms p.terms q.terms⟩
+
+instance [Grind.CommRing R] : Add (Polynomial R n) := ⟨add⟩
 
 /-
 Negation and subtraction
@@ -474,23 +486,23 @@ def neg [Neg R] (p : Polynomial R n) : Polynomial R n :=
 
 instance [Neg R] : Neg (Polynomial R n) := ⟨neg⟩
 
-def sub [Grind.CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
+def sub [Grind.CommRing R] (p q : Polynomial R n) : Polynomial R n :=
   add p (neg q)
 
-instance [Grind.CommRing R] [BEq R] : Sub (Polynomial R n) := ⟨sub⟩
+instance [Grind.CommRing R] : Sub (Polynomial R n) := ⟨sub⟩
 
 /-
   Multiplication implementation
 -/
-def smul [CommRing R] [BEq R] (c : R) (p : Polynomial R n) : Polynomial R n :=
-  ⟨removeZeros <| p.terms.map fun ⟨c',m⟩ => ⟨c * c', m⟩⟩
+def smul [CommRing R] (c : R) (p : Polynomial R n) : Polynomial R n :=
+  ⟨p.terms.map fun ⟨c',m⟩ => ⟨c * c', m⟩⟩
 
 def mulMonTerms [CommRing R] (c : R) (m : Mon n) (p : List (PolyTerm R n))
   : List (PolyTerm R n) :=
   p.map fun ⟨c',m'⟩ => ⟨c * c', m.mul m'⟩
 
-def mulMon [CommRing R] [BEq R] (c : R) (m : Mon n) (p : Polynomial R n) : Polynomial R n :=
-  ⟨removeZeros <| mulMonTerms c m p.terms⟩
+def mulMon [CommRing R] (c : R) (m : Mon n) (p : Polynomial R n) : Polynomial R n :=
+  ⟨mulMonTerms c m p.terms⟩
 
 def mulTerms [CommRing R]
     (xs ys : List (PolyTerm R n)) : List (PolyTerm R n) :=
@@ -505,17 +517,18 @@ def mulTerms [CommRing R]
       ⟨c * c', m.mul m'⟩ ::
       mergeTerms (mulMonTerms c m ys') (mulTerms xs' ys)
 
+/-- Multiplication.  Like `add`, it does not strip zero coefficients; see there. -/
 @[simp]
-def mul [CommRing R] [BEq R] (p q : Polynomial R n) : Polynomial R n :=
-  ⟨removeZeros <| mulTerms p.terms q.terms⟩
+def mul [CommRing R] (p q : Polynomial R n) : Polynomial R n :=
+  ⟨mulTerms p.terms q.terms⟩
 
-instance [CommRing R] [BEq R] : Mul (Polynomial R n) := ⟨mul⟩
+instance [CommRing R] : Mul (Polynomial R n) := ⟨mul⟩
 
-def pow [BEq R] [CommRing R] (p : Polynomial R n) (m : Nat) : Polynomial R n := match m with
+def pow [CommRing R] (p : Polynomial R n) (m : Nat) : Polynomial R n := match m with
   | 0 => ⟨[.mk 1 .unit]⟩
   | .succ m' => p.mul (pow p m')
 
-instance [CommRing R] [BEq R] : NatPow (Polynomial R n) := ⟨pow⟩
+instance [CommRing R] : NatPow (Polynomial R n) := ⟨pow⟩
 
 /-! ### Guarded multiplication
 
@@ -544,15 +557,15 @@ def mulOk (p q : Polynomial R n) : Bool :=
     decide (monDegBound p.terms + monDegBound q.terms < Mon.base n)
 
 /-- `mul`, refusing to answer when the packing would overflow. -/
-def mulChecked [CommRing R] [BEq R] (p q : Polynomial R n) : Option (Polynomial R n) :=
+def mulChecked [CommRing R] (p q : Polynomial R n) : Option (Polynomial R n) :=
   if mulOk p q then some (p.mul q) else none
 
 /-- `pow`, refusing to answer when the packing would overflow. -/
-def powChecked [CommRing R] [BEq R] (p : Polynomial R n) : Nat → Option (Polynomial R n)
+def powChecked [CommRing R] (p : Polynomial R n) : Nat → Option (Polynomial R n)
   | 0 => some ⟨[⟨1, .unit⟩]⟩
   | k + 1 => (powChecked p k).bind (mulChecked p)
 
-instance [CommRing R] [BEq R] : SMul R (Polynomial R n) := ⟨smul⟩
+instance [CommRing R] : SMul R (Polynomial R n) := ⟨smul⟩
 
 /--
   Get the lead term of the polynomial,

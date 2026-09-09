@@ -25,7 +25,7 @@ the packed monomial key (`Polynomial.mulChecked`).  Making both explicit keeps
 `toPoly` total and keeps soundness free of degree side conditions.
 -/
 def toPoly (nv : Nat) : AlgExpr Int → Option (Polynomial Int nv)
-  | .coeff k => some ⟨Polynomial.removeZeros [⟨k, Mon.unit⟩]⟩
+  | .coeff k => some (Polynomial.ofConst k)
   | .var i => if h : i < nv then some (Polynomial.ofVar ⟨i, h⟩) else none
   | .add a b =>
     match toPoly nv a, toPoly nv b with
@@ -42,11 +42,19 @@ def toPoly (nv : Nat) : AlgExpr Int → Option (Polynomial Int nv)
   | .neg a => (toPoly nv a).map Polynomial.neg
   | .pow a k => (toPoly nv a).bind (Polynomial.powChecked · k)
 
-/-- The certificate the kernel checks: both sides evaluate, and to the same
-normal form. -/
+/--
+The certificate the kernel checks: both sides evaluate, and to the same normal
+form.
+
+`removeZeros` is applied here and nowhere else.  `add` and `mul` keep the
+grevlex-descending order but leave the zero coefficients that cancellation
+produces (stripping after every operation costs a traversal of the whole
+accumulated polynomial per step); a single pass at the end is what turns two
+sorted term lists with the same nonzero terms into the same list.
+-/
 def checkPolyEq (nv : Nat) (e₁ e₂ : AlgExpr Int) : Bool :=
   match toPoly nv e₁, toPoly nv e₂ with
-  | some p, some q => p == q
+  | some p, some q => Polynomial.removeZeros p.terms == Polynomial.removeZeros q.terms
   | _, _ => false
 
 section
@@ -65,9 +73,6 @@ theorem denote_toPoly (nv : Nat) :
   | coeff k =>
     intro p hp
     cases hp
-    show Polynomial.denoteTerms ctx
-      (Polynomial.mapCoeffTerms φ (Polynomial.removeZeros [⟨k, Mon.unit⟩])) = φ k
-    rw [Polynomial.denoteTerms_mapCoeffTerms_removeZeros hφ]
     exact Polynomial.denoteWith_ofConst hφ ctx k
   | var i =>
     intro p hp
@@ -116,13 +121,13 @@ theorem denote_toPoly (nv : Nat) :
 If both sides evaluate to the *same* `Polynomial Int nv`, they denote the same
 element of `A`.
 
-Only this direction is needed, and it needs nothing but `LawfulBEq`: equal
-normal forms give equal denotations.  Whether equal expressions *do* reach equal
-normal forms is completeness, and that is what the sortedness invariant is for
-(`Polynomial.sorted_add`, `Polynomial.sorted_mul`): `add` and `mul` both merge
-grevlex-descending term lists, coalescing equal monomials, and then strip zero
-coefficients, so on sorted inputs they produce the unique sorted zero-free
-normal form and a plain `BEq` is decisive.  Nothing here relies on that.
+Only this direction is needed: term lists with the same nonzero terms give
+equal denotations, because `φ 0 = 0`.  Whether equal expressions *do* reach
+equal normal forms is completeness, and that is what the sortedness invariant is
+for (`Polynomial.sorted_add`, `Polynomial.sorted_mul`): `add` and `mul` both
+merge grevlex-descending term lists, coalescing equal monomials, so on sorted
+inputs the final `removeZeros` produces the unique sorted zero-free normal form
+and a plain `BEq` is decisive.  Nothing here relies on that.
 -/
 theorem eq_of_checkPolyEq (nv : Nat) (e₁ e₂ : AlgExpr Int)
     (h : checkPolyEq nv e₁ e₂ = true) :
@@ -130,7 +135,11 @@ theorem eq_of_checkPolyEq (nv : Nat) (e₁ e₂ : AlgExpr Int)
   unfold checkPolyEq at h
   split at h
   · rename_i p q hp hq
-    rw [← denote_toPoly hφ ctx nv e₁ p hp, ← denote_toPoly hφ ctx nv e₂ q hq,
+    rw [← denote_toPoly hφ ctx nv e₁ p hp, ← denote_toPoly hφ ctx nv e₂ q hq]
+    show Polynomial.denoteTerms ctx (Polynomial.mapCoeffTerms φ p.terms) =
+      Polynomial.denoteTerms ctx (Polynomial.mapCoeffTerms φ q.terms)
+    rw [← Polynomial.denoteTerms_mapCoeffTerms_removeZeros hφ ctx p.terms,
+      ← Polynomial.denoteTerms_mapCoeffTerms_removeZeros hφ ctx q.terms,
       eq_of_beq h]
   · exact absurd h (by simp)
 

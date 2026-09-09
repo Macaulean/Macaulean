@@ -122,9 +122,8 @@ variable [BEq C] [LawfulBEq C]
 theorem denoteWith_add {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Context A)
     (p q : Polynomial C n) :
     denoteWith φ ctx (p.add q) = denoteWith φ ctx p + denoteWith φ ctx q := by
-  show denoteTerms ctx (mapCoeffTerms φ (removeZeros (mergeTerms p.terms q.terms))) = _
-  rw [denoteTerms_mapCoeffTerms_removeZeros hφ, mapCoeffTerms_mergeTerms hφ,
-    denoteTerms_mergeTerms]
+  show denoteTerms ctx (mapCoeffTerms φ (mergeTerms p.terms q.terms)) = _
+  rw [mapCoeffTerms_mergeTerms hφ, denoteTerms_mergeTerms]
   rfl
 
 theorem denoteWith_neg {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Context A)
@@ -156,8 +155,8 @@ theorem denoteWith_mulChecked {φ : C → A} (hφ : IsCoeffHom φ) (ctx : Contex
   · rename_i hok
     cases h
     simp only [mulOk, Bool.and_eq_true, decide_eq_true_eq] at hok
-    show denoteTerms ctx (mapCoeffTerms φ (removeZeros (mulTerms p.terms q.terms))) = _
-    rw [denoteTerms_mapCoeffTerms_removeZeros hφ, mapCoeffTerms_mulTerms hφ,
+    show denoteTerms ctx (mapCoeffTerms φ (mulTerms p.terms q.terms)) = _
+    rw [mapCoeffTerms_mulTerms hφ,
       denoteTerms_mulTerms ctx hok.2 _ _
         (termsOk_mapCoeffTerms (termsOk_of_monWFB hok.1.1))
         (termsOk_mapCoeffTerms (termsOk_of_monWFB hok.1.2))]
