@@ -1,5 +1,10 @@
-import Macaulean.Polynomial.Basic
-import Lean
+module
+
+public import Macaulean.Polynomial.Basic
+public import Lean
+
+@[expose] public section
+
 open Lean Grind CommRing Meta
 
 namespace Macaulean
@@ -1460,3 +1465,5 @@ end Theorems
 end Polynomial
 
 end Macaulean
+
+end

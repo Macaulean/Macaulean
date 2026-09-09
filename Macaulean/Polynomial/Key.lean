@@ -20,6 +20,10 @@
   the degree bound as an explicit hypothesis, and check it with `Nat.blt`.
 -/
 
+module
+
+@[expose] public section
+
 namespace Macaulean
 namespace Mon
 
@@ -499,3 +503,5 @@ theorem compare_encodeKey (b : Nat) (p₁ p₂ : List Nat)
 
 end Mon
 end Macaulean
+
+end

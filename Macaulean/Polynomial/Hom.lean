@@ -6,7 +6,11 @@
   `Polynomial Int n` -- where the kernel can actually compute -- while the goal
   it closes lives in an arbitrary `Lean.Grind.CommRing A`.
 -/
-import Macaulean.Polynomial.Lemmas
+module
+
+public import Macaulean.Polynomial.Lemmas
+
+@[expose] public section
 
 open Lean Grind CommRing
 
@@ -210,3 +214,5 @@ end
 end Polynomial
 
 end Macaulean
+
+end

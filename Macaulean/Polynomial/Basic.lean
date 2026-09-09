@@ -4,9 +4,13 @@
   Polynomials as sorted lists of coefficient-monomial pairs, using
   Vector Nat n for monomials.
 -/
-import Lean
-import MRDI
-import Macaulean.Polynomial.Key
+module
+
+public import Lean
+public import Macaulean.Polynomial.Key
+
+@[expose] public section
+
 open Lean Grind CommRing
 namespace Macaulean
 
@@ -376,7 +380,7 @@ instance [CommRing R] [BEq R] : HasEquiv (Polynomial R n) where
 
 instance [CommRing R] [BEq R] [LawfulBEq R] : DecidableRel (@Equiv R n _ _) :=
   fun p q =>
-    decidable_of_bool _ <| by
+    decidable_of_bool (normalize p == normalize q) <| by
       unfold Equiv
       constructor
       case mp =>
@@ -661,3 +665,5 @@ def Grevlex (p q : Polynomial R n) : Prop := p.grevlex q = .gt
 end Polynomial
 
 end Macaulean
+
+end
