@@ -67,7 +67,7 @@ new ConcretePoly from RingElement := (T, f) -> (
 			    {coeffmap#coeff ??= first(n, n += 1), 1});
 			coeff = 1);
 		    {coeff, mon})),
-	    "coefficients" => apply(pairs coeffmap, (a, i) -> {i, toLean a}),
+	    "coefficients" => apply(pairs coeffmap, (a, i) -> {i, a}),
 	    "params" => leanRings#(coefficientRing R)})
 
 fromLean = method(Dispatch => Type)
@@ -85,7 +85,7 @@ value ConcretePoly := f -> (
 	R := kk[vars varlist];
 	sum(toSequence \ f#"poly", (coeff, mon) -> (
 		coeff * product(toSequence \ mon, (var, pow) ->
-		    (R_(varmap#var))^pow ?? (fromLean kk) coeffmap#var))))
+		    (R_(varmap#var))^pow ?? coeffmap#var))))
 
 ------------------------------------------
 -- MRDI serialization & deserialization --
