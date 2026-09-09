@@ -90,7 +90,8 @@ value ConcretePoly := f -> (
 -- MRDI serialization & deserialization --
 ------------------------------------------
 
-addNamespace("Macaulean", "https://github.com/Macaulean/Macaulean", "0.1.0")
+addNamespace("Macaulean", "https://github.com/Macaulean/Macaulean",
+    (options Macaulean).Version)
 
 addSaveMethod(RingElement,
     f -> leanRings#(coefficientRing ring f),
