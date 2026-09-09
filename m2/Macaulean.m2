@@ -1,6 +1,6 @@
 newPackage(
     "Macaulean",
-    Version => "0.1",
+    Version => "0.1.0",
     Date => "September 2026",
     Headline => "Macaulay2 <-> Lean interface",
     Authors => {
@@ -90,13 +90,13 @@ value ConcretePoly := f -> (
 -- MRDI serialization & deserialization --
 ------------------------------------------
 
-addNamespace("Lean", "https://github.com/leanprover/lean4", "4.29.1")
+addNamespace("Macaulean", "https://github.com/Macaulean/Macaulean", "0.1.0")
 
 addSaveMethod(RingElement,
     f -> leanRings#(coefficientRing ring f),
     f -> apply(listForm f, (m, c) -> {toLean c, m}),
     Name => "Polynomial",
-    Namespace => "Lean")
+    Namespace => "Macaulean")
 
 -- eventually replace fromLean w/ this
 fromLean2 = method(Dispatch => Type)
@@ -110,12 +110,12 @@ addLoadMethod("Polynomial",
 	R := kk[vars(0..<#last first data)];
 	sum(data, cm -> (fromLean2 kk) cm#0 * product(#cm#1,
 		i -> R_i^(value cm#1#i)))),
-    Namespace => "Lean")
+    Namespace => "Macaulean")
 
 addSaveMethod(LeanGrindCommRingPoly,
     toList,
     Name => "Lean.Grind.CommRing.Poly",
-    Namespace => "Lean",
+    Namespace => "Macaulean",
     UseID => true)
 
 addSaveMethod(ConcretePoly,
@@ -123,13 +123,13 @@ addSaveMethod(ConcretePoly,
     f -> hashTable {
 	"poly" => f#"poly",
 	"coefficients" => f#"coefficients"},
-    Namespace => "Lean")
+    Namespace => "Macaulean")
 
 addLoadMethod("Lean.Grind.CommRing.Poly",
     (params, data) -> LeanGrindCommRingPoly apply(data, term -> {
 	    value term#0,
 	    apply(term#1, varpow -> value \ varpow)}),
-    Namespace => "Lean")
+    Namespace => "Macaulean")
 
 loadCoefficient = R -> x -> (
     if R == "Rat" then {value x#0, value x#1}
@@ -142,7 +142,7 @@ addLoadMethod("ConcretePoly",
 	"coefficients" => apply(toSequence \ data#"coefficients",
 	    (i, coeff) -> {value i, (loadCoefficient params) coeff}),
 	"params" => params},
-    Namespace => "Lean")
+    Namespace => "Macaulean")
 
 
 readLSPHeaderLine = method();
@@ -231,10 +231,10 @@ macauleanServer = () -> (
 	    hashTable {
 		"quotient" => apply(flatten entries q,
 		    g -> saveMRDI(g,
-			Namespace => "Lean",
+			Namespace => "Macaulean",
 			ToString => false)),
 		"remainder" => saveMRDI(r_(0,0),
-		    Namespace => "Lean",
+		    Namespace => "Macaulean",
 		    ToString => false)}));
 
     registerMethod(server, "factor", (nmrdi) -> (
@@ -250,13 +250,13 @@ macauleanServer = () -> (
     registerMethod(server, "mrdiEcho", (mrdi) -> (
 	    f := loadMRDI mrdi;
 	    stderr << f << endl;
-	    saveMRDI(f, Namespace => "Lean")));
+	    saveMRDI(f, Namespace => "Macaulean")));
 
     registerMethod(server, "mrdiFactor", (mrdi) -> (
 	    f := loadMRDI mrdi;
 	    stderr << f << endl;
 	    apply(toList \ toList factor f, term -> (
-		    saveMRDI(term#0, Namespace => "Lean"), term#1))));
+		    saveMRDI(term#0, Namespace => "Macaulean"), term#1))));
 
     server)
 
@@ -273,7 +273,7 @@ TEST ///
 -- MRDI would hand back the object we just saved, so make it forget the UUID's
 debug MRDI
 roundTrip = f -> (
-    mrdi := saveMRDI(new ConcretePoly from f, Namespace => "Lean");
+    mrdi := saveMRDI(new ConcretePoly from f, Namespace => "Macaulean");
     scan(keys thingsByUuid, uuid -> remove(thingsByUuid, uuid));
     value loadMRDI mrdi)
 -- polynomials come back in rings with (possibly) fewer variables
@@ -330,16 +330,16 @@ TEST ///
 -- RingElement round trips; no UUID's or references are involved here
 R = QQ[x,y,z]
 f = x*z^2 - 3/2*y
-g = loadMRDI saveMRDI(f, Namespace => "Lean")
+g = loadMRDI saveMRDI(f, Namespace => "Macaulean")
 assert Equation(f, (map(R, ring g, vars R)) g)
 
 S = ZZ[x,y,z]
 h = x*z^2 - 3*y
-k = loadMRDI saveMRDI(h, Namespace => "Lean")
+k = loadMRDI saveMRDI(h, Namespace => "Macaulean")
 assert Equation(h, (map(S, ring k, vars S)) k)
 
 -- the zero polynomial carries no ring information
-z0 = loadMRDI saveMRDI(0_R, Namespace => "Lean")
+z0 = loadMRDI saveMRDI(0_R, Namespace => "Macaulean")
 assert instance(z0, ZZ)
 assert zero z0
 ///
@@ -352,15 +352,15 @@ TEST ///
 -- MRDI produced by M2 must use the type names that Lean expects
 needsPackage "JSON"
 R = QQ[x,y,z]
-mrdi = fromJSON saveMRDI(new ConcretePoly from x + 1/2*y, Namespace => "Lean")
+mrdi = fromJSON saveMRDI(new ConcretePoly from x + 1/2*y, Namespace => "Macaulean")
 assert Equation(mrdi#"_type"#"name", "ConcretePoly")
 assert Equation(mrdi#"_type"#"params", "Rat")
-assert Equation(first keys mrdi#"_ns", "Lean")
+assert Equation(first keys mrdi#"_ns", "Macaulean")
 -- the underlying Lean.Grind.CommRing.Poly is stored as a reference
 assert Equation(#mrdi#"_refs", 1)
 assert Equation((first values mrdi#"_refs")#"_type", "Lean.Grind.CommRing.Poly")
 
-mrdi = fromJSON saveMRDI(x + 1/2*y, Namespace => "Lean")
+mrdi = fromJSON saveMRDI(x + 1/2*y, Namespace => "Macaulean")
 assert Equation(mrdi#"_type"#"name", "Polynomial")
 assert Equation(mrdi#"_type"#"params", "Rat")
 ///
@@ -368,7 +368,7 @@ assert Equation(mrdi#"_type"#"params", "Rat")
 TEST ///
 -- everything we serialize must be valid MRDI
 needsPackage "JSON"
-lean = x -> saveMRDI(x, Namespace => "Lean", ToString => false)
+lean = x -> saveMRDI(x, Namespace => "Macaulean", ToString => false)
 
 R = QQ[x,y,z]
 f = x*z^2 - 3/2*y
@@ -406,7 +406,7 @@ TEST ///
 -- a bare Lean.Grind.CommRing.Poly
 p = loadMRDI "{\"data\": [[\"3\", []], [\"5\", [[\"2\", \"3\"]]], [\"0\", []]],
  \"_type\": \"Lean.Grind.CommRing.Poly\",
- \"_ns\": {\"Lean\": [\"https://github.com/leanprover/lean4\", \"4.33.1\"]}}"
+ \"_ns\": {\"Macaulean\": [\"https://github.com/Macaulean/Macaulean\", \"0.1.0\"]}}"
 assert(class p === LeanGrindCommRingPoly)
 assert Equation(toList p, {{3, {}}, {5, {{2, 3}}}, {0, {}}})
 
@@ -422,7 +422,7 @@ f = value loadMRDI "{\"data\":
     [\"1\", [[\"0\", \"1\"], [\"1\", \"2\"]]],
     [\"1\", []]],
    \"_type\": \"Lean.Grind.CommRing.Poly\"}},
- \"_ns\": {\"Lean\": [\"https://github.com/leanprover/lean4\", \"4.33.1\"]}}"
+ \"_ns\": {\"Macaulean\": [\"https://github.com/Macaulean/Macaulean\", \"0.1.0\"]}}"
 S = ring f
 assert Equation(numgens S, 2)
 assert Equation(f, 1/2*S_0^2 + 3/2*S_1^2 + 1)
@@ -434,7 +434,7 @@ f = loadMRDI "{\"data\":
   [[\"2\", \"1\"], [\"2\", \"1\", \"2\"]],
   [[\"1\", \"1\"], [\"1\", \"2\", \"3\"]]],
  \"_type\": {\"params\": \"Rat\", \"name\": \"Polynomial\"},
- \"_ns\": {\"Lean\": [\"https://github.com/leanprover/lean4\", \"4.33.1\"]}}"
+ \"_ns\": {\"Macaulean\": [\"https://github.com/Macaulean/Macaulean\", \"0.1.0\"]}}"
 S = ring f
 assert Equation(numgens S, 3)
 (x, y, z) = toSequence gens S
@@ -480,7 +480,7 @@ TEST ///
 -- ideal membership via the quotientRemainder method
 needsPackage "JSON"
 server = macauleanServer()
-mrdi = f -> saveMRDI(new ConcretePoly from f, Namespace => "Lean",
+mrdi = f -> saveMRDI(new ConcretePoly from f, Namespace => "Macaulean",
     ToString => false)
 qr = (f, I) -> (
     request := makeRequest("quotientRemainder",
@@ -529,7 +529,7 @@ assert Equation(call("factorInt", {12}), {{2, 2}, {3, 1}})
 R = QQ[x,y]
 f = x^2 - y^2
 result = call("mrdiFactor",
-    {saveMRDI(f, Namespace => "Lean", ToString => false)})
+    {saveMRDI(f, Namespace => "Macaulean", ToString => false)})
 toR = g -> (map(R, ring g, (gens R)_{0..<numgens ring g})) g
 L = apply(result, term -> (toR loadMRDI term#0, term#1))
 assert Equation(f, product(L, term -> term#0^(term#1)))
@@ -597,7 +597,7 @@ assert Equation(call("factorInt", {12}), {{2, 2}, {3, 1}})
 R = QQ[x,y,z]
 I = ideal(x*z, y)
 f = x*z^2
-mrdi = g -> saveMRDI(new ConcretePoly from g, Namespace => "Lean",
+mrdi = g -> saveMRDI(new ConcretePoly from g, Namespace => "Macaulean",
     ToString => false)
 result = call("quotientRemainder", {mrdi f, apply(first entries gens I, mrdi)})
 toR = g -> (
