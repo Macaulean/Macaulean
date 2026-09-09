@@ -10,8 +10,10 @@
   3. bridge `AlgExpr.denote (intDenote A) ctx e = goalSide` in both directions;
   4. chain the three with `AlgExpr.eq_of_checkPolyEq`.
 
-  Never `native_decide`, never `+native`: the whole certificate is checked by
-  the kernel.
+  By default the whole certificate is checked by the kernel.  `+native` swaps
+  step 2 for `decide +native`, which is `Lean.ofReduceBool` -- the compiler and
+  its runtime join the trusted base.  It is never the default, and using it
+  always logs a warning.
 -/
 module
 
@@ -26,6 +28,16 @@ open Lean Meta Elab Tactic
 namespace Macaulean.AlgPoly.Tactic
 
 meta section
+
+/--
+The `+native` flag, shared by every tactic in this library that ends in a
+reflective certificate.  Writing it closes the `checkPolyEq … = true`
+obligation with `decide +native` instead of `decide +kernel`: a compiled
+computation instead of a kernel one, which puts `Lean.ofReduceBool` -- and so
+the Lean compiler and its runtime -- into the proof's trusted base.  It is
+never the default and using it always warns.
+-/
+syntax nativeFlag := " +" &"native"
 
 initialize Lean.registerTraceClass `macaulean.reflect
 
@@ -94,23 +106,35 @@ def proveBridge (lhs rhs : Expr) : TacticM Expr := do
   catch _ =>
     simpBridge lhs rhs
 
-/-- Close `t = true` by kernel evaluation. -/
-def proveBoolTrue (t : Expr) : TacticM Expr := do
+/-- Close `t = true` by kernel evaluation, or -- only when the caller asked for
+it in so many words -- by native evaluation. -/
+def proveBoolTrue (t : Expr) (native : Bool := false) : TacticM Expr := do
   let ty ← mkEq t (mkConst ``true)
   let mvar ← mkFreshExprMVar ty
   let savedGoals ← getGoals
   setGoals [mvar.mvarId!]
   try
-    evalTactic (← `(tactic| decide +kernel))
+    if native then
+      evalTactic (← `(tactic| decide +native))
+    else
+      evalTactic (← `(tactic| decide +kernel))
   finally
     setGoals savedGoals
   instantiateMVars mvar
 
-def solveGoal : TacticM Unit := withMainContext do
-  let mainGoal ← getMainGoal
-  let target ← instantiateMVars (← getMainTarget)
-  let some (lhs, rhs) := getEqSides? target
-    | throwError "algebra_norm_reflect only handles equality goals"
+/--
+Build a proof of `lhs = rhs` by the reflective certificate, without touching
+the goal state.  This is the whole of `algebra_norm_reflect`; tactics that
+assemble a certificate themselves (`Macaulean.PolyCert`, `m2cert`) call it
+directly rather than going back through tactic syntax.
+-/
+def proveEq (lhs rhs : Expr) (native : Bool := false) : TacticM Expr := do
+  if native then
+    logWarning "the reflective certificate is checked by `decide +native`: the \
+      proof depends on `Lean.ofReduceBool` -- which this toolchain records as a \
+      generated `._native.decide.ax` axiom -- so the Lean compiler and its \
+      runtime are part of its trusted base.  Drop `+native` to have the kernel \
+      check it."
   let A ← instantiateMVars (← inferType lhs)
   let uA ← Reify.getTypeLevel A
   unless uA.isZero do
@@ -136,7 +160,7 @@ def solveGoal : TacticM Unit := withMainContext do
   let checkTerm := mkAppN (mkConst ``Macaulean.AlgExpr.checkPolyEq)
     #[nvE, reified.lhsReified, reified.rhsReified]
   let t0 ← IO.monoMsNow
-  let hChk ← proveBoolTrue checkTerm
+  let hChk ← proveBoolTrue checkTerm native
   let t1 ← IO.monoMsNow
   trace[macaulean.reflect] "kernel certificate: {t1 - t0} ms"
   -- 2. The two denotation bridges.
@@ -162,6 +186,14 @@ def solveGoal : TacticM Unit := withMainContext do
   let proof ← instantiateMVars proof
   if proof.hasMVar then
     throwError m!"reflective proof has metavariables: {proof}"
+  pure proof
+
+def solveGoal (native : Bool := false) : TacticM Unit := withMainContext do
+  let mainGoal ← getMainGoal
+  let target ← instantiateMVars (← getMainTarget)
+  let some (lhs, rhs) := getEqSides? target
+    | throwError "algebra_norm_reflect only handles equality goals"
+  let proof ← proveEq lhs rhs native
   mainGoal.assign proof
   setGoals ((← getGoals).erase mainGoal)
 
@@ -170,17 +202,23 @@ def solveGoal : TacticM Unit := withMainContext do
 reflection: both sides are normalized to `Macaulean.Polynomial Int nv` *inside
 the kernel* and compared.  It never falls back on `simp`/`grind`, so a failure
 names the reflective check that went wrong.
+
+`algebra_norm_reflect +native` checks the certificate with `decide +native`
+instead.  That is `Lean.ofReduceBool`: the proof then rests on the Lean
+compiler and its runtime as well as on the kernel, so it is opt-in and always
+warns.
 -/
-elab "algebra_norm_reflect" : tactic => solveGoal
+elab "algebra_norm_reflect" native:(nativeFlag)? : tactic => solveGoal native.isSome
 
 /--
 `algebra_norm` is `algebra_norm_reflect` with a `grind` fallback for small
-goals (which may, unlike the reflective path, use hypotheses).
+goals (which may, unlike the reflective path, use hypotheses).  It takes the
+same `+native` opt-in.
 -/
-elab "algebra_norm" : tactic => do
+elab "algebra_norm" native:(nativeFlag)? : tactic => do
   let s ← get
   try
-    solveGoal
+    solveGoal native.isSome
     return
   catch e =>
     set s
