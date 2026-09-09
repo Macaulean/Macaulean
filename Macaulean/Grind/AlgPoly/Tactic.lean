@@ -13,12 +13,19 @@
   Never `native_decide`, never `+native`: the whole certificate is checked by
   the kernel.
 -/
-import Macaulean.Grind.AlgPoly.Reify
-import Lean.Elab.Tactic.Basic
+module
+
+public import Macaulean.Grind.AlgPoly.Reify
+public meta import Macaulean.Grind.AlgPoly.Reify
+public meta import Lean.Elab.Tactic.Basic
+
+@[expose] public section
 
 open Lean Meta Elab Tactic
 
 namespace Macaulean.AlgPoly.Tactic
+
+meta section
 
 initialize Lean.registerTraceClass `macaulean.reflect
 
@@ -183,4 +190,8 @@ elab "algebra_norm" : tactic => do
 and it is too large for the `grind` fallback.\n{e.toMessageData}"
   evalTactic (← `(tactic| grind))
 
+end
+
 end Macaulean.AlgPoly.Tactic
+
+end

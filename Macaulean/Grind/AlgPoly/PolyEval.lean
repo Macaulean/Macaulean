@@ -8,7 +8,11 @@
   nothing on this path ever calls `sortTerms` (`List.mergeSort` is well-founded
   and the kernel cannot unfold it).
 -/
-import Macaulean.Grind.AlgPoly.Expr
+module
+
+public import Macaulean.Grind.AlgPoly.Expr
+
+@[expose] public section
 
 namespace Macaulean
 
@@ -157,3 +161,5 @@ end
 end AlgExpr
 
 end Macaulean
+
+end

@@ -6,7 +6,11 @@
   atoms, the trees are evaluated to `Macaulean.Polynomial Int nv` by the kernel,
   and the normal forms are compared.
 -/
-import Macaulean.Polynomial.Hom
+module
+
+public import Macaulean.Polynomial.Hom
+
+@[expose] public section
 
 namespace Macaulean
 
@@ -268,3 +272,5 @@ end
 end AlgExpr
 
 end Macaulean
+
+end

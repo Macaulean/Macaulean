@@ -8,12 +8,22 @@
   else is an atom.  The tree mirrors the source term node for node, which is
   what makes the tactic's denotation bridge hold definitionally.
 -/
-import Macaulean.Grind.AlgPoly.PolyEval
-import Lean.Data.RArray
+module
+
+public import Macaulean.Grind.AlgPoly.PolyEval
+public import Lean.Data.RArray
+public meta import Macaulean.Grind.AlgPoly.PolyEval
+public meta import Lean.Data.RArray
+public meta import Lean.Meta.Basic
+public meta import Lean.Meta.SynthInstance
+
+@[expose] public section
 
 open Lean Meta
 
 namespace Macaulean.AlgPoly.Reify
+
+meta section
 
 def intTypeE : Expr := mkConst ``Int
 
@@ -130,4 +140,8 @@ def runPair (lhs rhs : Expr) : MetaM PairResult := do
       pure (l, r)).run {}
   pure { lhsReified := l, rhsReified := r, atoms := s.atoms }
 
+end
+
 end Macaulean.AlgPoly.Reify
+
+end
