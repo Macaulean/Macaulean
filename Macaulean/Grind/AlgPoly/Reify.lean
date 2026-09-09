@@ -7,6 +7,13 @@
   a `Nat` literal exponent become the corresponding constructors; everything
   else is an atom.  The tree mirrors the source term node for node, which is
   what makes the tactic's denotation bridge hold definitionally.
+
+  The classification itself (`classify`) and the atom table (`AtomState`,
+  `mkAtom`) are shared with the Macaulay2 half of the library, which reifies
+  the same terms into `Macaulean.Polynomial` instead
+  (`Macaulean/IdealMembership.lean`).  One definition of "atom" for both is not
+  a tidiness point: a certificate Macaulay2 produces in *its* variables has to
+  be checkable by the kernel in *these* ones.
 -/
 module
 
@@ -73,11 +80,22 @@ def mkContextExpr (type : Expr) (vars : Array Expr) : MetaM Expr := do
   else
     Lean.RArray.toExpr type id (Lean.RArray.leaf (← mkNatZero type))
 
-structure State where
+/-! ### The atom table
+
+Both halves of the library -- the reflective checker below, and the Macaulay2
+round trip in `Macaulean/IdealMembership.lean` -- have to agree on *what a
+variable is*, or a certificate obtained by one cannot be checked by the other.
+There is therefore one atom table and one classifier, here, and two thin
+recursions over them. -/
+
+/-- The atoms discovered so far, in first-occurrence order, with a cache from
+the syntactic forms already seen to their index.  The order is what makes
+`m2cert?`'s printed `in [...]` clause reproducible. -/
+structure AtomState where
   atoms : Array Expr := #[]
   atomMap : Std.HashMap Expr Nat := {}
 
-abbrev ReifyM := StateT State MetaM
+abbrev AtomM := StateT AtomState MetaM
 
 /-- Find an already-registered atom that is *definitionally* equal to `e`.
 
@@ -93,7 +111,9 @@ def findDefEqAtom (atoms : Array Expr) (e : Expr) : MetaM (Option Nat) := do
       return some i
   return none
 
-def mkAtom (e : Expr) : ReifyM Nat := do
+/-- The index of `e` in the atom table, registering it if it is new.  A new
+atom is appended, so indices follow first occurrence. -/
+def mkAtom (e : Expr) : AtomM Nat := do
   let s ← get
   match s.atomMap[e]? with
   | some idx => pure idx
@@ -109,45 +129,102 @@ def mkAtom (e : Expr) : ReifyM Nat := do
         atomMap := s.atomMap.insert e idx }
       pure idx
 
-partial def reify (e : Expr) : ReifyM Expr := do
+/-! ### The classifier -/
+
+/--
+What one node of a ring expression is, as far as this library is concerned.
+
+Everything that is not one of the five ring operations or an integer
+coefficient is an `atom` -- a maximal non-arithmetic subterm.  A free variable
+is not special: `x`, `MvPolynomial.X 0` and `f x y` are all atoms, and are
+identified up to definitional equality by `mkAtom`.
+-/
+inductive Node where
+  /-- `a + b`. -/
+  | add (a b : Expr)
+  /-- `a - b`. -/
+  | sub (a b : Expr)
+  /-- `a * b`. -/
+  | mul (a b : Expr)
+  /-- `-a`. -/
+  | neg (a : Expr)
+  /-- `a ^ k` with a `Nat` literal exponent. -/
+  | pow (a : Expr) (k : Nat)
+  /-- An integer coefficient: a numeral, a cast of one, or the ambient ring's
+  own `CASRing.ofInt` applied to one. -/
+  | coeff (k : Int)
+  /-- A maximal non-arithmetic subterm. -/
+  | atom
+
+/--
+Classify one node.  This is the *single* definition of "ring operation",
+"coefficient" and "atom" in the library: `reify` below turns it into an
+`AlgExpr`, and `toPolynomialExpr` (`Macaulean/IdealMembership.lean`) turns it
+into a `Macaulean.Polynomial` for Macaulay2.  If the two ever disagreed, a
+certificate obtained from Macaulay2 could not be checked by the kernel.
+-/
+def classify (e : Expr) : MetaM Node := do
   match_expr e with
-  | HAdd.hAdd _ _ _ _ a b =>
-    pure <| mkCtor ``Macaulean.AlgExpr.add #[← reify a, ← reify b]
-  | HSub.hSub _ _ _ _ a b =>
-    pure <| mkCtor ``Macaulean.AlgExpr.sub #[← reify a, ← reify b]
-  | HMul.hMul _ _ _ _ a b =>
-    pure <| mkCtor ``Macaulean.AlgExpr.mul #[← reify a, ← reify b]
-  | Neg.neg _ _ a =>
-    pure <| mkCtor ``Macaulean.AlgExpr.neg #[← reify a]
+  | HAdd.hAdd _ _ _ _ a b => pure <| .add a b
+  | HSub.hSub _ _ _ _ a b => pure <| .sub a b
+  | HMul.hMul _ _ _ _ a b => pure <| .mul a b
+  | Neg.neg _ _ a => pure <| .neg a
   | HPow.hPow _ _ _ _ a b =>
     match (← getNatValue? b) with
-    | some k => pure <| mkCtor ``Macaulean.AlgExpr.pow #[← reify a, mkRawNatLit k]
-    | none => mkVar <$> mkAtom e
+    | some k => pure <| .pow a k
+    | none => pure .atom
   | IntCast.intCast _ _ a =>
     match (← getIntValue? a) with
-    | some k => pure <| mkCoeff k
-    | none => mkVar <$> mkAtom e
+    | some k => pure <| .coeff k
+    | none => pure .atom
   | Macaulean.CASRing.ofInt _ _ a =>
     -- The coefficient map of the ambient ring's own `CASRing` instance.  The
     -- scaling path (`poly_cert … / d`) states its identity with an explicit
-    -- `ofInt d` factor, and it has to reify as the *coefficient* `d` rather
+    -- `ofInt d` factor, and it has to count as the *coefficient* `d` rather
     -- than as an atom -- `d * (p - r) = Σ qᵢ' gᵢ` is a polynomial identity in
     -- the goal's variables only, not in `d`.  Reifying it as a coefficient is
     -- also what makes the denotation bridge `rfl`: the tactic's `φ` is this
     -- very projection.
     match (← intLitValue? a) with
-    | some k => pure <| mkCoeff k
-    | none => mkVar <$> mkAtom e
+    | some k => pure <| .coeff k
+    | none => pure .atom
   | NatCast.natCast _ _ a =>
     match (← getNatValue? a) with
-    | some k => pure <| mkCoeff (Int.ofNat k)
-    | none => mkVar <$> mkAtom e
+    | some k => pure <| .coeff (Int.ofNat k)
+    | none => pure .atom
   | OfNat.ofNat _ n _ =>
     match (← getNatValue? n) with
-    | some k => pure <| mkCoeff (Int.ofNat k)
-    | none => mkVar <$> mkAtom e
-  | _ =>
-    mkVar <$> mkAtom e
+    | some k => pure <| .coeff (Int.ofNat k)
+    | none => pure .atom
+  | _ => pure .atom
+
+partial def reify (e : Expr) : AtomM Expr := do
+  match ← liftM (classify e) with
+  | .add a b => pure <| mkCtor ``Macaulean.AlgExpr.add #[← reify a, ← reify b]
+  | .sub a b => pure <| mkCtor ``Macaulean.AlgExpr.sub #[← reify a, ← reify b]
+  | .mul a b => pure <| mkCtor ``Macaulean.AlgExpr.mul #[← reify a, ← reify b]
+  | .neg a => pure <| mkCtor ``Macaulean.AlgExpr.neg #[← reify a]
+  | .pow a k => pure <| mkCtor ``Macaulean.AlgExpr.pow #[← reify a, mkRawNatLit k]
+  | .coeff k => pure <| mkCoeff k
+  | .atom => mkVar <$> mkAtom e
+
+/--
+Walk `e` for its atoms only, registering each in the table.  Used to learn the
+variable count before building anything that needs it -- `Polynomial R nv`
+mentions `nv` in its type, so the Macaulay2 side has to know it up front.
+-/
+partial def collectAtoms (e : Expr) : AtomM Unit := do
+  match ← liftM (classify e) with
+  | .add a b | .sub a b | .mul a b => collectAtoms a; collectAtoms b
+  | .neg a => collectAtoms a
+  | .pow a _ => collectAtoms a
+  | .coeff _ => pure ()
+  | .atom => discard <| mkAtom e
+
+/-- The atoms of `es`, in first-occurrence order, left to right. -/
+def atomStateOf (es : Array Expr) : MetaM AtomState := do
+  let (_, s) ← (es.forM collectAtoms).run {}
+  pure s
 
 structure PairResult where
   lhsReified : Expr
