@@ -33,22 +33,35 @@ Measured on an M2 (Lean 4.33.1, `set_option Elab.async false`), where
 
 | identity          | monomials | tactic ms | kernel ms | peak RSS |
 |-------------------|-----------|-----------|-----------|----------|
-| perf_hess_sq      |        41 |       271 |        12 |          |
-| perf_redH2_sq     |       296 |      6768 |        63 |          |
-| perf_redH3_sq     |       755 |     38513 |       160 |          |
-| perf_theta3_step  |      1350 |    114446 |       341 |  34.5 GB |
+| perf_hess_sq      |        41 |       193 |        12 |          |
+| perf_redH2_sq     |       296 |      3498 |        63 |          |
+| perf_redH3_sq     |       755 |     19139 |       161 |          |
+| perf_theta3_step  |      1350 |     58105 |       344 |  20.6 GB |
 
-Essentially all of "tactic" is the `decide +kernel` certificate (114017 of
-114446 ms on the largest one); the two denotation bridges cost 398 ms there,
-because they are `Eq.refl` handed to the *kernel* via `mkAuxLemma` rather
-than proved by `Meta.isDefEq`.
+Essentially all of "tactic" is the `decide +kernel` certificate; the two
+denotation bridges cost a few hundred ms on the largest one, because they are
+`Eq.refl` handed to the *kernel* via `mkAuxLemma` rather than proved by
+`Meta.isDefEq`.
 
-The kernel cost is dominated by `Mon.grevlex`: on a synthetic 100x100-term
-product (1015 monomials of output) the same pipeline takes 15.0 s with
-`Mon.grevlex`, 11.3 s with a fused list-free reimplementation of it, and
-4.0 s with a single packed-`Nat` monomial key -- against 2.3 s for a
-Kronecker-packed `List (Nat x Int)` representation.  Comparing three-element
-exponent lists, rather than one machine word, is the whole gap.
+These numbers are with monomials packed into a single `Nat` key
+(`Macaulean/Polynomial/Key.lean`).  Before that -- with `Mon n` an exponent
+*list* and `Mon.grevlex` comparing lists -- the same four identities cost
+271 / 6768 / 38513 / 114446 ms and 34.5 GB, so packing is worth about 2x in
+time and 1.7x in memory.  On the largest identity the packing itself took
+114446 ms to 71541 ms, and then spelling the comparison as `Nat.beq`/`Nat.ble`
+rather than `compare` took it to 58105: `compare` goes through `Decidable`
+instances, so every kernel comparison was building a `Nat.le` proof term that
+the whnf cache then held on to.
+
+The overflow guard the packing needs (`Polynomial.mulOk`, checked by the kernel
+at every product) costs about 3.5%: 58105 ms against 56093 ms with the check
+stubbed out.
+
+What is left is no longer the monomials.  A Kronecker-packed
+`List (Nat x Int)` -- no `PolyTerm`/`Mon` structures, no `Grind.CommRing`
+coefficient projections -- did the same four in 196 / 2773 / 15009 / 38295 ms,
+so roughly another 1.5x is sitting in the term plumbing around the monomial,
+not in the monomial.
 
 This file is not part of the `MacauleanTest` root (same convention as the
 other speed-test files); run it directly:
