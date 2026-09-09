@@ -265,6 +265,382 @@ macauleanStart = () -> macauleanMainLoop(macauleanServer(), stdio);
 
 beginDocumentation()
 
+doc ///
+  Key
+    Macaulean
+  Headline
+    Macaulay2 <-> Lean interface
+  Description
+    Text
+      This package is the Macaulay2 half of
+      @HREF("https://github.com/Macaulean/Macaulean", "Macaulean")@, an
+      interface between Macaulay2 and the
+      @HREF("https://lean-lang.org/", "Lean")@ theorem prover.  The Lean half
+      provides tactics which, on appropriate goals, ask Macaulay2 to perform a
+      computation and then use the result of that computation to produce a
+      proof of the goal.  Ideal membership and factorization are the first
+      targets.
+    Text
+      Macaulay2 acts as an oracle.  Lean starts it as a subprocess along the
+      lines of
+    Pre
+      M2 --stop --no-debug --silent -q \
+         -e 'needsPackage "Macaulean"' \
+         -e 'macauleanStart()' \
+         -e 'exit 0'
+    Text
+      and then talks to it over its standard input and output.  The
+      conversation is a @TO2("JSONRPC::JSONRPC", "JSON-RPC 2.0")@ exchange in
+      which each message is preceded by a @SAMP "Content-Length"@ header,
+      exactly as in the base protocol of the
+      @HREF("https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#baseProtocol",
+	  "Language Server Protocol")@.  See @TO macauleanStart@ for the loop
+      that reads these messages and @TO macauleanServer@ for the methods that
+      may be called.
+    Text
+      Mathematical objects travel across the wire in the
+      @TO2("MRDI::MRDI", "mrdi file format")@, using types registered in a
+      Macaulean namespace so that both systems agree on their meaning.  See
+      @TO "the Macaulean MRDI namespace"@.
+    Example
+      server = macauleanServer()
+      handleRequest(server, makeRequest("factorInt", {12}, 1))
+  Acknowledgement
+    This work is supported by the
+    @HREF("https://www.renaissancephilanthropy.org/ai-for-math-fund/",
+	"AI for Math Fund")@ as part of the project
+    @HREF("https://www.renaissancephilanthropy.org/bridging-proof-and-computation-a-verified-leanmacaulay2-interface",
+	"Bridging proof and computation: a verified Lean/Macaulay2 interface")@.
+  Subnodes
+    "the Macaulean MRDI namespace"
+    ConcretePoly
+    LeanGrindCommRingPoly
+    macauleanServer
+    macauleanStart
+///
+
+doc ///
+  Key
+    "the Macaulean MRDI namespace"
+  Headline
+    types used to exchange polynomials with Lean
+  Description
+    Text
+      Objects sent between Macaulay2 and Lean are serialized using the
+      @TO2("MRDI::MRDI", "mrdi file format")@.  This package registers the
+      namespace @SAMP "Macaulean"@ together with the three types below;
+      passing @CODE "Namespace => \"Macaulean\""@ to
+      @TO "MRDI::saveMRDI"@ selects them.  Since each type is also implemented
+      on the Lean side, the two systems can agree on what they are looking at.
+    Text
+      Two of them, @SAMP "Polynomial"@ and @SAMP "ConcretePoly"@, take a
+      parameter naming the coefficient ring, using Lean's name for it:
+      @SAMP "Int"@ for @TO ZZ@ and @SAMP "Rat"@ for @TO QQ@.
+      As the mrdi format requires, integers are serialized as strings, and a
+      rational number is serialized as a pair of strings giving its numerator
+      and denominator.  Variables are referred to by their index rather than
+      by name.
+    Text
+      @HEADER3 "Polynomial"@
+    Text
+      A @TO RingElement@ is serialized as a @SAMP "Polynomial"@, a list of
+      @CODE "{coefficient, exponents}"@ pairs, one for each term, where
+      @VAR "exponents"@ is the term's exponent vector, as in @TO listForm@ but
+      with the coefficient first.  This is the type in which the server
+      returns its answers.
+    Example
+      R = QQ[x,y,z]
+      f = x*z^2 - 3/2*y
+      saveMRDI(f, Namespace => "Macaulean")
+    Text
+      Nothing in this format records the number of variables of the ring, so
+      trailing variables which do not appear in any term are lost; the ring
+      reconstructed by @TO "MRDI::loadMRDI"@ has only as many variables as the
+      exponent vectors do.  In particular, the zero polynomial has no terms at
+      all, and so comes back as the integer zero.
+    Example
+      loadMRDI saveMRDI(f, Namespace => "Macaulean")
+      loadMRDI saveMRDI(0_R, Namespace => "Macaulean")
+    Text
+      @HEADER3 "Lean.Grind.CommRing.Poly"@
+    Text
+      A @TO LeanGrindCommRingPoly@ is serialized as a
+      @SAMP "Lean.Grind.CommRing.Poly"@, mirroring the type of the same name
+      used by Lean's @CODE "grind"@ tactic.  It is a list of
+      @CODE "{coefficient, monomial}"@ pairs, where a @VAR "monomial"@ is a
+      list of @CODE "{variable, exponent}"@ pairs; only the variables actually
+      occurring in the monomial are listed.  It is saved with
+      @CODE "UseID => true"@, so it appears among the @SAMP "_refs"@ of
+      whatever object contains it rather than inline.
+    Text
+      @HEADER3 "ConcretePoly"@
+    Text
+      A @TO ConcretePoly@ is serialized as a @SAMP "ConcretePoly"@, a hash
+      table with two keys: @SAMP "poly"@, a reference to a
+      @SAMP "Lean.Grind.CommRing.Poly"@, and @SAMP "coefficients"@, a list of
+      @CODE "{variable, value}"@ pairs.  A @SAMP "Lean.Grind.CommRing.Poly"@
+      has integer coefficients, so a coefficient which is not an integer is
+      recorded here as an extra variable instead; see @TO ConcretePoly@.
+    Example
+      cp = new ConcretePoly from f
+      saveMRDI(cp, Namespace => "Macaulean")
+  SeeAlso
+    "MRDI::addNamespace"
+    "MRDI::validateMRDI"
+    "MRDI::Namespace"
+///
+
+doc ///
+  Key
+    ConcretePoly
+  Headline
+    the class of all Lean concrete polynomials
+  Description
+    Text
+      A @TO ConcretePoly@ is a @TO LeanGrindCommRingPoly@ together with an
+      interpretation of some of its variables as coefficients.  Lean's
+      @SAMP "Lean.Grind.CommRing.Poly"@ has integer coefficients only, so a
+      polynomial over a larger ring is represented by moving each offending
+      coefficient into a new variable and remembering its value on the side.
+    Text
+      It is a @TO SelfInitializingType@ of @TO HashTable@ with three keys.
+    Text
+      @UL {
+	  LI {CODE "\"poly\"", ", a ", TO LeanGrindCommRingPoly},
+	  LI {CODE "\"coefficients\"", ", a list of ",
+	      CODE "{variable, value}", " pairs giving the values of those
+	      variables which are really coefficients"},
+	  LI {CODE "\"params\"", ", the name Lean uses for the coefficient
+	      ring, either ", SAMP "Int", " or ", SAMP "Rat"}}@
+    Example
+      R = QQ[x,y,z]
+      peek new ConcretePoly from x*z^2 - 3/2*y
+    Text
+      Here @CODE "x*z^2"@ has integer coefficient 1 and is stored as it
+      stands, but @CODE "-3/2"@ cannot be, so it becomes the variable with
+      index 3, one past the variables of @VAR "R"@, whose value
+      @CODE "{-3, 2}"@ is recorded under @CODE "\"coefficients\""@.
+    Text
+      Objects of this class may be serialized and deserialized in the
+      @TO "the Macaulean MRDI namespace"@.
+  SeeAlso
+    LeanGrindCommRingPoly
+  Subnodes
+    (NewFromMethod, ConcretePoly, RingElement)
+    (value, ConcretePoly)
+///
+
+doc ///
+  Key
+    (NewFromMethod, ConcretePoly, RingElement)
+  Headline
+    convert a ring element to a Lean concrete polynomial
+  Usage
+    new ConcretePoly from f
+  Inputs
+    f:RingElement -- in a polynomial ring over @TO ZZ@ or @TO QQ@
+  Outputs
+    :ConcretePoly
+  Description
+    Text
+      The terms of @VAR "f"@ become the terms of the underlying
+      @TO LeanGrindCommRingPoly@.  Coefficients which lift to @TO ZZ@ are used
+      as they are.  Each of the others is assigned a variable, numbered
+      consecutively starting from @TO numgens@ of the ring of @VAR "f"@, and
+      the term is rewritten as that variable times the remaining monomial.
+    Example
+      R = ZZ[x,y]
+      peek new ConcretePoly from x^2 + 3*y - 1
+    Text
+      Over @TO QQ@ every coefficient which is not an integer needs a variable
+      of its own, but equal coefficients share one.
+    Example
+      S = QQ[x,y]
+      peek new ConcretePoly from 1/2*x^2 + 1/2*y
+  SeeAlso
+    (value, ConcretePoly)
+    listForm
+///
+
+doc ///
+  Key
+    (value, ConcretePoly)
+  Headline
+    convert a Lean concrete polynomial to a ring element
+  Usage
+    value f
+  Inputs
+    f:ConcretePoly
+  Outputs
+    :RingElement
+  Description
+    Text
+      Each variable of @VAR "f"@ which is listed under
+      @CODE "\"coefficients\""@ is replaced by its value, and the rest become
+      the variables of a new polynomial ring over @TO ZZ@ or @TO QQ@,
+      according to @CODE "f#\"params\""@.
+    Example
+      R = QQ[x,y,z]
+      f = x*z^2 - 3/2*y
+      value new ConcretePoly from f
+    Text
+      Note that the ring returned is not the ring of the polynomial we started
+      with.  Only those variables which occur in some term of @VAR "f"@ appear
+      in it, and they are renamed accordingly, so a map is needed to compare
+      the two.
+    Example
+      g = value new ConcretePoly from f
+      describe ring g
+      (map(R, ring g, {x, y, z})) g == f
+  SeeAlso
+    (NewFromMethod, ConcretePoly, RingElement)
+///
+
+doc ///
+  Key
+    LeanGrindCommRingPoly
+  Headline
+    the class of all Lean grind commutative ring polynomials
+  Description
+    Text
+      This class represents Lean's @SAMP "Lean.Grind.CommRing.Poly"@, the
+      normal form for polynomials with integer coefficients used by Lean's
+      @CODE "grind"@ tactic.  It is a @TO SelfInitializingType@ of @TO List@,
+      each element of which is a pair @CODE "{coefficient, monomial}"@ where
+      the monomial is itself a list of pairs @CODE "{variable, exponent}"@,
+      listing only those variables which actually occur.
+    Example
+      p = LeanGrindCommRingPoly {{3, {}}, {5, {{2, 3}}}}
+    Text
+      So @VAR "p"@ is @CODE "3 + 5*x_2^3"@.  Such an object is usually met as
+      the @CODE "\"poly\""@ key of a @TO ConcretePoly@, which is how
+      coefficients outside of @TO ZZ@ are accommodated.
+    Example
+      R = QQ[x,y,z]
+      (new ConcretePoly from x*z^2 - 3/2*y)#"poly"
+    Text
+      Objects of this class may be serialized and deserialized in the
+      @TO "the Macaulean MRDI namespace"@.
+  SeeAlso
+    ConcretePoly
+///
+
+doc ///
+  Key
+    macauleanServer
+  Headline
+    create a JSON-RPC server for Lean
+  Usage
+    macauleanServer()
+  Outputs
+    :JSONRPCServer
+  Description
+    Text
+      This function returns a new @TO "JSONRPC::JSONRPCServer"@ with the
+      methods that Macaulean's Lean tactics call.  It is a function rather
+      than a global variable so that each caller gets a server of its own.
+    Example
+      server = macauleanServer()
+      methods server
+    Text
+      Requests may be handed to it directly using
+      @TO "JSONRPC::handleRequest"@, which is convenient for testing;
+      @TO macauleanStart@ does so in a loop, reading the requests from
+      standard input.
+    Text
+      @HEADER3 "quotientRemainder"@
+    Text
+      Given a polynomial and a list of polynomials generating an ideal, all
+      serialized in @TO "the Macaulean MRDI namespace"@, this method returns a
+      hash table with keys @SAMP "quotient"@ and @SAMP "remainder"@, the
+      result of dividing the polynomial by the generators.  If the remainder
+      is zero, then the quotient is a certificate that the polynomial belongs
+      to the ideal, and it is this certificate which the Lean side turns into
+      a proof.
+    Example
+      R = QQ[x,y,z]
+      lean = f -> saveMRDI(f, Namespace => "Macaulean", ToString => false)
+      handleRequest(server, makeRequest("quotientRemainder",
+	      {lean(x*z^2), {lean(x*z), lean y}}, 1))
+    Text
+      @HEADER3 "factorInt"@
+    Text
+      Given an integer, this method returns its factorization as a list of
+      @CODE "{prime, exponent}"@ pairs.  No mrdi is involved; the integers are
+      sent as plain JSON.
+    Example
+      handleRequest(server, makeRequest("factorInt", {12}, 2))
+    Text
+      @HEADER3 "mrdiFactor"@
+    Text
+      Given a polynomial serialized in
+      @TO "the Macaulean MRDI namespace"@, this method returns its
+      factorization as a list of @CODE "{factor, exponent}"@ pairs, where each
+      factor is again serialized.
+    Example
+      handleRequest(server, makeRequest("mrdiFactor", {lean(x^2 - y^2)}, 3))
+    Text
+      @HEADER3 "mrdiEcho"@
+    Text
+      Given an object serialized in @TO "the Macaulean MRDI namespace"@, this
+      method prints it to standard error and hands it back, serialized again.
+      It is useful for checking that the two systems read each other's mrdi
+      the way they are meant to.
+    Text
+      @HEADER3 "testMethod"@
+    Text
+      Given a string, this method evaluates it as a Macaulay2 expression and
+      returns @TO toExternalString@ of the result.
+    Example
+      handleRequest(server, makeRequest("testMethod", {"2 + 2"}, 4))
+  Caveat
+    The @SAMP "quotientRemainder"@ method returns its polynomials as JSON
+    objects, but @SAMP "mrdiFactor"@ and @SAMP "mrdiEcho"@ return theirs as
+    strings containing JSON, which must be parsed a second time.
+
+    A @SAMP "factor"@ method is registered as well, but it is not yet working:
+    it tries to serialize a list, for which no save method exists.
+  SeeAlso
+    macauleanStart
+    "JSONRPC::registerMethod"
+///
+
+doc ///
+  Key
+    macauleanStart
+  Headline
+    run a JSON-RPC server for Lean on standard input and output
+  Usage
+    macauleanStart()
+  Description
+    Text
+      This function creates a @TO macauleanServer@ and then serves requests
+      read from @TO stdio@ until end of file, writing each response back to
+      it.  It is what Lean asks Macaulay2 to do when it starts it as a
+      subprocess.
+    Pre
+      M2 --stop --no-debug --silent -q \
+         -e 'needsPackage "Macaulean"' \
+         -e 'macauleanStart()' \
+         -e 'exit 0'
+    Text
+      Requests and responses are framed as in the base protocol of the
+      @HREF("https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#baseProtocol",
+	  "Language Server Protocol")@: a @SAMP "Content-Length"@ header giving
+      the number of bytes in the message, any number of further headers, a
+      blank line, and then the message itself, with every line ending in
+      @SAMP "\\r\\n"@.  Only @SAMP "Content-Length"@ is looked at; the other
+      headers are read and ignored.
+    Text
+      So a session on the terminal, were one to hold it by hand, would begin
+    Pre
+      Content-Length: 66
+
+      {"jsonrpc": "2.0", "id": 1, "method": "factorInt", "params": [12]}
+  SeeAlso
+    macauleanServer
+    "JSONRPC::handleRequest"
+///
 ----------------------------------
 -- ConcretePoly <-> RingElement --
 ----------------------------------
