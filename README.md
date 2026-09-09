@@ -34,6 +34,12 @@ See the [wiki](https://github.com/Macaulay2/M2/wiki).
 * [Lean-Oscar](https://github.com/todbeibrot/Lean-Oscar)
 * [mrdi file format](https://arxiv.org/abs/2309.00465)
 
+## Notes
+
+* [`docs/poly-repr-reflect.md`](docs/poly-repr-reflect.md) — the packed
+  monomial representation, the kernel path of `algebra_norm_reflect`, and the
+  measured cost of each change to it.
+
 ##  Tests (Lean)
 
 From command line:

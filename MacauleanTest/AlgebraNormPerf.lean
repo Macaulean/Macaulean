@@ -33,10 +33,10 @@ Measured on an M2 (Lean 4.33.1, `set_option Elab.async false`), where
 
 | identity          | monomials | tactic ms | kernel ms | peak RSS |
 |-------------------|-----------|-----------|-----------|----------|
-| perf_hess_sq      |        41 |       153 |        12 |          |
-| perf_redH2_sq     |       296 |      2447 |        62 |          |
-| perf_redH3_sq     |       755 |     13780 |       161 |          |
-| perf_theta3_step  |      1350 |     36104 |       340 |  14.3 GB |
+| perf_hess_sq      |        41 |       139 |        11 |          |
+| perf_redH2_sq     |       296 |      1581 |        63 |          |
+| perf_redH3_sq     |       755 |      7391 |       163 |          |
+| perf_theta3_step  |      1350 |     15795 |       341 |   7.0 GB |
 
 Essentially all of "tactic" is the `decide +kernel` certificate; the two
 denotation bridges cost a few hundred ms on the largest one, because they are
@@ -45,53 +45,51 @@ denotation bridges cost a few hundred ms on the largest one, because they are
 
 ## Where the time went
 
-With `Mon n` an exponent *list* and `Mon.grevlex` comparing lists, the four
-identities cost 271 / 6768 / 38513 / 114446 ms and 34.5 GB.  Packing the
-exponent vector into a single `Nat` key (`Macaulean/Polynomial/Key.lean`) took
-the largest one to 71541 ms, and spelling the key comparison as
-`Nat.beq`/`Nat.ble` instead of `compare` -- which goes through `Decidable`
-instances, so every comparison was building a `Nat.le` proof term the whnf
-cache then held on to -- took it to 58105.
+The whole history is in `docs/poly-repr-reflect.md`; in short, the four
+identities cost 271 / 6768 / 38513 / 114446 ms and 34.5 GB with `Mon n` an
+exponent *list*, and each of five changes was found by a kernel micro-harness
+that times the individual steps of the certificate (`decide +kernel` on
+`Nat.blt <step> 0`, one measurement per `addDecl`) and compares each against
+the corresponding step of a Kronecker-packed `List (Nat x Int)`:
 
-The two steps after that were found by a kernel micro-harness that times the
-individual steps of the certificate (`decide +kernel` on `Nat.blt <step> 0`,
-one measurement per `addDecl`) and compares each against the corresponding step
-of a Kronecker-packed `List (Nat x Int)`.  On the 755-monomial identity that
-said, unambiguously, that the multiplication was *not* the problem -- the
-product `A * B` cost 4.4 s against the packed form's 4.9 s -- and that all the
-loss was in building an operand out of a sum of monomials: 13.6 s against 4.3 s
-for `Q * G + R`.  Two things were doing it:
-
-* `add` and `mul` each ended with `removeZeros`, a filter over the whole
-  accumulated polynomial, which on a left-nested sum of `m` monomials is a
-  second `O(m^2)` on top of the merge.  Stripping zeros once, in `checkPolyEq`,
-  is 26% of the whole check.
-
-* `mergeTermsF` matched on `Mon.grevlex x y`, so the kernel built an `Ordering`
-  and cased on it at every step.  Comparing the keys directly is another 6%.
+* pack the exponent vector into a single `Nat` key, and compare keys with
+  `Nat.beq`/`Nat.ble` rather than `compare` (which goes through `Decidable`
+  instances, so every comparison built a `Nat.le` proof the whnf cache then
+  held on to): 114446 -> 58105 ms;
+* compare the keys inside `mergeTermsF` instead of matching on the `Ordering`
+  that `Mon.grevlex` returns: 6%;
+* strip zero coefficients once, in `checkPolyEq`, instead of after every `add`
+  and `mul`: 26%;
+* sum a chain of monomials as a *balanced* tree rather than left to right, so
+  the merges cost `O(m log m)` instead of `O(m^2)`: 35483 -> 16876 ms and
+  14.2 -> 7.3 GB;
+* check the packing guard by walking the digits of the key rather than
+  decoding, summing and re-encoding it: another 6%.
 
 What is *not* the problem, measured the same way: the `PolyTerm`/`Mon`
 structures.  Rewriting the whole pipeline over bare `List (Nat x Int)` pairs,
 with no structure projections at all, was worth 1.6% -- the kernel unfolds a
-projection-of-constructor cheaply.
+projection-of-constructor cheaply.  Nor are the `Lean.Grind.CommRing Int`
+coefficient operations: `Semiring.toAdd` for `Grind.instCommRingInt` whnfs to
+`{ add := Int.add }` in one step, and a 2000-step kernel loop of `a + b`
+through the instance costs 36 ms against 26 ms for `Int.add` -- a difference
+swamped by the rest of a merge step.  Nor is `Mon.fromVar`: replacing it by a
+literal key is worth 3% of building an operand and 0.5% of the check.
 
 ## What is left
 
 A Kronecker-packed `List (Nat x Int)` does the same four in
-196 / 2773 / 15009 / 38295 ms, so this representation is now faster at every
-size.  The remaining difference is entirely in the sum-of-monomials build, and
-is measured to be:
+196 / 2773 / 15009 / 38295 ms, so this representation is now 2.4x faster than
+that at the largest size.  On the 755-monomial identity the micro-harness
+attributes the 7.1 s as: the product `A * B` itself 3.3 s (against the packed
+form's 4.2 s), building the right-hand side 2.9 s (of which the 524-monomial
+remainder is 0.9 s), the final `removeZeros` 43 ms and the `BEq` 48 ms.
 
-* the packing guard.  `Polynomial.mulOk` calls `Mon.wf`, which decodes a key
-  into an exponent list and re-encodes it, once per factor of every product --
-  including the one-monomial products that a sum is made of.  Stubbing the
-  guard out saves 12% of the right-hand side at 755 monomials.  Making it
-  cheaper means a digit-walk well-formedness check and a matching proof in
-  `Key.lean`.
-
-* the per-step cost of the merge itself, about 1.15x the packed form's, and
-  `Mon.fromVar` (which runs `List.ofFn` and `encodeKey`) where the packed form
-  computes one `powNat D i`.
+The one item still worth more than 3% is the packing guard: stubbing
+`Polynomial.mulOk` out entirely saves 12%, because it is re-checked at every
+one of the ten-or-so products a single monomial is built from.  Removing it
+would mean bounding the total degree of the whole `AlgExpr` once, up front, and
+carrying `TermsOk` through `denote_toPoly` as an invariant.
 
 This file is not part of the `MacauleanTest` root (same convention as the
 other speed-test files); run it directly:
