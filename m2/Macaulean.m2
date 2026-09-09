@@ -366,6 +366,40 @@ assert Equation(mrdi#"_type"#"params", "Rat")
 ///
 
 TEST ///
+-- everything we serialize must be valid MRDI
+needsPackage "JSON"
+lean = x -> saveMRDI(x, Namespace => "Lean", ToString => false)
+
+R = QQ[x,y,z]
+f = x*z^2 - 3/2*y
+validateMRDI lean f
+validateMRDI lean 0_R -- the zero polynomial
+cp = new ConcretePoly from f
+validateMRDI lean cp
+validateMRDI lean cp#"poly" -- a bare Lean.Grind.CommRing.Poly
+
+S = ZZ[x,y,z]
+g = x*z^2 - 3*y
+validateMRDI lean g
+validateMRDI lean(new ConcretePoly from g)
+
+-- and so must everything the server hands back
+server = macauleanServer()
+call = (m, params) -> (
+    (fromJSON handleRequest(server, makeRequest(m, params, 1)))#"result")
+
+I = ideal(x*z, y)
+result = call("quotientRemainder",
+    {lean(new ConcretePoly from x*z^2),
+	apply(first entries gens I, h -> lean new ConcretePoly from h)})
+validateMRDI result#"remainder"
+scan(result#"quotient", validateMRDI)
+
+validateMRDI call("mrdiEcho", {lean f})
+scan(call("mrdiFactor", {lean(x^2 - y^2)}), term -> validateMRDI term#0)
+///
+
+TEST ///
 -- MRDI produced by Lean must load in M2
 -- these fixtures are pinned by #guard_msgs in MacauleanTest/Poly.lean
 
