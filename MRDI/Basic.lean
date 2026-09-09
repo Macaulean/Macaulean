@@ -3,6 +3,7 @@ import MRDI.Uuid
 open Lean Json
 
 def Macaulean.githubURL := "https://github.com/Macaulean/Macaulean"
+-- keep in sync with lakefile.toml
 def Macaulean.versionString := "0.1.0"
 
 inductive MrdiTypeDesc where
