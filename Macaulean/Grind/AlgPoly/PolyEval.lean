@@ -51,9 +51,16 @@ grevlex-descending order but leave the zero coefficients that cancellation
 produces (stripping after every operation costs a traversal of the whole
 accumulated polynomial per step); a single pass at the end is what turns two
 sorted term lists with the same nonzero terms into the same list.
+
+Both sides go through `AlgExpr.rebalance` first, which re-associates every
+`+`/`-` chain into a balanced tree.  A polynomial written out monomial by
+monomial arrives as a left-nested chain, and evaluating that left to right
+merges a one-term list into a growing sorted list once per monomial -- `O(m²)`.
+Balanced, the same merges cost `O(m log m)`.  `AlgExpr.denote_rebalance` says
+the rewriting does not change what either side denotes.
 -/
 def checkPolyEq (nv : Nat) (e₁ e₂ : AlgExpr Int) : Bool :=
-  match toPoly nv e₁, toPoly nv e₂ with
+  match toPoly nv e₁.rebalance, toPoly nv e₂.rebalance with
   | some p, some q => Polynomial.removeZeros p.terms == Polynomial.removeZeros q.terms
   | _, _ => false
 
@@ -135,7 +142,9 @@ theorem eq_of_checkPolyEq (nv : Nat) (e₁ e₂ : AlgExpr Int)
   unfold checkPolyEq at h
   split at h
   · rename_i p q hp hq
-    rw [← denote_toPoly hφ ctx nv e₁ p hp, ← denote_toPoly hφ ctx nv e₂ q hq]
+    rw [← denote_rebalance hφ ctx e₁, ← denote_rebalance hφ ctx e₂,
+      ← denote_toPoly hφ ctx nv e₁.rebalance p hp,
+      ← denote_toPoly hφ ctx nv e₂.rebalance q hq]
     show Polynomial.denoteTerms ctx (Polynomial.mapCoeffTerms φ p.terms) =
       Polynomial.denoteTerms ctx (Polynomial.mapCoeffTerms φ q.terms)
     rw [← Polynomial.denoteTerms_mapCoeffTerms_removeZeros hφ ctx p.terms,
