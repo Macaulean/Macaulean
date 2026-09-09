@@ -38,8 +38,8 @@ Measured on an M2 (Lean 4.33.1, `set_option Elab.async false`), where
 | perf_redH3_sq     |       755 |      7440 |       160 |          |
 | perf_theta3_step  |      1350 |     15917 |       336 |   7.0 GB |
 
-The goals are over `Rat`, whose `Macaulean.CertRingRat` instance is what the
-tactic now takes its coefficient map from (`AlgPoly.Tactic.certRingData`)
+The goals are over `Rat`, whose `Macaulean.CASRingRat` instance is what the
+tactic now takes its coefficient map from (`AlgPoly.Tactic.casRingData`)
 instead of naming `intDenote` itself.  That is two extra structure projections
 at the head of the coefficient map, and the numbers above are the same as the
 139 / 1581 / 7391 / 15795 ms measured before the class existed: the kernel

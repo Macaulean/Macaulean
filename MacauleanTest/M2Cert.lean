@@ -58,7 +58,7 @@ Generators with non-unit leading coefficients make Macaulay2 actually divide,
 and over `QQ` the cofactors come back with denominators.  `m2cert` clears them
 by scaling the whole certificate by their least common denominator, checking
 the *integer* identity in the kernel, and cancelling the scale factor through
-`Rat`'s `Macaulean.CertRingRat` instance.  Nothing about the goal or the call
+`Rat`'s `Macaulean.CASRingRat` instance.  Nothing about the goal or the call
 says any of this happened.
 -/
 
@@ -168,7 +168,7 @@ default.
 #guard_msgs in
 #print axioms mem_six_gens
 
--- The scaling path adds nothing either: `CertRingRat.cancel` is an ordinary
+-- The scaling path adds nothing either: `CASRingRat.cancel` is an ordinary
 -- theorem, and the identity the kernel checked is an integer one.
 /-- info: 'MacauleanTest.M2Cert.mem_scaled' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in

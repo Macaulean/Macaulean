@@ -167,7 +167,7 @@ the ambient one (see `m2QuotientRemainderRaw`'s `coeffRing`).
 
 Numerals and unary minus are translated rather than treated as opaque
 constants, which is what lets the two rings differ: a goal over
-`MvPolynomial (Fin 3) ℚ` whose `CertRing` instance says `QQ` sends its
+`MvPolynomial (Fin 3) ℚ` whose `CASRing` instance says `QQ` sends its
 coefficients as `Rat`.  When the two rings *are* the same -- every caller
 before `m2cert` -- the numeral branch rebuilds the numeral it was given, so
 nothing changes.
@@ -337,7 +337,7 @@ directly, to build the certificate in the ambient ring instead.
 `coeffRing` is the ring the coefficients are serialised in -- the Macaulay2
 base ring.  It defaults to the ambient ring, which is what every caller wanted
 back when the ambient ring was always `Int` or `Rat`; `m2cert` passes what the
-ambient ring's `Macaulean.CertRing` instance asks for.
+ambient ring's `Macaulean.CASRing` instance asks for.
 
 With `sortVars` the variables are indexed in the order of their *user* names
 rather than in the order `collectFVars` happens to visit them.  The tactics
@@ -367,7 +367,7 @@ unsafe def m2QuotientRemainderRaw (goal : MVarId) (ring : Expr) (idealExprs : Ar
   -- The Macaulay2 base ring.  `none` keeps the historical behaviour -- the
   -- coefficients travel in the ambient ring itself, which is why this used to
   -- work only for ambient rings that happen to carry a `Macaulay2Ring`
-  -- instance.  `m2cert` passes the ring its `Macaulean.CertRing` instance
+  -- instance.  `m2cert` passes the ring its `Macaulean.CASRing` instance
   -- names (`Int` for `ZZ`, `Rat` for `QQ`) instead.
   let cring := coeffRing.getD ring
   let polyExprPoly ← toPolynomialExpr? vars cring polyExpr

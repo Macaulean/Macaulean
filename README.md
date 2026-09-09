@@ -41,7 +41,7 @@ See the [wiki](https://github.com/Macaulay2/M2/wiki).
   measured cost of each change to it, and `m2cert` / `m2cert?` / `poly_cert`:
   a Macaulay2 certificate the Lean kernel checks, and how to commit the data
   so that later builds need no Macaulay2.  It also documents
-  `Macaulean.CertRing`, the one instance a ring declares to make all of those
+  `Macaulean.CASRing`, the one instance a ring declares to make all of those
   work on its goals, and the `/ d` scaling that lets a `QQ` ring accept
   Macaulay2's non-integral cofactors without putting `Rat` in the kernel.
 

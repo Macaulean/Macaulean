@@ -9,7 +9,7 @@ public import Macaulean.Polynomial.Hom
 @[expose] public section
 
 /-!
-# `CertRing`: one instance to subscribe a ring to the certificate machinery
+# `CASRing`: one instance to subscribe a ring to the certificate machinery
 
 `algebra_norm_reflect`, `poly_cert` and `m2cert` all do their arithmetic in
 `Macaulean.Polynomial Int nv` -- the kernel can compute there, and only there,
@@ -18,14 +18,14 @@ goal is stated in.  Everything ring-specific that those tactics need is
 collected here, so a consumer ring declares *one* instance and every tactic in
 the library works on its goals.
 
-`CertRing R` bundles:
+`CASRing R` bundles:
 
 * `ofInt : Int → R`, the coefficient map, with its `IsCoeffHom` proof.  The
   kernel carrier stays `Int` on purpose: `Rat` arithmetic goes through
   `Nat.gcd`, which is an out-of-line GMP call and falls off the kernel's
   small-`Nat` fast path.
 * the `Lean.Grind.CommRing R` structure itself (as the parent), so
-  `[CertRing R]` alone meets the reflective layer's instance needs;
+  `[CASRing R]` alone meets the reflective layer's instance needs;
 * `m2BaseRing`, the Macaulay2 base ring the coefficients are serialised into.
 
 What it deliberately does *not* bundle:
@@ -40,11 +40,11 @@ What it deliberately does *not* bundle:
   literally `⟨fun a b => ∃ c, b = a * c⟩`, so the unfolding is definitional and
   a class field would only restate it.
 
-`CertRingRat R` is the optional extension for rings that admit `1/d` for a
+`CASRingRat R` is the optional extension for rings that admit `1/d` for a
 nonzero integer `d`.  It is what lets the tactics accept the *non-integral*
 cofactors Macaulay2 returns over `QQ`: scale by the least common denominator
 `d`, check the integer identity `d * (p - r) = Σ qᵢ' gᵢ` reflectively, and
-cancel `d` at the end (`CertRingRat.cancel`, `CertRingRat.dvd_witness`).  Rings
+cancel `d` at the end (`CASRingRat.cancel`, `CASRingRat.dvd_witness`).  Rings
 that only ever see integer cofactors need not provide it.
 -/
 
@@ -64,8 +64,8 @@ numerals.  Packaging it as a named definition keeps the `Grind.Ring` instance
 argument in one place, so the term the tactic emits and the term
 `intDenote_isCoeffHom` talks about are syntactically identical.
 
-This is the `ofInt` of every `CertRing` instance in this library, and the
-default one `CertRing.ofGrindCommRing` gives a ring that has not subscribed.
+This is the `ofInt` of every `CASRing` instance in this library, and the
+default one `CASRing.ofGrindCommRing` gives a ring that has not subscribed.
 -/
 noncomputable def intDenote (A : Type) [Grind.CommRing A] : Int → A :=
   fun k => Grind.CommRing.denoteInt k
@@ -93,7 +93,7 @@ theorem intDenote_isCoeffHom (A : Type) [Grind.CommRing A] :
 /--
 The base ring a certificate's coefficients are serialised into when the request
 goes to Macaulay2.  `ZZ` promises integral cofactors; `QQ` allows Macaulay2 to
-divide, and then the tactics take the scaling path (see `CertRingRat`).
+divide, and then the tactics take the scaling path (see `CASRingRat`).
 -/
 inductive M2BaseRing where
   /-- The integers. -/
@@ -109,7 +109,7 @@ def M2BaseRing.toString : M2BaseRing → String
 
 instance : ToString M2BaseRing := ⟨M2BaseRing.toString⟩
 
-/-! ### `CertRing` -/
+/-! ### `CASRing` -/
 
 /--
 A commutative ring that has subscribed to the certificate machinery.
@@ -117,15 +117,15 @@ A commutative ring that has subscribed to the certificate machinery.
 Declare one instance and `algebra_norm_reflect`, `poly_cert`, `m2cert` and
 `m2cert?` all work on goals stated over `R`.  A ring with no instance still
 gets the reflective identity check: the tactics fall back on
-`CertRing.ofGrindCommRing R` (base ring `ZZ`, `ofInt = intDenote R`), which is
+`CASRing.ofGrindCommRing R` (base ring `ZZ`, `ofInt = intDenote R`), which is
 what they hard-wired before this class existed.
 
-The class *extends* `Lean.Grind.CommRing R`, so `[CertRing R]` on its own is
+The class *extends* `Lean.Grind.CommRing R`, so `[CASRing R]` on its own is
 enough to state and prove everything the reflective layer needs.  The parent
 projection is registered at priority 100 so that a concrete ring's own
 `Grind.CommRing` instance still wins.
 -/
-class CertRing (R : Type) extends Lean.Grind.CommRing R where
+class CASRing (R : Type) extends Lean.Grind.CommRing R where
   /-- The coefficient map.  The kernel works over `Int`; this is how its
   coefficients reach `R`. -/
   ofInt : Int → R
@@ -135,7 +135,7 @@ class CertRing (R : Type) extends Lean.Grind.CommRing R where
   /-- The Macaulay2 base ring to serialise coefficients into. -/
   m2BaseRing : M2BaseRing
 
-attribute [instance 100] CertRing.toCommRing
+attribute [instance 100] CASRing.toCommRing
 
 /--
 The default subscription for any `Lean.Grind.CommRing`: coefficients travel
@@ -144,27 +144,27 @@ through `intDenote`, and the Macaulay2 base ring is `ZZ` unless said otherwise.
 A consumer whose ring wants nothing special writes
 
 ```lean
-noncomputable instance : Macaulean.CertRing MyRing :=
-  Macaulean.CertRing.ofGrindCommRing MyRing
+noncomputable instance : Macaulean.CASRing MyRing :=
+  Macaulean.CASRing.ofGrindCommRing MyRing
 ```
 
 This is a `def` rather than an `instance` on purpose: a generic
-`[Grind.CommRing R] → CertRing R` instance and the `CertRing.toCommRing`
+`[Grind.CommRing R] → CASRing R` instance and the `CASRing.toCommRing`
 projection instance close a synthesis loop, and priority games around it are
 not worth the fragility.
 -/
 @[instance_reducible]
-noncomputable def CertRing.ofGrindCommRing (R : Type) [inst : Lean.Grind.CommRing R]
-    (base : M2BaseRing := .ZZ) : CertRing R where
+noncomputable def CASRing.ofGrindCommRing (R : Type) [inst : Lean.Grind.CommRing R]
+    (base : M2BaseRing := .ZZ) : CASRing R where
   toCommRing := inst
   ofInt := intDenote R
   ofInt_isCoeffHom := intDenote_isCoeffHom R
   m2BaseRing := base
 
-/-! ### `CertRingRat`: rings that can cancel an integer denominator -/
+/-! ### `CASRingRat`: rings that can cancel an integer denominator -/
 
 /--
-A `CertRing` in which every nonzero integer is invertible.
+A `CASRing` in which every nonzero integer is invertible.
 
 Macaulay2 working over `QQ` routinely returns cofactors with denominators, and
 `Rat` has no place in the kernel certificate (its arithmetic goes through
@@ -177,29 +177,29 @@ That last step is the only thing this class adds.
 are typically not fields (`MvPolynomial (Fin 3) ℚ` is the motivating one), they
 merely contain `ℚ`.
 -/
-class CertRingRat (R : Type) extends CertRing R where
+class CASRingRat (R : Type) extends CASRing R where
   /-- A right inverse for `ofInt d`, for `d ≠ 0`. -/
   invOfInt : Int → R
   /-- …which is what makes it one. -/
-  mul_invOfInt : ∀ d : Int, d ≠ 0 → CertRing.ofInt d * invOfInt d = 1
+  mul_invOfInt : ∀ d : Int, d ≠ 0 → CASRing.ofInt d * invOfInt d = 1
 
-namespace CertRingRat
+namespace CASRingRat
 
-variable {R : Type} [CertRingRat R]
+variable {R : Type} [CASRingRat R]
 
 /--
 **Cancellation.**  This is what turns the scaled, integer-coefficient identity
 the kernel checked back into the identity that was asked for.
 -/
 theorem cancel (d : Int) (hd : d ≠ 0) (a b : R)
-    (h : CertRing.ofInt d * a = CertRing.ofInt d * b) : a = b := by
-  have h1 := CertRingRat.mul_invOfInt (R := R) d hd
-  calc a = (CertRing.ofInt d * invOfInt d) * a := by rw [h1, Semiring.one_mul]
-    _ = invOfInt d * (CertRing.ofInt d * a) := by
-          rw [CommSemiring.mul_comm (CertRing.ofInt d) (invOfInt d), Semiring.mul_assoc]
-    _ = invOfInt d * (CertRing.ofInt d * b) := by rw [h]
-    _ = (CertRing.ofInt d * invOfInt d) * b := by
-          rw [CommSemiring.mul_comm (CertRing.ofInt d) (invOfInt d), Semiring.mul_assoc]
+    (h : CASRing.ofInt d * a = CASRing.ofInt d * b) : a = b := by
+  have h1 := CASRingRat.mul_invOfInt (R := R) d hd
+  calc a = (CASRing.ofInt d * invOfInt d) * a := by rw [h1, Semiring.one_mul]
+    _ = invOfInt d * (CASRing.ofInt d * a) := by
+          rw [CommSemiring.mul_comm (CASRing.ofInt d) (invOfInt d), Semiring.mul_assoc]
+    _ = invOfInt d * (CASRing.ofInt d * b) := by rw [h]
+    _ = (CASRing.ofInt d * invOfInt d) * b := by
+          rw [CommSemiring.mul_comm (CASRing.ofInt d) (invOfInt d), Semiring.mul_assoc]
     _ = b := by rw [h1, Semiring.one_mul]
 
 /--
@@ -207,29 +207,29 @@ theorem cancel (d : Int) (hd : d ≠ 0) (a b : R)
 gives the unscaled witness `q'/d` directly, which is what `g ∣ f` wants.
 -/
 theorem dvd_witness (d : Int) (hd : d ≠ 0) (f g q : R)
-    (h : CertRing.ofInt d * f = g * q) : f = g * (invOfInt d * q) := by
-  have h1 := CertRingRat.mul_invOfInt (R := R) d hd
-  calc f = (CertRing.ofInt d * invOfInt d) * f := by rw [h1, Semiring.one_mul]
-    _ = invOfInt d * (CertRing.ofInt d * f) := by
-          rw [CommSemiring.mul_comm (CertRing.ofInt d) (invOfInt d), Semiring.mul_assoc]
+    (h : CASRing.ofInt d * f = g * q) : f = g * (invOfInt d * q) := by
+  have h1 := CASRingRat.mul_invOfInt (R := R) d hd
+  calc f = (CASRing.ofInt d * invOfInt d) * f := by rw [h1, Semiring.one_mul]
+    _ = invOfInt d * (CASRing.ofInt d * f) := by
+          rw [CommSemiring.mul_comm (CASRing.ofInt d) (invOfInt d), Semiring.mul_assoc]
     _ = invOfInt d * (g * q) := by rw [h]
     _ = g * (invOfInt d * q) := by
           rw [← Semiring.mul_assoc, CommSemiring.mul_comm (invOfInt d) g, Semiring.mul_assoc]
 
-end CertRingRat
+end CASRingRat
 
 /--
-Every `Lean.Grind.Field` of characteristic zero is a `CertRingRat`, with
+Every `Lean.Grind.Field` of characteristic zero is a `CASRingRat`, with
 `invOfInt d = (ofInt d)⁻¹`.  This is how the `Rat` instance below is built, and
 it is the right helper for a consumer working in an honest field.  A ring that
 merely *contains* `ℚ` -- `MvPolynomial (Fin 3) ℚ`, a function field's
 polynomial ring -- writes the instance by hand instead (see the doc comment on
-`CertRing`'s `MvPolynomial` example in `docs/poly-repr-reflect.md`).
+`CASRing`'s `MvPolynomial` example in `docs/poly-repr-reflect.md`).
 -/
 @[instance_reducible]
-noncomputable def CertRingRat.ofGrindField (R : Type) [inst : Lean.Grind.Field R]
-    [Lean.Grind.IsCharP R 0] : CertRingRat R where
-  toCertRing := CertRing.ofGrindCommRing R .QQ
+noncomputable def CASRingRat.ofGrindField (R : Type) [inst : Lean.Grind.Field R]
+    [Lean.Grind.IsCharP R 0] : CASRingRat R where
+  toCASRing := CASRing.ofGrindCommRing R .QQ
   invOfInt d := (intDenote R d)⁻¹
   mul_invOfInt d hd :=
     Lean.Grind.CommRing.inv_int_eq (α := R) d (by simp [hd])
@@ -237,11 +237,11 @@ noncomputable def CertRingRat.ofGrindField (R : Type) [inst : Lean.Grind.Field R
 /-! ### The instances this library ships -/
 
 /-- `Int` certifies over `ZZ`, with integral cofactors and no scaling. -/
-noncomputable instance : CertRing Int := CertRing.ofGrindCommRing Int .ZZ
+noncomputable instance : CASRing Int := CASRing.ofGrindCommRing Int .ZZ
 
 /-- `Rat` certifies over `QQ`; a non-integral cofactor is scaled away and the
 denominator cancelled. -/
-noncomputable instance : CertRingRat Rat := CertRingRat.ofGrindField Rat
+noncomputable instance : CASRingRat Rat := CASRingRat.ofGrindField Rat
 
 end Macaulean
 

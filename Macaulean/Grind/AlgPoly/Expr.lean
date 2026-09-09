@@ -8,7 +8,7 @@
 -/
 module
 
-public import Macaulean.CertRing
+public import Macaulean.CASRing
 
 @[expose] public section
 

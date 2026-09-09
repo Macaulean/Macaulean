@@ -7,9 +7,9 @@
   1. reify both sides of the goal into `AlgExpr Int` plus a context of atoms;
   2. close `AlgExpr.checkPolyEq nv lhs rhs = true` with `decide +kernel`, which
      evaluates both sides to `Macaulean.Polynomial Int nv` inside the kernel;
-  3. bridge `AlgExpr.denote (CertRing.ofInt A) ctx e = goalSide` in both
+  3. bridge `AlgExpr.denote (CASRing.ofInt A) ctx e = goalSide` in both
      directions -- `ofInt` being the ambient ring's own coefficient map, from
-     its `Macaulean.CertRing` instance (`certRingData`), or the default
+     its `Macaulean.CASRing` instance (`casRingData`), or the default
      subscription when it has none;
   4. chain the three with `AlgExpr.eq_of_checkPolyEq`.
 
@@ -56,17 +56,17 @@ partial def exprNodeCount : Expr → Nat
 
 /--
 Everything the reflective layer needs to know about the ambient ring, resolved
-once per certificate: the `CertRing` instance, its `Grind.CommRing` parent, its
+once per certificate: the `CASRing` instance, its `Grind.CommRing` parent, its
 coefficient map and the proof that the map is a ring map.
 
 Every term below is built from the *same* `certInst`, so the denotation bridge
 and `AlgExpr.eq_of_checkPolyEq` agree syntactically and the bridge stays a
 kernel `rfl`.
 -/
-structure CertRingData where
+structure CASRingData where
   /-- The ambient ring. -/
   ring : Expr
-  /-- `CertRing ring`. -/
+  /-- `CASRing ring`. -/
   certInst : Expr
   /-- `Lean.Grind.CommRing ring`, as the class's parent projection. -/
   commRingInst : Expr
@@ -78,50 +78,50 @@ structure CertRingData where
 /--
 Resolve the ambient ring's subscription to the certificate machinery.
 
-A ring with a `Macaulean.CertRing` instance uses it.  A ring without one still
-gets the identity check: the default subscription `CertRing.ofGrindCommRing A`
+A ring with a `Macaulean.CASRing` instance uses it.  A ring without one still
+gets the identity check: the default subscription `CASRing.ofGrindCommRing A`
 is built on the spot, and its `ofInt` is `Macaulean.intDenote A` -- exactly what
 this tactic hard-wired before the class existed, so nothing that used to work
 stops working, and nothing that used to be checked by the kernel now is not.
 -/
-def certRingData (A : Expr) : MetaM CertRingData := do
-  let certTy := mkApp (mkConst ``Macaulean.CertRing) A
+def casRingData (A : Expr) : MetaM CASRingData := do
+  let certTy := mkApp (mkConst ``Macaulean.CASRing) A
   let certInst ←
     match ← trySynthInstance certTy with
     | .some inst => pure inst
     | _ =>
       let commRingInst ← synthInstance (mkApp (mkConst ``Lean.Grind.CommRing [.zero]) A)
-      pure <| mkApp3 (mkConst ``Macaulean.CertRing.ofGrindCommRing) A commRingInst
+      pure <| mkApp3 (mkConst ``Macaulean.CASRing.ofGrindCommRing) A commRingInst
         (mkConst ``Macaulean.M2BaseRing.ZZ)
   pure {
     ring := A
     certInst := certInst
-    commRingInst := mkApp2 (mkConst ``Macaulean.CertRing.toCommRing) A certInst
-    phi := mkApp2 (mkConst ``Macaulean.CertRing.ofInt) A certInst
-    hphi := mkApp2 (mkConst ``Macaulean.CertRing.ofInt_isCoeffHom) A certInst }
+    commRingInst := mkApp2 (mkConst ``Macaulean.CASRing.toCommRing) A certInst
+    phi := mkApp2 (mkConst ``Macaulean.CASRing.ofInt) A certInst
+    hphi := mkApp2 (mkConst ``Macaulean.CASRing.ofInt_isCoeffHom) A certInst }
 
 /-- The term `(k : R)` as the ambient ring's own coefficient map applies it.
 `Reify` recognises this shape as the coefficient `k`, which is what lets the
 scaling path state `ofInt d * p = …` and still have it be a polynomial identity
 in the goal's variables. -/
-def CertRingData.mkOfInt (d : CertRingData) (k : Int) : Expr :=
+def CASRingData.mkOfInt (d : CASRingData) (k : Int) : Expr :=
   mkApp d.phi (Reify.intLitE k)
 
 /-- The Macaulay2 base ring the ambient ring asks its coefficients to be
-serialised into.  `whnf` rather than `evalExpr`: `CertRing` instances are
+serialised into.  `whnf` rather than `evalExpr`: `CASRing` instances are
 `noncomputable` (`intDenote` is), but unfolding a projection of a structure
 literal is something the elaborator does anyway. -/
-def CertRingData.m2BaseRing (d : CertRingData) : MetaM Macaulean.M2BaseRing := do
-  let e ← whnf (mkApp2 (mkConst ``Macaulean.CertRing.m2BaseRing) d.ring d.certInst)
+def CASRingData.m2BaseRing (d : CASRingData) : MetaM Macaulean.M2BaseRing := do
+  let e ← whnf (mkApp2 (mkConst ``Macaulean.CASRing.m2BaseRing) d.ring d.certInst)
   if e.isConstOf ``Macaulean.M2BaseRing.QQ then pure .QQ
   else if e.isConstOf ``Macaulean.M2BaseRing.ZZ then pure .ZZ
   else throwError m!"could not evaluate the Macaulay2 base ring of{indentExpr d.ring}\
     \nit reduced to{indentExpr e}"
 
-/-- The `CertRingRat` instance of the ambient ring, if it has subscribed to the
+/-- The `CASRingRat` instance of the ambient ring, if it has subscribed to the
 denominator-scaling path. -/
-def certRingRatInst? (A : Expr) : MetaM (Option Expr) := do
-  match ← trySynthInstance (mkApp (mkConst ``Macaulean.CertRingRat) A) with
+def casRingRatInst? (A : Expr) : MetaM (Option Expr) := do
+  match ← trySynthInstance (mkApp (mkConst ``Macaulean.CASRingRat) A) with
   | .some inst => pure (some inst)
   | _ => pure none
 
@@ -161,8 +161,8 @@ def simpBridge (lhs rhs : Expr) : TacticM Expr := do
       evalTactic (← `(tactic| rfl))
     catch _ =>
       evalTactic (← `(tactic|
-        simp [Macaulean.AlgExpr.denote, Macaulean.CertRing.ofInt,
-          Macaulean.CertRing.ofGrindCommRing, Macaulean.intDenote,
+        simp [Macaulean.AlgExpr.denote, Macaulean.CASRing.ofInt,
+          Macaulean.CASRing.ofGrindCommRing, Macaulean.intDenote,
           Lean.Grind.CommRing.denoteInt_eq, Lean.RArray.get, Nat.ble]))
       if !(← getGoals).isEmpty then
         evalTactic (← `(tactic| grind))
@@ -214,7 +214,7 @@ def proveEq (lhs rhs : Expr) (native : Bool := false) : TacticM Expr := do
   let uA ← Reify.getTypeLevel A
   unless uA.isZero do
     throwError m!"algebra_norm_reflect needs the ambient ring in `Type`, got `{A} : Type {uA}`"
-  let crd ← certRingData A
+  let crd ← casRingData A
   let commRingInst := crd.commRingInst
   let reified ← Reify.runPair lhs rhs
   let nv := reified.atoms.size

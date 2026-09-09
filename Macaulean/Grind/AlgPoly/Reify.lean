@@ -127,8 +127,8 @@ partial def reify (e : Expr) : ReifyM Expr := do
     match (← getIntValue? a) with
     | some k => pure <| mkCoeff k
     | none => mkVar <$> mkAtom e
-  | Macaulean.CertRing.ofInt _ _ a =>
-    -- The coefficient map of the ambient ring's own `CertRing` instance.  The
+  | Macaulean.CASRing.ofInt _ _ a =>
+    -- The coefficient map of the ambient ring's own `CASRing` instance.  The
     -- scaling path (`poly_cert … / d`) states its identity with an explicit
     -- `ofInt d` factor, and it has to reify as the *coefficient* `d` rather
     -- than as an atom -- `d * (p - r) = Σ qᵢ' gᵢ` is a polynomial identity in

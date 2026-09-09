@@ -47,7 +47,7 @@ theorem paste_native (x y z : Rat) (h1 : x * y - z = 0) (h2 : y ^ 2 - x = 0) :
 
 `m2cert?` on a `QQ` goal whose cofactors are not integral prints a `/ d`.
 These are those lines, unedited.  The kernel checks `d * (p - r) = Σ qᵢ' gᵢ`
-over the integers and `Rat`'s `Macaulean.CertRingRat` instance cancels the `d`.
+over the integers and `Rat`'s `Macaulean.CASRingRat` instance cancels the `d`.
 -/
 
 theorem paste_scaled (x y z : Rat) (h1 : 3 * x * y - 3 * z = 0) (h2 : y ^ 2 - x = 0) :
@@ -68,14 +68,14 @@ theorem term_scaled (x y z : Rat) (h1 : 3 * x * y - 3 * z = 0) (h2 : y ^ 2 - x =
 
 Lean core gives `Rat` no `Dvd`; this is the instance every `CommMonoid` has in
 Mathlib (`semigroupDvd`), spelled out.  It is also the check that `poly_cert`
-needs no `Dvd` field in `CertRing`: the tactic unfolds the goal with `whnf`,
+needs no `Dvd` field in `CASRing`: the tactic unfolds the goal with `whnf`,
 and an instance of this shape *is* the `∃` definitionally.
 -/
 
 local instance : Dvd Rat := ⟨fun a b => ∃ c, b = a * c⟩
 
 /-- `x - y + z = (2x - 2y + 2z) * (1/2)`: the witness itself is not integral,
-which plain cancellation could not produce -- `CertRingRat.dvd_witness` does. -/
+which plain cancellation could not produce -- `CASRingRat.dvd_witness` does. -/
 theorem dvd_scaled (x y z : Rat) : (2 * x - 2 * y + 2 * z) ∣ (x - y + z) := by
   poly_cert ["0.0.0.1"] / 2 in [x, y, z]
 
@@ -155,7 +155,7 @@ example (x y z : Int) :
 /--
 error: poly_cert: this certificate is scaled by 2, which needs to be cancelled at the end, but
   Int
-has no `Macaulean.CertRingRat` instance.  Either give it one (see `Macaulean/CertRing.lean`) or supply integral cofactors.
+has no `Macaulean.CASRingRat` instance.  Either give it one (see `Macaulean/CASRing.lean`) or supply integral cofactors.
 -/
 #guard_msgs in
 example (x y z : Int) (h : 2 * x - 2 * y + 2 * z = 0) : x = y - z := by
@@ -168,19 +168,19 @@ example (x y z : Rat) (h : 2 * x - 2 * y + 2 * z = 0) : x = y - z := by
 
 /-! ## The instances this library ships -/
 
-/-- info: Macaulean.instCertRingInt -/
+/-- info: Macaulean.instCASRingInt -/
 #guard_msgs in
-#synth Macaulean.CertRing Int
+#synth Macaulean.CASRing Int
 
-/-- info: Macaulean.instCertRingRatRat -/
+/-- info: Macaulean.instCASRingRatRat -/
 #guard_msgs in
-#synth Macaulean.CertRingRat Rat
+#synth Macaulean.CASRingRat Rat
 
-/-- info: Macaulean.instCertRingRatRat.toCertRing -/
+/-- info: Macaulean.instCASRingRatRat.toCASRing -/
 #guard_msgs in
-#synth Macaulean.CertRing Rat
+#synth Macaulean.CASRing Rat
 
--- `CertRing.toCommRing` sits at priority 100, so a ring's own
+-- `CASRing.toCommRing` sits at priority 100, so a ring's own
 -- `Grind.CommRing` instance is still the one that gets found: nothing
 -- downstream sees a new instance path just because this class exists.
 /-- info: Lean.Grind.instFieldRat.toCommRing -/

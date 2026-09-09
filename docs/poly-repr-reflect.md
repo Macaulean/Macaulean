@@ -148,13 +148,13 @@ Peak RSS is for the 1350-monomial run.
 | one `removeZeros`, in `checkPolyEq` | 153 | 2447 | 13780 | 36104 | 14.3 GB |
 | balanced `+`/`-` chains (`AlgExpr.rebalance`) | 156 | 1741 | 7899 | 16876 | 7.3 GB |
 | digit-walk packing guard (`Mon.wfFrom`, `Mon.degB`) | 139 | 1581 | 7391 | 15795 | 7.0 GB |
-| coefficient map from `CertRing`, not `intDenote` | **140** | **1604** | **7440** | **15917** | **7.0 GB** |
+| coefficient map from `CASRing`, not `intDenote` | **140** | **1604** | **7440** | **15917** | **7.0 GB** |
 
 (ms of tactic time.  Run-to-run spread on the same binary is about 5%: the
 `removeZeros` row re-measured as 156 / 2420 / 13401 / 35483 and 14.2 GB
 immediately before the balanced-chain change.  The last row is not a change to
 the representation at all: taking the coefficient map from the ambient ring's
-`CertRing` instance puts two structure projections at the head of `φ`, and the
+`CASRing` instance puts two structure projections at the head of `φ`, and the
 kernel unfolds a projection-of-constructor cheaply and whnfs the head once.)
 
 Reference points on the same machine and identities: packing the key but still
@@ -206,24 +206,24 @@ Measured and **rejected**:
   same.  Balancing only pays when the summands are *singletons*, which is
   exactly the sum-of-monomials case that `AlgExpr.rebalance` handles.
 
-## `CertRing`: one instance per ring, for all of it
+## `CASRing`: one instance per ring, for all of it
 
 `algebra_norm_reflect`, `poly_cert` and `m2cert` each used to hard-wire three
 ring-specific decisions: coefficients are `Int` literals mapped by
 `Macaulean.intDenote`, the Macaulay2 base ring is whatever the ambient type
 happens to have an `MRDI` instance for, and a `Dvd` goal unfolds the way `Int`'s
-instance does.  `Macaulean/CertRing.lean` collects them into one class:
+instance does.  `Macaulean/CASRing.lean` collects them into one class:
 
 ```lean
-class CertRing (R : Type) extends Lean.Grind.CommRing R where
+class CASRing (R : Type) extends Lean.Grind.CommRing R where
   ofInt : Int → R
   ofInt_isCoeffHom : Polynomial.IsCoeffHom ofInt
   m2BaseRing : M2BaseRing        -- `.ZZ` or `.QQ`
 ```
 
 Declare one instance and every tactic in the library works on goals over `R`.
-Extending `Lean.Grind.CommRing` means `[CertRing R]` alone meets the reflective
-layer's instance needs; `CertRing.toCommRing` is registered at priority 100, so
+Extending `Lean.Grind.CommRing` means `[CASRing R]` alone meets the reflective
+layer's instance needs; `CASRing.toCommRing` is registered at priority 100, so
 `Grind.CommRing Rat` still resolves to `Grind.instFieldRat.toCommRing` and
 nothing downstream sees a new instance path.  The kernel carrier stays `Int` on
 purpose, for the `Nat.gcd` reason above.
@@ -240,7 +240,7 @@ Two things are deliberately *not* fields.
   `MacauleanTest/PolyCert.lean` writes that instance out for `Rat` (core gives
   `Rat` no `Dvd`) and closes a divisibility goal through it, which is the check.
 
-### Rational cofactors: `CertRingRat` and `/ d`
+### Rational cofactors: `CASRingRat` and `/ d`
 
 Macaulay2 over `QQ` routinely returns cofactors with denominators.  Rather than
 put `Rat` in the kernel, the certificate is **scaled**: `m2cert` takes the least
@@ -257,15 +257,15 @@ the one thing an arbitrary commutative ring cannot do, so it is an optional
 second class:
 
 ```lean
-class CertRingRat (R : Type) extends CertRing R where
+class CASRingRat (R : Type) extends CASRing R where
   invOfInt : Int → R
-  mul_invOfInt : ∀ d : Int, d ≠ 0 → CertRing.ofInt d * invOfInt d = 1
+  mul_invOfInt : ∀ d : Int, d ≠ 0 → CASRing.ofInt d * invOfInt d = 1
 ```
 
 An inverse rather than a bare cancellation law, because cancellation alone does
 not serve the divisibility shape: `g ∣ f` wants a *witness*, and the witness is
 `q'/d`.  With the inverse both lemmas are three lines
-(`CertRingRat.cancel`, `CertRingRat.dvd_witness`) and cancellation is one of
+(`CASRingRat.cancel`, `CASRingRat.dvd_witness`) and cancellation is one of
 them.  `invOfInt` is a plain function, not an `Inv R`: the motivating rings
 (`MvPolynomial (Fin 3) ℚ`) are not fields, they merely contain `ℚ`.
 
@@ -281,22 +281,22 @@ Try this:
 ```
 
 (cofactors `2/6` and `3/6`, i.e. `1/3` and `1/2`).  A ring with no
-`CertRingRat` instance gets a message naming the class rather than a failed
+`CASRingRat` instance gets a message naming the class rather than a failed
 check; `Int` is such a ring and does not need one, because `ZZ` cofactors are
 integral.
 
 ### The instances shipped, and the one a Mathlib consumer writes
 
-`Macaulean/CertRing.lean` ships `CertRing Int` (`ZZ`) and `CertRingRat Rat`
-(`QQ`), plus two helpers: `CertRing.ofGrindCommRing R base`, which fills
+`Macaulean/CASRing.lean` ships `CASRing Int` (`ZZ`) and `CASRingRat Rat`
+(`QQ`), plus two helpers: `CASRing.ofGrindCommRing R base`, which fills
 `ofInt` with `intDenote R` and its proof with `intDenote_isCoeffHom R`, and
-`CertRingRat.ofGrindField R`, for an honest `Lean.Grind.Field` of characteristic
+`CASRingRat.ofGrindField R`, for an honest `Lean.Grind.Field` of characteristic
 zero.
 
-A generic `[Grind.CommRing R] → CertRing R` *instance* is deliberately not
-shipped: together with the `CertRing.toCommRing` projection instance it closes
+A generic `[Grind.CommRing R] → CASRing R` *instance* is deliberately not
+shipped: together with the `CASRing.toCommRing` projection instance it closes
 a synthesis loop.  A ring without an instance is not turned away, though --
-`AlgPoly.Tactic.certRingData` builds `CertRing.ofGrindCommRing A` on the spot,
+`AlgPoly.Tactic.casRingData` builds `CASRing.ofGrindCommRing A` on the spot,
 so every goal that worked before the class exists still works, with the same
 certificate.
 
@@ -311,10 +311,10 @@ import Macaulean.M2Cert
 
 open Macaulean
 
-noncomputable instance : CertRingRat (MvPolynomial (Fin 3) ℚ) where
+noncomputable instance : CASRingRat (MvPolynomial (Fin 3) ℚ) where
   -- `ofInt`, its ring-map proof and the `Grind.CommRing` parent all come from
   -- Mathlib's `CommRing` instance, through grind's canonical `Int` map.
-  toCertRing := CertRing.ofGrindCommRing (MvPolynomial (Fin 3) ℚ) .QQ
+  toCASRing := CASRing.ofGrindCommRing (MvPolynomial (Fin 3) ℚ) .QQ
   -- `1/d` lives in the coefficient field; `C` puts it in the ring.
   invOfInt d := MvPolynomial.C ((d : ℚ)⁻¹)
   mul_invOfInt d hd := by
@@ -442,7 +442,7 @@ unreadable to `MRDI.m2`, whose `fromMRDI` recursion knows hash tables, strings
 and lists only; a rational travels as a numerator/denominator pair of strings.
 
 `R` above is the *coefficient* ring, `m2QuotientRemainderRaw`'s `coeffRing`
-argument, and it is what the ambient ring's `CertRing.m2BaseRing` names -- `Int`
+argument, and it is what the ambient ring's `CASRing.m2BaseRing` names -- `Int`
 for `ZZ`, `Rat` for `QQ`.  It used to be the ambient ring itself, which is why
 `m2cert` only ever worked over `Int` and `Rat`: those are the types with `MRDI`
 instances.  It defaults to the ambient ring, so `m2idealmem` and `m2remainder`
@@ -482,12 +482,12 @@ any atom -- so committed certificates over such a ring work today.
 * `algebra_norm_reflect` and `algebra_norm` take an optional `+native` flag.
   The kernel is still the default; `+native` warns.
 * The coefficient map is no longer `Macaulean.intDenote` by fiat: it is
-  `CertRing.ofInt` of the ambient ring's `Macaulean.CertRing` instance, or of
-  `CertRing.ofGrindCommRing A` when it has none.  `intDenote` is still what
-  those instances use; it now lives in `Macaulean/CertRing.lean`, which
+  `CASRing.ofInt` of the ambient ring's `Macaulean.CASRing` instance, or of
+  `CASRing.ofGrindCommRing A` when it has none.  `intDenote` is still what
+  those instances use; it now lives in `Macaulean/CASRing.lean`, which
   `Macaulean/Grind/AlgPoly/Expr.lean` imports, so the name and statement of
   `intDenote_isCoeffHom` are unchanged.
-* `Reify` reifies an application of `CertRing.ofInt` to an integer literal as
+* `Reify` reifies an application of `CASRing.ofInt` to an integer literal as
   that *coefficient*, and `Reify.intLitValue?` reads the raw
   `Int.ofNat`/`Int.negSucc` constructor form that `Meta.getIntValue?` does not.
 * `poly_cert` takes an optional `/ d` between the cofactor list and `in`;

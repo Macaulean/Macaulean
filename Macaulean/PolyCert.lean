@@ -61,7 +61,7 @@ with `qᵢ'` integral.  There is **one** denominator for the whole invocation,
 not one per cofactor: a per-cofactor denominator buys nothing (the integer
 identity has to be scaled by the common multiple anyway) and makes the printed
 line harder to read.  The tactic checks the scaled identity in the kernel and
-then cancels `d` -- which is what `Macaulean.CertRingRat` is for, so the
+then cancels `d` -- which is what `Macaulean.CASRingRat` is for, so the
 ambient ring needs that instance (`Rat` has it; `Int` does not, and does not
 need it, since `ZZ` cofactors are integral).
 
@@ -119,23 +119,23 @@ def intNeZeroProof (d : Int) : MetaM Expr := do
   mkDecideProof (mkApp3 (mkConst ``Ne [1]) (mkConst ``Int)
     (AlgPoly.Reify.intLitE d) (AlgPoly.Reify.intLitE 0))
 
-/-- The ambient ring's `CertRingRat` instance, or a message saying why the
+/-- The ambient ring's `CASRingRat` instance, or a message saying why the
 scaling path is not available to it. -/
-def certRingRatInst (A : Expr) (denom : Nat) : TacticM Expr := do
-  match ← AlgPoly.Tactic.certRingRatInst? A with
+def casRingRatInst (A : Expr) (denom : Nat) : TacticM Expr := do
+  match ← AlgPoly.Tactic.casRingRatInst? A with
   | some inst => pure inst
   | none =>
     throwError m!"poly_cert: this certificate is scaled by {denom}, which needs \
       to be cancelled at the end, but{indentExpr A}\nhas no \
-      `Macaulean.CertRingRat` instance.  Either give it one (see \
-      `Macaulean/CertRing.lean`) or supply integral cofactors."
+      `Macaulean.CASRingRat` instance.  Either give it one (see \
+      `Macaulean/CASRing.lean`) or supply integral cofactors."
 
 /--
 Close a goal `g ∣ f` with the cofactor `q`: the divisibility unfolds to
 `∃ c, f = g * c`, and `f = g * q` is a polynomial identity.
 
 With `denom = d > 1` the cofactor is scaled: `q` witnesses `d * f = g * q`, the
-kernel checks *that*, and `CertRingRat.dvd_witness` turns it into the witness
+kernel checks *that*, and `CASRingRat.dvd_witness` turns it into the witness
 `q/d` the `∃` wants.
 -/
 def closeDvd (native : Bool) (goal : MVarId) (q : Expr) (denom : Nat := 1) : TacticM Unit := do
@@ -158,16 +158,16 @@ def closeDvd (native : Bool) (goal : MVarId) (q : Expr) (denom : Nat := 1) : Tac
           | _ => none)
         | throwError m!"poly_cert: a scaled divisibility certificate needs a goal of \
             the shape `g ∣ f`, got{indentExpr target}"
-      let ratInst ← certRingRatInst α denom
-      let crd ← AlgPoly.Tactic.certRingData α
+      let ratInst ← casRingRatInst α denom
+      let crd ← AlgPoly.Tactic.casRingData α
       let dE := crd.mkOfInt (Int.ofNat denom)
       -- the kernel checks the *integer* identity `d * f = g * q`
       let hScaled ← AlgPoly.Tactic.proveEq (← mkMul dE f) (← mkMul g q) native
       let dLit := AlgPoly.Reify.intLitE (Int.ofNat denom)
-      let inv := mkApp3 (mkConst ``Macaulean.CertRingRat.invOfInt) α ratInst dLit
+      let inv := mkApp3 (mkConst ``Macaulean.CASRingRat.invOfInt) α ratInst dLit
       let witness ← mkMul inv q
       let hd ← intNeZeroProof (Int.ofNat denom)
-      pure (witness, mkAppN (mkConst ``Macaulean.CertRingRat.dvd_witness)
+      pure (witness, mkAppN (mkConst ``Macaulean.CASRingRat.dvd_witness)
         #[α, ratInst, dLit, hd, f, g, q, hScaled])
   let proof := mkApp4 (mkConst ``Exists.intro [u]) α p witness hEq
   unless ← goal.checkedAssign proof do
@@ -190,8 +190,8 @@ def closeEq (native : Bool) (goal : MVarId) (hyps cofactors : Array Expr)
   let scaled? ←
     if denom == 1 then pure none
     else do
-      let ratInst ← certRingRatInst A denom
-      let crd ← AlgPoly.Tactic.certRingData A
+      let ratInst ← casRingRatInst A denom
+      let crd ← AlgPoly.Tactic.casRingData A
       pure (some (ratInst, crd.mkOfInt (Int.ofNat denom)))
   let lhs ← match scaled? with
     | none => pure p
@@ -212,7 +212,7 @@ def closeEq (native : Bool) (goal : MVarId) (hyps cofactors : Array Expr)
     | some (ratInst, _) => do
       let dLit := AlgPoly.Reify.intLitE (Int.ofNat denom)
       let hd ← intNeZeroProof (Int.ofNat denom)
-      instantiateMVars <| mkAppN (mkConst ``Macaulean.CertRingRat.cancel)
+      instantiateMVars <| mkAppN (mkConst ``Macaulean.CASRingRat.cancel)
         #[A, ratInst, dLit, hd, p, r, scaledEq]
   unless ← goal.checkedAssign proof do
     throwError m!"poly_cert: the certificate did not typecheck against{indentExpr target}"
@@ -252,7 +252,7 @@ string `"e₁.….eₙ.k …"` — in which case the variables have to be listed
 `poly_cert [q₁, …] / d …` is the scaled form: the listed cofactors are `d`
 times the real ones, the kernel checks the integer identity `d * (p - r) =
 Σ qᵢ' gᵢ` (or `d * f = g * q'`), and `d` is cancelled through the ambient
-ring's `Macaulean.CertRingRat` instance.
+ring's `Macaulean.CASRingRat` instance.
 
 This tactic never invokes a computer algebra system; `m2cert?` prints the
 invocation to write here.

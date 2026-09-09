@@ -42,7 +42,7 @@ the recommended way to keep a computer algebra system out of a build.
 
 ## Which base ring, and what happens to denominators
 
-The ambient ring's `Macaulean.CertRing` instance says whether its coefficients
+The ambient ring's `Macaulean.CASRing` instance says whether its coefficients
 are serialised over `ZZ` or over `QQ`; that is the only thing choosing the
 Macaulay2 base ring, and `Int` and `Rat` ship with instances saying `ZZ` and
 `QQ`.
@@ -53,9 +53,9 @@ has nowhere to put a denominator -- it normalises over
 out-of-line GMP call, into the kernel.  So `m2cert` clears them: it takes the
 least common denominator `d` of all the cofactors at once, hands
 `poly_cert … / d` the integral cofactors `d * qᵢ`, and lets it check the
-integer identity and cancel `d` through the ring's `Macaulean.CertRingRat`
+integer identity and cancel `d` through the ring's `Macaulean.CASRingRat`
 instance.  The printed suggestion carries the `/ d`, so a paste proves the same
-thing the same way.  A ring with no `CertRingRat` instance gets a message
+thing the same way.  A ring with no `CASRingRat` instance gets a message
 naming the class.
 
 A `poly_def` *declaration* cannot hold such a cofactor: its body is a closed
@@ -148,8 +148,8 @@ unsafe def certify (tacName : Name) (goal : MVarId) (A : Expr) (gens : Array Exp
     (polyExpr : Expr) : MetaM (Array FVarId × Array String × Nat) := do
   let fail {α} (e : String) : MetaM α := throwTacticEx tacName goal e
   -- Which base ring the coefficients travel in is the ambient ring's own
-  -- decision, taken through its `Macaulean.CertRing` instance.
-  let crd ← AlgPoly.Tactic.certRingData A
+  -- decision, taken through its `Macaulean.CASRing` instance.
+  let crd ← AlgPoly.Tactic.casRingData A
   let base ← crd.m2BaseRing
   let coeffRing := match base with
     | .ZZ => mkConst ``Int
