@@ -3,7 +3,11 @@ Copyright (c) 2026 Macaulean contributors. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 -/
 
-import Lean
+module
+
+public meta import Lean
+
+@[expose] public section
 
 /-!
 # `poly_def`: computer-algebra polynomial data as Lean definitions
@@ -41,6 +45,8 @@ set_option autoImplicit false
 namespace Macaulean
 
 open Lean Meta Elab
+
+meta section
 
 /--
 The pieces needed to turn a monomial string into an `Expr`: the variable
@@ -168,4 +174,8 @@ elab doc:(Lean.Parser.Command.docComment)? "poly_def " name:ident " : " ty:term
     if let some doc := doc then
       addDocStringCore declName doc.getDocString
 
+end
+
 end Macaulean
+
+end
