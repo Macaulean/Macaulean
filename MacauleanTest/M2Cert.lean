@@ -52,6 +52,28 @@ theorem mem_six_gens (a b c d e f : Rat)
     c ^ 2 * d - 2 * b * c * e + a * e ^ 2 + b ^ 2 * f - a * d * f = 0 := by
   m2cert [f1, f2, f3, f4, f5, f6]
 
+/-! ## S3: `QQ` cofactors that are not integral
+
+Generators with non-unit leading coefficients make Macaulay2 actually divide,
+and over `QQ` the cofactors come back with denominators.  `m2cert` clears them
+by scaling the whole certificate by their least common denominator, checking
+the *integer* identity in the kernel, and cancelling the scale factor through
+`Rat`'s `Macaulean.CertRingRat` instance.  Nothing about the goal or the call
+says any of this happened.
+-/
+
+/-- Cofactor `(x² + z)/3`: one denominator. -/
+theorem mem_scaled (x y z : Rat) (h1 : 3 * x * y - 3 * z = 0) (h2 : y ^ 2 - x = 0) :
+    x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  m2cert [h1, h2]
+
+/-- Cofactors `1/3` and `1/2`: *one* scale factor for the whole certificate,
+their lcm, not one per cofactor. -/
+theorem mem_scaled_lcm (x y z : Rat)
+    (h1 : 3 * (x * y - z) = 0) (h2 : 2 * (y ^ 2 - x) = 0) :
+    x * y - z + y ^ 2 - x = 0 := by
+  m2cert [h1, h2]
+
 /-! ## What `m2cert?` prints
 
 The variables are indexed by their user names, so the `in [...]` clause and the
@@ -77,6 +99,30 @@ info: Try this:
 #guard_msgs in
 theorem suggest_mem (x y z : Rat) (h1 : x * y - z = 0) (h2 : y ^ 2 - x = 0) :
     x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  m2cert? [h1, h2]
+
+-- A scaled certificate prints its denominator, so the paste proves the same
+-- thing by the same route.
+/--
+info: Try this:
+  [apply] poly_cert ["2.0.0.1 0.0.1.1", "0.0.0.0"] / 3 in [x, y, z] using [h1, h2]
+  (the cofactors are Macaulay2's, in its emission order; pasting this keeps Macaulay2 out of the build)
+-/
+#guard_msgs in
+theorem suggest_scaled (x y z : Rat) (h1 : 3 * x * y - 3 * z = 0) (h2 : y ^ 2 - x = 0) :
+    x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  m2cert? [h1, h2]
+
+-- `2/6` and `3/6`, i.e. `1/3` and `1/2`.
+/--
+info: Try this:
+  [apply] poly_cert ["0.0.0.2", "0.0.0.3"] / 6 in [x, y, z] using [h1, h2]
+  (the cofactors are Macaulay2's, in its emission order; pasting this keeps Macaulay2 out of the build)
+-/
+#guard_msgs in
+theorem suggest_scaled_lcm (x y z : Rat)
+    (h1 : 3 * (x * y - z) = 0) (h2 : 2 * (y ^ 2 - x) = 0) :
+    x * y - z + y ^ 2 - x = 0 := by
   m2cert? [h1, h2]
 
 /-! ## `+native` is opt-in, explicit, and loud -/
@@ -121,6 +167,16 @@ default.
 /-- info: 'MacauleanTest.M2Cert.mem_six_gens' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms mem_six_gens
+
+-- The scaling path adds nothing either: `CertRingRat.cancel` is an ordinary
+-- theorem, and the identity the kernel checked is an integer one.
+/-- info: 'MacauleanTest.M2Cert.mem_scaled' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms mem_scaled
+
+/-- info: 'MacauleanTest.M2Cert.mem_scaled_lcm' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms mem_scaled_lcm
 
 /--
 info: 'MacauleanTest.M2Cert.mem_native' depends on axioms: [propext,

@@ -43,6 +43,42 @@ theorem paste_native (x y z : Rat) (h1 : x * y - z = 0) (h2 : y ^ 2 - x = 0) :
     x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
   poly_cert +native ["2.0.0.1 0.0.1.1", "0.0.0.0"] in [x, y, z] using [h1, h2]
 
+/-! ## Scaled certificates, pasted
+
+`m2cert?` on a `QQ` goal whose cofactors are not integral prints a `/ d`.
+These are those lines, unedited.  The kernel checks `d * (p - r) = Σ qᵢ' gᵢ`
+over the integers and `Rat`'s `Macaulean.CertRingRat` instance cancels the `d`.
+-/
+
+theorem paste_scaled (x y z : Rat) (h1 : 3 * x * y - 3 * z = 0) (h2 : y ^ 2 - x = 0) :
+    x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  poly_cert ["2.0.0.1 0.0.1.1", "0.0.0.0"] / 3 in [x, y, z] using [h1, h2]
+
+theorem paste_scaled_lcm (x y z : Rat)
+    (h1 : 3 * (x * y - z) = 0) (h2 : 2 * (y ^ 2 - x) = 0) :
+    x * y - z + y ^ 2 - x = 0 := by
+  poly_cert ["0.0.0.2", "0.0.0.3"] / 6 in [x, y, z] using [h1, h2]
+
+/-- A scaled cofactor may be an ordinary term too. -/
+theorem term_scaled (x y z : Rat) (h1 : 3 * x * y - 3 * z = 0) (h2 : y ^ 2 - x = 0) :
+    x ^ 3 * y + x * y * z + 5 = x ^ 2 * z + z ^ 2 + 5 := by
+  poly_cert [x ^ 2 + z, 0] / 3 using [h1, h2]
+
+/-! ## Scaled divisibility
+
+Lean core gives `Rat` no `Dvd`; this is the instance every `CommMonoid` has in
+Mathlib (`semigroupDvd`), spelled out.  It is also the check that `poly_cert`
+needs no `Dvd` field in `CertRing`: the tactic unfolds the goal with `whnf`,
+and an instance of this shape *is* the `∃` definitionally.
+-/
+
+local instance : Dvd Rat := ⟨fun a b => ∃ c, b = a * c⟩
+
+/-- `x - y + z = (2x - 2y + 2z) * (1/2)`: the witness itself is not integral,
+which plain cancellation could not produce -- `CertRingRat.dvd_witness` does. -/
+theorem dvd_scaled (x y z : Rat) : (2 * x - 2 * y + 2 * z) ∣ (x - y + z) := by
+  poly_cert ["0.0.0.1"] / 2 in [x, y, z]
+
 /-! ## Cofactors as terms
 
 A monomial string and the term it stands for produce the same proof, so a
@@ -88,6 +124,14 @@ theorem def_dvd : ((2:Int) ^ 2 * 3 - 5 + 1) ∣ (((2:Int) ^ 2 * 3 - 5 + 1) * quo
 #guard_msgs in
 #print axioms def_dvd
 
+/-- info: 'MacauleanTest.PolyCert.paste_scaled_lcm' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms paste_scaled_lcm
+
+/-- info: 'MacauleanTest.PolyCert.dvd_scaled' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms dvd_scaled
+
 /--
 info: 'MacauleanTest.PolyCert.paste_native' depends on axioms: [propext,
  Classical.choice,
@@ -105,6 +149,49 @@ info: 'MacauleanTest.PolyCert.paste_native' depends on axioms: [propext,
 example (x y z : Int) :
     (x ^ 2 * y - z + 1) ∣ ((x ^ 2 * y - z + 1) * (x * y + 2 * z - 3)) := by
   poly_cert ["1.1.0.1 0.0.1.2 0.0.0.-3"]
+
+-- Scaling has to be cancellable, and `Int` cannot cancel a 2.  The message
+-- names the class rather than reporting a failed check.
+/--
+error: poly_cert: this certificate is scaled by 2, which needs to be cancelled at the end, but
+  Int
+has no `Macaulean.CertRingRat` instance.  Either give it one (see `Macaulean/CertRing.lean`) or supply integral cofactors.
+-/
+#guard_msgs in
+example (x y z : Int) (h : 2 * x - 2 * y + 2 * z = 0) : x = y - z := by
+  poly_cert ["0.0.0.1"] / 2 in [x, y, z] using [h]
+
+-- A wrong scale factor is rejected like any other wrong certificate.
+example (x y z : Rat) (h : 2 * x - 2 * y + 2 * z = 0) : x = y - z := by
+  fail_if_success poly_cert ["0.0.0.1"] / 3 in [x, y, z] using [h]
+  poly_cert ["0.0.0.1"] / 2 in [x, y, z] using [h]
+
+/-! ## The instances this library ships -/
+
+/-- info: Macaulean.instCertRingInt -/
+#guard_msgs in
+#synth Macaulean.CertRing Int
+
+/-- info: Macaulean.instCertRingRatRat -/
+#guard_msgs in
+#synth Macaulean.CertRingRat Rat
+
+/-- info: Macaulean.instCertRingRatRat.toCertRing -/
+#guard_msgs in
+#synth Macaulean.CertRing Rat
+
+-- `CertRing.toCommRing` sits at priority 100, so a ring's own
+-- `Grind.CommRing` instance is still the one that gets found: nothing
+-- downstream sees a new instance path just because this class exists.
+/-- info: Lean.Grind.instFieldRat.toCommRing -/
+#guard_msgs in
+#synth Lean.Grind.CommRing Rat
+
+/-- info: Lean.Grind.instCommRingInt -/
+#guard_msgs in
+#synth Lean.Grind.CommRing Int
+
+/-! ## Misuse (continued) -/
 
 /-- A wrong cofactor fails the reflective check rather than being believed. -/
 example (x y z : Int) :

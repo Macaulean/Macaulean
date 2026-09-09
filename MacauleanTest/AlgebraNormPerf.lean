@@ -33,10 +33,18 @@ Measured on an M2 (Lean 4.33.1, `set_option Elab.async false`), where
 
 | identity          | monomials | tactic ms | kernel ms | peak RSS |
 |-------------------|-----------|-----------|-----------|----------|
-| perf_hess_sq      |        41 |       139 |        11 |          |
-| perf_redH2_sq     |       296 |      1581 |        63 |          |
-| perf_redH3_sq     |       755 |      7391 |       163 |          |
-| perf_theta3_step  |      1350 |     15795 |       341 |   7.0 GB |
+| perf_hess_sq      |        41 |       140 |        12 |          |
+| perf_redH2_sq     |       296 |      1604 |        63 |          |
+| perf_redH3_sq     |       755 |      7440 |       160 |          |
+| perf_theta3_step  |      1350 |     15917 |       336 |   7.0 GB |
+
+The goals are over `Rat`, whose `Macaulean.CertRingRat` instance is what the
+tactic now takes its coefficient map from (`AlgPoly.Tactic.certRingData`)
+instead of naming `intDenote` itself.  That is two extra structure projections
+at the head of the coefficient map, and the numbers above are the same as the
+139 / 1581 / 7391 / 15795 ms measured before the class existed: the kernel
+unfolds a projection-of-constructor cheaply, and the head is whnf'd once and
+cached.
 
 Essentially all of "tactic" is the `decide +kernel` certificate; the two
 denotation bridges cost a few hundred ms on the largest one, because they are
