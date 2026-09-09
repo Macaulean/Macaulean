@@ -434,6 +434,13 @@ The fuel-0 fallback is `mergeTermsSpec` itself, so `mergeTermsF f = mergeTermsSp
 for *every* `f` and no lemma downstream carries a fuel side-condition.  With
 `mergeFuel` the fallback is unreachable in practice; if it were ever reached the
 kernel would simply get stuck (a tactic failure, never an unsound proof).
+
+The comparison is written out as `Nat.beq`/`Nat.ble` on the keys rather than as
+a `match` on `Mon.grevlex`: the two agree (`mergeTermsF_cons_cons`), but the
+`match` makes the kernel build an `Ordering` value and case on it at every step,
+and the merge does nothing else.  On the certificate benchmarks
+(`MacauleanTest/AlgebraNormPerf.lean`) that round trip is 5-7% of the whole
+check.
 -/
 def mergeTermsF [Grind.CommRing R] :
     Nat → List (PolyTerm R n) → List (PolyTerm R n) → List (PolyTerm R n)
@@ -441,10 +448,12 @@ def mergeTermsF [Grind.CommRing R] :
   | _ + 1, [], ys => ys
   | _ + 1, x :: xs, [] => x :: xs
   | fuel + 1, x :: xs, y :: ys =>
-    match x.monomial.grevlex y.monomial with
-    | .gt => x :: mergeTermsF fuel xs (y :: ys)
-    | .eq => ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTermsF fuel xs ys
-    | .lt => y :: mergeTermsF fuel (x :: xs) ys
+    bif Nat.beq x.monomial.key y.monomial.key then
+      ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTermsF fuel xs ys
+    else bif Nat.ble x.monomial.key y.monomial.key then
+      y :: mergeTermsF fuel (x :: xs) ys
+    else
+      x :: mergeTermsF fuel xs (y :: ys)
 
 /-- Merge two grevlex-descending term lists, coalescing equal monomials. -/
 def mergeTerms [Grind.CommRing R]

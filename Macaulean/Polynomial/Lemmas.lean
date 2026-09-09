@@ -480,12 +480,21 @@ theorem mergeTermsSpec_cons_cons (x y : PolyTerm R n) (xs ys : List (PolyTerm R 
   cases h : x.monomial.grevlex y.monomial <;>
     simp only [h, mergeTermsSpec, mergeTermsSpec.takeTillGE]
 
+/-- The three-way defining equation of `mergeTermsF`, back in terms of
+`Mon.grevlex`.  The definition itself spells the comparison out as
+`Nat.beq`/`Nat.ble` (that is the kernel-hot form); this is where the two are
+reconciled, and every lemma below argues from this equation. -/
 theorem mergeTermsF_cons_cons (f : Nat) (x y : PolyTerm R n) (xs ys : List (PolyTerm R n)) :
     mergeTermsF (f + 1) (x :: xs) (y :: ys) =
       match x.monomial.grevlex y.monomial with
       | .gt => x :: mergeTermsF f xs (y :: ys)
       | .eq => ⟨x.coefficient + y.coefficient, x.monomial⟩ :: mergeTermsF f xs ys
-      | .lt => y :: mergeTermsF f (x :: xs) ys := rfl
+      | .lt => y :: mergeTermsF f (x :: xs) ys := by
+  show (bif Nat.beq x.monomial.key y.monomial.key then _ else
+        bif Nat.ble x.monomial.key y.monomial.key then _ else _) = _
+  unfold Mon.grevlex
+  cases Nat.beq x.monomial.key y.monomial.key <;>
+    cases Nat.ble x.monomial.key y.monomial.key <;> rfl
 
 /-- Fuel is irrelevant: at every amount, `mergeTermsF` computes the reference
 merge. -/
