@@ -33,8 +33,9 @@ What it deliberately does *not* bundle:
 * **variables/atoms.**  `Macaulean.AlgPoly.Reify` treats anything it does not
   recognise as arithmetic as an atom, up to definitional equality, so
   `MvPolynomial.X i` and `Polynomial.X` need no help: they simply become
-  variables of the reified expression.  There is no hook because no code would
-  call it.
+  variables of the reified expression.  The Macaulay2 round trip shares that
+  classifier (`Reify.classify`), so this is true on both sides of the wire.
+  There is no hook because no code would call it.
 * **`Dvd`.**  `poly_cert` unfolds a goal `g ∣ f` with `whnf`.  Both the
   instances Lean core gives commutative rings and Mathlib's `semigroupDvd` are
   literally `⟨fun a b => ∃ c, b = a * c⟩`, so the unfolding is definitional and

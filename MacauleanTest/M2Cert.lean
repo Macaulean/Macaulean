@@ -74,11 +74,81 @@ theorem mem_scaled_lcm (x y z : Rat)
     x * y - z + y ^ 2 - x = 0 := by
   m2cert [h1, h2]
 
+/-! ## S4: ring variables that are not free variables
+
+A ring variable is any maximal non-arithmetic subterm -- exactly what the
+reflective half already treated as an atom -- so an application is a variable
+on the same footing as a local, and the two halves cannot disagree about which
+is which.  Mathlib is not available in this repository, so the motivating case,
+a goal in `MvPolynomial (Fin 3) ℚ` whose variables are `MvPolynomial.X 0`,
+`X 1`, `X 2`, cannot be written here.  `X` below is the closest thing that can:
+an opaque constant applied to numerals, which reifies through the same code
+path.
+-/
+
+/-- Opaque, so nothing about these terms is arithmetic and nothing unfolds:
+`f x` and `g x y` are atoms and stay atoms. -/
+opaque f : Rat → Rat
+/-- A two-argument atom head. -/
+opaque g : Rat → Rat → Rat
+/-- Applied to a numeral, in the shape `MvPolynomial.X 0` has. -/
+opaque X : Nat → Rat
+
+/-- The same certificate as `mem_two_gens`, with `f x`, `g x y`, `f y` in place
+of `x`, `y`, `z`.  Nothing in the tactic call says the variables are
+applications. -/
+theorem app_atoms (x y : Rat)
+    (h1 : f x * g x y - f y = 0) (h2 : g x y ^ 2 - f x = 0) :
+    f x ^ 3 * g x y + f x * g x y * f y + 5 = f x ^ 2 * f y + f y ^ 2 + 5 := by
+  m2cert [h1, h2]
+
+/-- Variables applied to numerals, and *no* free variables in the goal at all
+-- the old round trip, which looked for `fvar`s, had nowhere to put these. -/
+theorem numeral_arg_atoms (h1 : X 0 * X 1 - X 2 = 0) (h2 : X 1 ^ 2 - X 0 = 0) :
+    X 0 ^ 3 * X 1 + X 0 * X 1 * X 2 + 5 = X 0 ^ 2 * X 2 + X 2 ^ 2 + 5 := by
+  m2cert [h1, h2]
+
+-- The `in [...]` clause is the atoms, pretty-printed, in first-occurrence order.
+/--
+info: Try this:
+  [apply] poly_cert ["2.0.0.1 0.0.1.1", "0.0.0.0"] in [f x, g x y, f y] using [h1, h2]
+  (the cofactors are Macaulay2's, in its emission order; pasting this keeps Macaulay2 out of the build)
+-/
+#guard_msgs in
+theorem suggest_app_atoms (x y : Rat)
+    (h1 : f x * g x y - f y = 0) (h2 : g x y ^ 2 - f x = 0) :
+    f x ^ 3 * g x y + f x * g x y * f y + 5 = f x ^ 2 * f y + f y ^ 2 + 5 := by
+  m2cert? [h1, h2]
+
+/--
+info: Try this:
+  [apply] poly_cert ["2.0.0.1 0.0.1.1", "0.0.0.0"] in [X 0, X 1, X 2] using [h1, h2]
+  (the cofactors are Macaulay2's, in its emission order; pasting this keeps Macaulay2 out of the build)
+-/
+#guard_msgs in
+theorem suggest_numeral_arg_atoms
+    (h1 : X 0 * X 1 - X 2 = 0) (h2 : X 1 ^ 2 - X 0 = 0) :
+    X 0 ^ 3 * X 1 + X 0 * X 1 * X 2 + 5 = X 0 ^ 2 * X 2 + X 2 ^ 2 + 5 := by
+  m2cert? [h1, h2]
+
+-- …and those two lines, pasted verbatim.  This is the whole point of printing
+-- them: the atoms have to re-elaborate to the same terms, or the reflective
+-- check would be looking at a different identity.
+theorem pasted_app_atoms (x y : Rat)
+    (h1 : f x * g x y - f y = 0) (h2 : g x y ^ 2 - f x = 0) :
+    f x ^ 3 * g x y + f x * g x y * f y + 5 = f x ^ 2 * f y + f y ^ 2 + 5 := by
+  poly_cert ["2.0.0.1 0.0.1.1", "0.0.0.0"] in [f x, g x y, f y] using [h1, h2]
+
+theorem pasted_numeral_arg_atoms
+    (h1 : X 0 * X 1 - X 2 = 0) (h2 : X 1 ^ 2 - X 0 = 0) :
+    X 0 ^ 3 * X 1 + X 0 * X 1 * X 2 + 5 = X 0 ^ 2 * X 2 + X 2 ^ 2 + 5 := by
+  poly_cert ["2.0.0.1 0.0.1.1", "0.0.0.0"] in [X 0, X 1, X 2] using [h1, h2]
+
 /-! ## What `m2cert?` prints
 
-The variables are indexed by their user names, so the `in [...]` clause and the
-exponent positions are the same on every run; the monomials are in Macaulay2's
-own (grevlex) emission order.
+The variables are indexed by first occurrence, left to right, so the `in [...]`
+clause and the exponent positions are the same on every run; the monomials are
+in Macaulay2's own (grevlex) emission order.
 -/
 
 /--
@@ -177,6 +247,32 @@ default.
 /-- info: 'MacauleanTest.M2Cert.mem_scaled_lcm' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms mem_scaled_lcm
+
+-- Application atoms add nothing either: `f`, `g` and `X` are `opaque`, so they
+-- carry `Classical.choice` in already, and no further axiom appears.
+/--
+info: 'MacauleanTest.M2Cert.app_atoms' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms app_atoms
+
+/--
+info: 'MacauleanTest.M2Cert.numeral_arg_atoms' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms numeral_arg_atoms
+
+/--
+info: 'MacauleanTest.M2Cert.pasted_app_atoms' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms pasted_app_atoms
+
+/--
+info: 'MacauleanTest.M2Cert.pasted_numeral_arg_atoms' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms pasted_numeral_arg_atoms
 
 /--
 info: 'MacauleanTest.M2Cert.mem_native' depends on axioms: [propext,

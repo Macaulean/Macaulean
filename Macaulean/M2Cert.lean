@@ -63,6 +63,20 @@ term, and the ring variables here are the goal's own bound variables.  When the
 variables are constants of a concrete polynomial ring, the same monomial
 strings go into `poly_def` directly and the resulting constants into
 `poly_cert [name, …]`.
+
+## What counts as a ring variable
+
+Whatever `Macaulean.AlgPoly.Reify.classify` says is an atom: any maximal
+subterm that is not `+ - * ^` or unary `-`, not a numeral or a cast of one, and
+not `CASRing.ofInt` of a literal.  A free variable is the case where that
+subterm is an `fvar`; `MvPolynomial.X 0` and `f x y` are variables on exactly
+the same footing.  Atoms are identified up to definitional equality and
+numbered by first occurrence, left to right, starting from the dividend, so the
+printed `in [...]` clause is the same on every run.
+
+That classifier is the reflective half's own, which is what makes the round
+trip close: Macaulay2's cofactors come back over these atoms, `poly_cert`
+rebuilds them as terms, and the kernel reifies those terms onto the same atoms.
 -/
 
 open Lean Grind Elab Parser Tactic Meta
@@ -134,10 +148,32 @@ def CertPoly.isZero (p : CertPoly) : Bool := p.all fun (_, k) => k == 0
 def CertPoly.scalesToInt (p : CertPoly) (scale : Nat) : Bool :=
   p.all fun (_, k) => (k * (scale : Int)).den == 1
 
-/-- The user-facing name of a goal variable, for the `in [x, y, z]` clause of
-the printed suggestion. -/
-def varName (fv : FVarId) : MetaM String := do
-  pure (toString (← fv.getUserName).eraseMacroScopes)
+/--
+How a ring variable is written in the `in [x, y, z]` clause of the printed
+suggestion: the atom, pretty-printed.
+
+The suggestion is meant to be *pasted*, so what comes out has to elaborate back
+to the atom in the same context.  Pretty-printing does that for an ordinary
+local, for a constant applied to numerals (`MvPolynomial.X 0`) and for an
+applied opaque function (`f x y`); it cannot for a term with a loose bound
+variable or an unassigned metavariable in it, and shadowed or inaccessible
+locals print with a `✝` that does not parse.  All three are refused here, with
+the atom named, rather than left for the paste to fail on.
+-/
+def atomText (tacName : Name) (goal : MVarId) (e : Expr) : MetaM String := do
+  if e.hasLooseBVars then
+    throwTacticEx tacName goal m!"a ring variable of this goal is not a closed \
+      term -- it mentions a bound variable:{indentExpr e}\nthere is no way to \
+      write it in the `in [...]` clause of a `poly_cert` line"
+  if e.hasExprMVar then
+    throwTacticEx tacName goal m!"a ring variable of this goal still contains a \
+      metavariable:{indentExpr e}\ninstantiate it before asking for a suggestion"
+  let s := toString (← ppExpr e)
+  if s.any (· == '✝') then
+    throwTacticEx tacName goal m!"a ring variable of this goal has no name that \
+      can be written down:{indentExpr e}\nit prints as `{s}`, which will not \
+      elaborate; name the binder (or use `m2cert` without the `?`)"
+  pure s
 
 /--
 The Macaulay2 half: divide `polyExpr` by `gens`, insist that the remainder
@@ -145,7 +181,7 @@ vanishes, and hand back the cofactors as monomial specs together with the
 variables they are written in.
 -/
 unsafe def certify (tacName : Name) (goal : MVarId) (A : Expr) (gens : Array Expr)
-    (polyExpr : Expr) : MetaM (Array FVarId × Array String × Nat) := do
+    (polyExpr : Expr) : MetaM (Array Expr × Array String × Nat) := do
   let fail {α} (e : String) : MetaM α := throwTacticEx tacName goal e
   -- Which base ring the coefficients travel in is the ambient ring's own
   -- decision, taken through its `Macaulean.CASRing` instance.
@@ -154,9 +190,9 @@ unsafe def certify (tacName : Name) (goal : MVarId) (A : Expr) (gens : Array Exp
   let coeffRing := match base with
     | .ZZ => mkConst ``Int
     | .QQ => mkConst ``Rat
-  let (fvars, reply) ← m2QuotientRemainderRaw goal A gens polyExpr (sortVars := true)
+  let (atoms, reply) ← m2QuotientRemainderRaw goal A gens polyExpr
     (coeffRing := some coeffRing)
-  let nv := fvars.size
+  let nv := atoms.size
   let .ok remainder := parseCertPoly nv reply.remainder
     | fail "could not read Macaulay2's remainder"
   unless remainder.isZero do
@@ -178,14 +214,14 @@ unsafe def certify (tacName : Name) (goal : MVarId) (A : Expr) (gens : Array Exp
       which should not happen"
   unless quotients.all (·.scalesToInt denom) do
     fail s!"scaling the cofactors by {denom} did not clear their denominators"
-  pure (fvars, quotients.map (·.toSpec nv denom), denom)
+  pure (atoms, quotients.map (·.toSpec nv denom), denom)
 
 /-- Build the cofactor terms from their monomial specs, over the goal's own
 variables.  This goes through `poly_cert`'s builder, so the term proved here is
 the term the printed suggestion proves. -/
-def buildCofactors (A : Expr) (fvars : Array FVarId) (specs : Array String) :
+def buildCofactors (A : Expr) (atoms : Array Expr) (specs : Array String) :
     TermElabM (Array Expr) := do
-  let b ← PolyCert.mkBuilder A (fvars.map mkFVar)
+  let b ← PolyCert.mkBuilder A atoms
   specs.mapM fun s => do
     match ← b.build? "m2cert" s with
     | some e => pure e
@@ -232,15 +268,15 @@ unsafe def run (ref : Syntax) (tacName : Name) (native suggest : Bool)
           fail m!"expected each argument to prove `g = 0` over{indentExpr A}"
         pure lhs
       pure (A, gens, ← mkSub p r, hyps)
-  let (fvars, specs, denom) ← certify tacName goal A gens dividend
-  let cofactors ← buildCofactors A fvars specs
+  let (atoms, specs, denom) ← certify tacName goal A gens dividend
+  let cofactors ← buildCofactors A atoms specs
   if hypStxs.isNone then
     PolyCert.closeDvd native goal cofactors[0]! denom
   else
     PolyCert.closeEq native goal hyps cofactors denom
   replaceMainGoal []
   if suggest then
-    let vars ← fvars.mapM fun fv => (varName fv : MetaM String)
+    let vars ← atoms.mapM fun a => (atomText tacName goal a : MetaM String)
     let hypNames := (hypStxs.getD #[]).map fun t => (Syntax.prettyPrint t.raw).pretty
     let text := suggestionText specs vars native hypNames denom
     Lean.Meta.Tactic.TryThis.addSuggestion ref

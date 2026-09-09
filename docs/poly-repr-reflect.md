@@ -234,6 +234,9 @@ Two things are deliberately *not* fields.
   arithmetic as an atom, up to definitional equality, so `MvPolynomial.X i` and
   `Polynomial.X` need no help: they become variables of the reified expression
   and the normal forms compare as they should.  A hook would have no caller.
+  Since the Macaulay2 half now shares that classifier
+  (`Reify.classify`, `Reify.AtomState`) rather than looking for free
+  variables of its own, this holds on both sides of the wire.
 * **`Dvd`.**  `poly_cert` unfolds `g ∣ f` with `whnf`.  Both the instance Lean
   core gives and Mathlib's `semigroupDvd` are literally
   `⟨fun a b => ∃ c, b = a * c⟩`, so the `∃` is definitional.
@@ -389,8 +392,11 @@ Try this:
 
 The strings are `poly_def`'s `e₁.….eₙ.k` monomial format -- one exponent per
 listed variable, then an integer coefficient -- in Macaulay2's own emission
-order, and the variables are indexed by their user names so the same goal
-prints the same line every time.  `poly_cert` (`Macaulean/PolyCert.lean`)
+order, and the variables are the goal's atoms in first-occurrence order (left
+to right, starting from the dividend), so the same goal prints the same line
+every time.  They are printed with `ppExpr`, and they have to elaborate back:
+`m2cert?` refuses rather than print an atom with a loose bound variable, an
+unassigned metavariable, or an inaccessible name in it.  `poly_cert` (`Macaulean/PolyCert.lean`)
 imports neither `Macaulean.Macaulay2` nor `Macaulean.IdealMembership`, so a
 file that has been through this once needs no M2 process, no M2 installation
 and no network: **committing the data and calling `poly_cert` is the
@@ -448,12 +454,37 @@ for `ZZ`, `Rat` for `QQ`.  It used to be the ambient ring itself, which is why
 instances.  It defaults to the ambient ring, so `m2idealmem` and `m2remainder`
 are unchanged.
 
-One limitation the class does not remove: `toPolynomialExpr?` recognises the
-goal's *free variables* as ring variables and nothing else, so a certificate
-over a polynomial ring whose variables are terms like `MvPolynomial.X 0` still
-has nowhere to put them on the Macaulay2 side.  The reflective half
-(`poly_cert`, `algebra_norm_reflect`) has no such limitation -- `Reify` takes
-any atom -- so committed certificates over such a ring work today.
+### What a ring variable is, on both sides
+
+The two halves of the library agree, by construction, on what a variable is.
+`Macaulean.AlgPoly.Reify.classify` is the single definition: `+`, `-`, `*`,
+unary `-` and `^` with a literal exponent are operations; a numeral, a cast of
+one, and `CASRing.ofInt` applied to a literal are coefficients; **everything
+else is an atom** -- a maximal non-arithmetic subterm.  Atoms are identified up
+to definitional equality (`Reify.mkAtom`, which scans the table with `isDefEq`)
+and numbered by first occurrence, left to right.
+
+`Reify.reify` turns that into an `AlgExpr Int` for the kernel;
+`toPolynomialExpr` (`Macaulean/IdealMembership.lean`) turns the *same*
+classification into a `Macaulean.Polynomial` for Macaulay2, which sees the
+atoms as its own `a, b, c, …` at the matching positions.  Macaulay2 sends the
+cofactors back as exponent vectors over those positions, `m2cert` rebuilds them
+as terms over the atoms, and `algebra_norm_reflect` reifies the result --
+which lands on the same atoms because it is the same classifier.
+
+A free variable is not a special case: it is the atom that happens to be an
+`fvar`.  A goal in `MvPolynomial (Fin 3) ℚ` whose variables are
+`MvPolynomial.X 0`, `X 1`, `X 2` makes the round trip like any other, and so
+does one over `f x`, `g x y`.  Before, `toPolynomialExpr?` looked for `fvar`s
+and embedded everything else as an opaque *constant*, so such a goal could not
+be serialized at all; that limitation is gone.
+
+`MacauleanTest/M2Cert.lean`'s S4 section is the test.  Mathlib is not available
+in this repository, so the `MvPolynomial` case itself cannot be written here;
+the nearest thing that can -- an `opaque X : Nat → Rat` applied to numerals,
+plus `f x` and `g x y` for opaque `f`, `g` -- goes through exactly the same
+code path, with `m2cert`, with the printed `poly_cert` line pasted back, and
+with `#print axioms` clean.
 
 
 ## What consumers notice
@@ -496,9 +527,18 @@ any atom -- so committed certificates over such a ring work today.
 * `M2Cert.CertPoly`'s coefficients are `Rat`, not `Int`, and
   `M2Cert.certify` returns the scale factor alongside the specs.
 * `m2QuotientRemainderRaw` takes an optional `coeffRing`, the Macaulay2 base
-  ring; `toPolynomialExpr?` translates numerals and unary minus instead of
+  ring; `toPolynomialExpr` translates numerals and unary minus instead of
   embedding them as opaque constants, which is what lets it differ from the
   ambient ring.
+* `Reify` exports the atom table (`AtomState`, `AtomM`, `mkAtom`,
+  `collectAtoms`, `atomStateOf`) and the classifier (`Node`, `classify`); the
+  Macaulay2 half uses them instead of its own free-variable scan.
+  `toPolynomialExpr?` is now `toPolynomialExpr`, taking the variable count and
+  running in `Reify.AtomM` rather than taking an `FVarIdMap Nat`;
+  `m2QuotientRemainderRaw` lost its `sortVars` flag and returns the atoms as
+  `Array Expr` rather than the free variables as `Array FVarId`, and so does
+  `M2Cert.certify`.  `M2Cert.varName` became `M2Cert.atomText`, which
+  pretty-prints an atom and refuses the ones that would not elaborate back.
 * `AlgPoly.Tactic.proveEq lhs rhs native` builds the reflective proof of
   `lhs = rhs` and returns it without touching the goal state.  That is the
   entry point for tactics that state their own identity (`poly_cert`,

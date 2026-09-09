@@ -3,6 +3,7 @@ import MRDI.Basic
 import MRDI.Poly
 import Macaulean.Macaulay2
 import Macaulean.Polynomial
+import Macaulean.Grind.AlgPoly.Reify
 open Lean Grind Elab Parser Tactic Meta
 
 structure VariableState where
@@ -160,59 +161,6 @@ partial def toCommRingExpr?
         fun varState => varState.mapCoefficient x)
       pure <| .var varName
 
-/--
-Reify `x`, an expression of the *ambient* ring, as a `Macaulean.Polynomial ring
-n` -- where `ring` is the ring the coefficients travel in, which need not be
-the ambient one (see `m2QuotientRemainderRaw`'s `coeffRing`).
-
-Numerals and unary minus are translated rather than treated as opaque
-constants, which is what lets the two rings differ: a goal over
-`MvPolynomial (Fin 3) ℚ` whose `CASRing` instance says `QQ` sends its
-coefficients as `Rat`.  When the two rings *are* the same -- every caller
-before `m2cert` -- the numeral branch rebuilds the numeral it was given, so
-nothing changes.
--/
-partial def toPolynomialExpr?
-  (variables : FVarIdMap Nat) (ring : Expr) (x : Lean.Expr) : MetaM Lean.Expr := do
-  match_expr x with
-  | HAdd.hAdd _ _ _ _ a b =>
-    mkAdd (← toPolynomialExpr? variables ring a) (← toPolynomialExpr? variables ring b)
-  | HSub.hSub _ _ _ _ a b =>
-    mkSub (← toPolynomialExpr? variables ring a) (← toPolynomialExpr? variables ring b)
-  | HMul.hMul _ _ _ _ a b =>
-    mkMul (← toPolynomialExpr? variables ring a) (← toPolynomialExpr? variables ring b)
-  | HPow.hPow _ _ _ _ a b =>
-    mkAppM ``HPow.hPow #[(← toPolynomialExpr? variables ring a), b]
-  | Neg.neg _ _ a =>
-    mkAppM ``Neg.neg #[← toPolynomialExpr? variables ring a]
-  | OfNat.ofNat _ n _ =>
-    match ← getNatValue? n with
-    | some k =>
-      mkAppOptM ``Macaulean.Polynomial.ofConst
-        #[ring, toExpr variables.size,
-          ← mkAppOptM ``OfNat.ofNat #[ring, mkRawNatLit k, none]]
-    | none =>
-      mkAppOptM ``Macaulean.Polynomial.ofConst #[ring, toExpr variables.size, x]
-  | _ =>
-    match x with
-    | .fvar varId =>
-      let .some varName := variables.get? varId | throwError "Unexected variable"
-      mkAppOptM ``Macaulean.Polynomial.ofVar #[
-        ring, none, none,
-        ← mkAppOptM ``Fin.ofNat #[toExpr variables.size, none, toExpr varName]]
-    | _ =>
-      -- TODO in this case we should check that x doesn't contain any variables
-      -- and we should check that the expression is a "constant", whatever that means
-      mkAppOptM ``Macaulean.Polynomial.ofConst #[ring, toExpr variables.size, x]
-
-def toExprPoly (p : CommRing.Poly) : StateT VariableState MetaM (ExprPoly) := do
-  let state ← get
-  let coeff := Std.TreeMap.ofList <| state.coefficientTable.toList.map Prod.swap
-  pure {
-    poly := p
-    coefficients := coeff
-  }
-
 def natAsRingElem (ringExpr : Expr) (k : Nat) : MetaM Expr :=
   mkAppOptM ``OfNat.ofNat #[ringExpr, mkRawNatLit k, none]
 
@@ -222,6 +170,54 @@ def intAsRingElem (ringExpr : Expr) (k : Int) : MetaM Expr := do
   if k >= 0
   then pure aExpr
   else mkAppM ``Neg.neg #[aExpr]
+
+/--
+Reify `x`, an expression of the *ambient* ring, as a `Macaulean.Polynomial ring
+nv` -- where `ring` is the ring the coefficients travel in, which need not be
+the ambient one (see `m2QuotientRemainderRaw`'s `coeffRing`).
+
+What counts as a ring operation, a coefficient or a **variable** is
+`Macaulean.AlgPoly.Reify.classify`'s decision, not this function's: any maximal
+non-arithmetic subterm is a variable, identified with the ones already seen up
+to definitional equality, and numbered by first occurrence.  A free variable is
+the special case where that subterm happens to be an `fvar`; `MvPolynomial.X 0`
+and `f x y` are variables on exactly the same footing, which is what lets a
+goal over `MvPolynomial (Fin 3) ℚ` make the round trip at all.
+
+Sharing the classifier with the reflective half is the point: Macaulay2's
+cofactors come back as exponent vectors over *these* variables, in *this*
+numbering, and `poly_cert` has to rebuild them as terms the kernel then reifies
+the same way.
+
+Numerals and unary minus are translated rather than treated as opaque
+constants, which is what lets the two rings differ: a goal over
+`MvPolynomial (Fin 3) ℚ` whose `CASRing` instance says `QQ` sends its
+coefficients as `Rat`.  When the two rings *are* the same -- every caller
+before `m2cert` -- the numeral branch rebuilds the numeral it was given, so
+nothing changes.
+-/
+partial def toPolynomialExpr (nv : Nat) (ring : Expr) (x : Lean.Expr) :
+    Macaulean.AlgPoly.Reify.AtomM Lean.Expr := do
+  match ← liftM (Macaulean.AlgPoly.Reify.classify x) with
+  | .add a b => mkAdd (← toPolynomialExpr nv ring a) (← toPolynomialExpr nv ring b)
+  | .sub a b => mkSub (← toPolynomialExpr nv ring a) (← toPolynomialExpr nv ring b)
+  | .mul a b => mkMul (← toPolynomialExpr nv ring a) (← toPolynomialExpr nv ring b)
+  | .neg a => mkAppM ``Neg.neg #[← toPolynomialExpr nv ring a]
+  | .pow a k => mkAppM ``HPow.hPow #[← toPolynomialExpr nv ring a, mkNatLit k]
+  | .coeff k =>
+    mkAppOptM ``Macaulean.Polynomial.ofConst #[ring, toExpr nv, ← intAsRingElem ring k]
+  | .atom =>
+    let i ← Macaulean.AlgPoly.Reify.mkAtom x
+    mkAppOptM ``Macaulean.Polynomial.ofVar #[
+      ring, none, none, ← mkAppOptM ``Fin.ofNat #[toExpr nv, none, toExpr i]]
+
+def toExprPoly (p : CommRing.Poly) : StateT VariableState MetaM (ExprPoly) := do
+  let state ← get
+  let coeff := Std.TreeMap.ofList <| state.coefficientTable.toList.map Prod.swap
+  pure {
+    poly := p
+    coefficients := coeff
+  }
 
 -- This shouldn't be an instance of ToExpr because it's not the expression
 -- that realizes the object p.
@@ -327,8 +323,15 @@ unsafe def makePolynomialSerializationPair (ring : Expr) (n : Nat) : MetaM Seral
 /--
 Reify `polyExpr` and `idealExprs` as `Macaulean.Polynomial`s over `ring`, ask
 Macaulay2 to divide the first by the rest, and hand back the reply *as it
-arrived* along with the free variables, in the index order both the request and
-the reply use.
+arrived* along with the **atoms** it was written in, in the index order both
+the request and the reply use.
+
+An atom is any maximal non-arithmetic subterm (see
+`Macaulean.AlgPoly.Reify.classify`), so `x`, `MvPolynomial.X 0` and `f x y` are
+all variables of the request; Macaulay2 sees them as its own `a, b, c, …` at
+the matching positions.  They are numbered by first occurrence, left to right,
+starting from `polyExpr` and then running through `idealExprs`, which makes the
+numbering -- and so `m2cert?`'s printed `in [...]` clause -- reproducible.
 
 `m2QuotientRemainderImpl` deserializes that reply into `Polynomial.denote`
 expressions; `m2cert` (`Macaulean/M2Cert.lean`) reads the monomials out of it
@@ -338,42 +341,39 @@ directly, to build the certificate in the ambient ring instead.
 base ring.  It defaults to the ambient ring, which is what every caller wanted
 back when the ambient ring was always `Int` or `Rat`; `m2cert` passes what the
 ambient ring's `Macaulean.CASRing` instance asks for.
-
-With `sortVars` the variables are indexed in the order of their *user* names
-rather than in the order `collectFVars` happens to visit them.  The tactics
-themselves do not care -- any consistent indexing works -- but `m2cert?` prints
-the variable list, and an unpredictable one is no use to a reader.
 -/
 unsafe def m2QuotientRemainderRaw (goal : MVarId) (ring : Expr) (idealExprs : Array Expr)
-  (polyExpr : Expr) (sortVars : Bool := false) (coeffRing : Option Expr := none) :
-  MetaM (Array FVarId × QuotientRemainder) := do
+  (polyExpr : Expr) (coeffRing : Option Expr := none) :
+  MetaM (Array Expr × QuotientRemainder) := do
   dbg_trace "M2IdealMem Start"
 
   --TODO reimplement universalization in a more systematic way
 
-  let (_,varsInfo) ← (
-    do
-      polyExpr.collectFVars
-      _ ← idealExprs.mapM (Expr.collectFVars)
-    ).run Inhabited.default
-  let collected := varsInfo.fvarSet.toArray
-  let fvarsSorted ←
-    if sortVars then
-      let keyed ← collected.mapM fun fv => do
-        pure (toString (← fv.getUserName).eraseMacroScopes ++ "\u0000" ++ fv.name.toString, fv)
-      pure <| (keyed.qsort (fun a b => a.1 < b.1)).map (·.2)
-    else pure collected
-  let vars : FVarIdMap Nat := .ofArray (cmp := _) <| fvarsSorted.mapIdx (fun a b => (b,a))
+  -- One pass for the atoms, because `Polynomial R nv` names `nv` in its type
+  -- and so the builder needs it up front; a second to build.  The second pass
+  -- re-runs the same classification over the same terms, so it discovers no
+  -- atom the first did not -- which is checked rather than assumed.
+  let atomState0 ← Macaulean.AlgPoly.Reify.atomStateOf (#[polyExpr] ++ idealExprs)
+  let nv := atomState0.atoms.size
+  if nv == 0 then
+    throwTacticEx `m2idealmem goal
+      "the goal has no ring variables, so there is nothing for Macaulay2 to work with"
   -- The Macaulay2 base ring.  `none` keeps the historical behaviour -- the
   -- coefficients travel in the ambient ring itself, which is why this used to
   -- work only for ambient rings that happen to carry a `Macaulay2Ring`
   -- instance.  `m2cert` passes the ring its `Macaulean.CASRing` instance
   -- names (`Int` for `ZZ`, `Rat` for `QQ`) instead.
   let cring := coeffRing.getD ring
-  let polyExprPoly ← toPolynomialExpr? vars cring polyExpr
-  let idealExprsPolys ← idealExprs.mapM (toPolynomialExpr? vars cring)
+  let ((polyExprPoly, idealExprsPolys), atomState) ← (do
+      let p ← toPolynomialExpr nv cring polyExpr
+      let gs ← idealExprs.mapM (toPolynomialExpr nv cring)
+      pure (p, gs)).run atomState0
+  unless atomState.atoms.size == nv do
+    throwTacticEx `m2idealmem goal
+      "the atom pass and the building pass disagreed on the variables"
+  let atoms := atomState.atoms
 
-  let (serializer,_) ← makePolynomialSerializationPair cring vars.size
+  let (serializer,_) ← makePolynomialSerializationPair cring nv
 
   let s ← IO.rand 0 (2^64-1)
   --I should be able to use the runMrdiIO variant
@@ -390,7 +390,7 @@ unsafe def m2QuotientRemainderRaw (goal : MVarId) (ring : Expr) (idealExprs : Ar
     let .ok result ← m2QuotientRemainder serializedGens.toList serializedPoly
       | throwTacticEx `m2idealmem goal "Ideal membership failed"
     dbg_trace "Coefficients Returned"
-    pure (fvarsSorted, result)
+    pure (atoms, result)
 
 /--
 This function implements the core of the tactic, serializing and deserializing
@@ -401,11 +401,11 @@ coefficients such that the product with the generators in idealExprs gives polyE
 -/
 unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
   : MetaM (List Expr × Expr) := do
-  let (fvars, result) ← m2QuotientRemainderRaw goal ring idealExprs polyExpr
+  let (atoms, result) ← m2QuotientRemainderRaw goal ring idealExprs polyExpr
   let varContextExpr ← mkAppM ``RArray.ofArray
-    #[← mkArrayLit ring <| Array.toList <| fvars.map .fvar,
-      ← mkAppM ``Nat.succ_pos #[toExpr (fvars.size - 1)]]
-  let (_,deserializer) ← makePolynomialSerializationPair ring fvars.size
+    #[← mkArrayLit ring atoms.toList,
+      ← mkAppM ``Nat.succ_pos #[toExpr (atoms.size - 1)]]
+  let (_,deserializer) ← makePolynomialSerializationPair ring atoms.size
   let s ← IO.rand 0 (2^64-1)
   runMrdiWithSeed s do
     --deserialize the result
