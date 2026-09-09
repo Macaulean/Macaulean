@@ -10,3 +10,4 @@ import Macaulean.Grind.AlgPoly.PolyEval
 import Macaulean.Grind.AlgPoly.Reify
 import Macaulean.Grind.AlgPoly.Tactic
 import Macaulean.PolyDef
+import Macaulean.PolyCert
