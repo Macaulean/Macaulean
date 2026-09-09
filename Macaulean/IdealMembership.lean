@@ -47,10 +47,18 @@ structure RingInfo where
   toMrdi? : Expr → MetaM (Option Json)
 
 --this should probably be in MRDI.Basic
+-- Integers travel as decimal *strings*, the same convention `Rat`,
+-- `Grind.CommRing.Power` and `MRDI.Term` already use.  A bare JSON number is
+-- not loadable on the Macaulay2 side: `MRDI.m2`'s `fromMRDI` recursion has
+-- methods for hash tables, strings and lists only, so a number anywhere inside
+-- `data` aborts the request.
 instance : MrdiType Int where
   mrdiType := .string "Int"
-  decode? := trivialDecode?
-  encode := trivialEncode
+  decode? (x : Json) := pure <|
+    match x with
+    | .str s => (s.toInt?).elim (.error s!"Expected a String representing an Int {s}") .ok
+    | j => fromJson? j
+  encode (x : Int) := pure <| .str (toString x)
 
 instance : MrdiType Rat where
   mrdiType := .string "Rat"

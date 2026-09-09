@@ -77,6 +77,9 @@ addSaveMethod(RingElement,
 -- eventually replace fromLean w/ this
 fromLean2 = method(Dispatch => Type)
 fromLean2 QQ := R -> x -> value x#0 / value x#1
+-- Lean sends an Int coefficient as one decimal string and a Rat coefficient as
+-- a {numerator, denominator} pair of decimal strings.
+fromLean2 ZZ := R -> x -> value x
 
 addLoadMethod("Polynomial",
     (params, data) -> (
