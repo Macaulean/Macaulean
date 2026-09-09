@@ -147,11 +147,15 @@ Peak RSS is for the 1350-monomial run.
 | key comparison inlined into `mergeTermsF` | 189 | 3330 | 17887 | 54997 | 19.9 GB |
 | one `removeZeros`, in `checkPolyEq` | 153 | 2447 | 13780 | 36104 | 14.3 GB |
 | balanced `+`/`-` chains (`AlgExpr.rebalance`) | 156 | 1741 | 7899 | 16876 | 7.3 GB |
-| digit-walk packing guard (`Mon.wfFrom`, `Mon.degB`) | **139** | **1581** | **7391** | **15795** | **7.0 GB** |
+| digit-walk packing guard (`Mon.wfFrom`, `Mon.degB`) | 139 | 1581 | 7391 | 15795 | 7.0 GB |
+| coefficient map from `CertRing`, not `intDenote` | **140** | **1604** | **7440** | **15917** | **7.0 GB** |
 
 (ms of tactic time.  Run-to-run spread on the same binary is about 5%: the
 `removeZeros` row re-measured as 156 / 2420 / 13401 / 35483 and 14.2 GB
-immediately before the balanced-chain change.)
+immediately before the balanced-chain change.  The last row is not a change to
+the representation at all: taking the coefficient map from the ambient ring's
+`CertRing` instance puts two structure projections at the head of `φ`, and the
+kernel unfolds a projection-of-constructor cheaply and whnfs the head once.)
 
 Reference points on the same machine and identities: packing the key but still
 comparing with `compare` put 1350 at 71541 ms; a Kronecker-packed
@@ -202,6 +206,131 @@ Measured and **rejected**:
   same.  Balancing only pays when the summands are *singletons*, which is
   exactly the sum-of-monomials case that `AlgExpr.rebalance` handles.
 
+## `CertRing`: one instance per ring, for all of it
+
+`algebra_norm_reflect`, `poly_cert` and `m2cert` each used to hard-wire three
+ring-specific decisions: coefficients are `Int` literals mapped by
+`Macaulean.intDenote`, the Macaulay2 base ring is whatever the ambient type
+happens to have an `MRDI` instance for, and a `Dvd` goal unfolds the way `Int`'s
+instance does.  `Macaulean/CertRing.lean` collects them into one class:
+
+```lean
+class CertRing (R : Type) extends Lean.Grind.CommRing R where
+  ofInt : Int → R
+  ofInt_isCoeffHom : Polynomial.IsCoeffHom ofInt
+  m2BaseRing : M2BaseRing        -- `.ZZ` or `.QQ`
+```
+
+Declare one instance and every tactic in the library works on goals over `R`.
+Extending `Lean.Grind.CommRing` means `[CertRing R]` alone meets the reflective
+layer's instance needs; `CertRing.toCommRing` is registered at priority 100, so
+`Grind.CommRing Rat` still resolves to `Grind.instFieldRat.toCommRing` and
+nothing downstream sees a new instance path.  The kernel carrier stays `Int` on
+purpose, for the `Nat.gcd` reason above.
+
+Two things are deliberately *not* fields.
+
+* **Variables and atoms.**  `Reify` treats anything it does not recognise as
+  arithmetic as an atom, up to definitional equality, so `MvPolynomial.X i` and
+  `Polynomial.X` need no help: they become variables of the reified expression
+  and the normal forms compare as they should.  A hook would have no caller.
+* **`Dvd`.**  `poly_cert` unfolds `g ∣ f` with `whnf`.  Both the instance Lean
+  core gives and Mathlib's `semigroupDvd` are literally
+  `⟨fun a b => ∃ c, b = a * c⟩`, so the `∃` is definitional.
+  `MacauleanTest/PolyCert.lean` writes that instance out for `Rat` (core gives
+  `Rat` no `Dvd`) and closes a divisibility goal through it, which is the check.
+
+### Rational cofactors: `CertRingRat` and `/ d`
+
+Macaulay2 over `QQ` routinely returns cofactors with denominators.  Rather than
+put `Rat` in the kernel, the certificate is **scaled**: `m2cert` takes the least
+common denominator `d` of all the cofactors at once, the kernel checks the
+integer identity
+
+```
+d * (p - r) = q₁' * g₁ + ⋯ + q_k' * g_k        (ideal membership)
+d * f       = g * q'                           (divisibility)
+```
+
+with `qᵢ' = d * qᵢ` integral, and `d` is cancelled afterwards.  Cancelling is
+the one thing an arbitrary commutative ring cannot do, so it is an optional
+second class:
+
+```lean
+class CertRingRat (R : Type) extends CertRing R where
+  invOfInt : Int → R
+  mul_invOfInt : ∀ d : Int, d ≠ 0 → CertRing.ofInt d * invOfInt d = 1
+```
+
+An inverse rather than a bare cancellation law, because cancellation alone does
+not serve the divisibility shape: `g ∣ f` wants a *witness*, and the witness is
+`q'/d`.  With the inverse both lemmas are three lines
+(`CertRingRat.cancel`, `CertRingRat.dvd_witness`) and cancellation is one of
+them.  `invOfInt` is a plain function, not an `Inv R`: the motivating rings
+(`MvPolynomial (Fin 3) ℚ`) are not fields, they merely contain `ℚ`.
+
+In the tactic the scale factor is written `poly_cert […] / d`, with **one**
+denominator for the whole invocation rather than one per cofactor -- the
+integer identity has to be scaled by the common multiple anyway, so a
+per-cofactor denominator buys nothing and only makes the printed line harder to
+read.  `m2cert?` prints it:
+
+```
+Try this:
+  poly_cert ["0.0.0.2", "0.0.0.3"] / 6 in [x, y, z] using [h1, h2]
+```
+
+(cofactors `2/6` and `3/6`, i.e. `1/3` and `1/2`).  A ring with no
+`CertRingRat` instance gets a message naming the class rather than a failed
+check; `Int` is such a ring and does not need one, because `ZZ` cofactors are
+integral.
+
+### The instances shipped, and the one a Mathlib consumer writes
+
+`Macaulean/CertRing.lean` ships `CertRing Int` (`ZZ`) and `CertRingRat Rat`
+(`QQ`), plus two helpers: `CertRing.ofGrindCommRing R base`, which fills
+`ofInt` with `intDenote R` and its proof with `intDenote_isCoeffHom R`, and
+`CertRingRat.ofGrindField R`, for an honest `Lean.Grind.Field` of characteristic
+zero.
+
+A generic `[Grind.CommRing R] → CertRing R` *instance* is deliberately not
+shipped: together with the `CertRing.toCommRing` projection instance it closes
+a synthesis loop.  A ring without an instance is not turned away, though --
+`AlgPoly.Tactic.certRingData` builds `CertRing.ofGrindCommRing A` on the spot,
+so every goal that worked before the class exists still works, with the same
+certificate.
+
+The instance a Mathlib project working in `MvPolynomial (Fin 3) ℚ` would write
+is this.  **It is not compiled here** -- this repository does not depend on
+Mathlib -- so the lemma names may need adjusting; the shape is the point, and
+every field is something Mathlib provides.
+
+```lean
+import Mathlib
+import Macaulean.M2Cert
+
+open Macaulean
+
+noncomputable instance : CertRingRat (MvPolynomial (Fin 3) ℚ) where
+  -- `ofInt`, its ring-map proof and the `Grind.CommRing` parent all come from
+  -- Mathlib's `CommRing` instance, through grind's canonical `Int` map.
+  toCertRing := CertRing.ofGrindCommRing (MvPolynomial (Fin 3) ℚ) .QQ
+  -- `1/d` lives in the coefficient field; `C` puts it in the ring.
+  invOfInt d := MvPolynomial.C ((d : ℚ)⁻¹)
+  mul_invOfInt d hd := by
+    have hd' : (d : ℚ) ≠ 0 := Int.cast_ne_zero.mpr hd
+    show (Lean.Grind.CommRing.denoteInt d : MvPolynomial (Fin 3) ℚ)
+        * MvPolynomial.C ((d : ℚ)⁻¹) = 1
+    rw [Lean.Grind.CommRing.denoteInt_eq, ← map_intCast (MvPolynomial.C (σ := Fin 3)),
+      ← map_mul, mul_inv_cancel₀ hd', map_one]
+```
+
+`Int.cast_ne_zero` is the `CharZero` fact the task's "`Rat.cast_injective`"
+stands for; `mul_inv_cancel₀` is the field's; `map_intCast`/`map_mul`/`map_one`
+are `MvPolynomial.C` being a ring hom.  With that one declaration, `m2cert`,
+`m2cert?`, `poly_cert` and `algebra_norm_reflect` all work on
+`MvPolynomial (Fin 3) ℚ` goals, and Macaulay2 is asked over `QQ`.
+
 ## `m2cert`: getting the certificate from Macaulay2
 
 The tactic above proves an identity it is *handed*.  Finding the identity --
@@ -242,11 +371,11 @@ and the tactic says so rather than leaving something behind.
 
 The cofactors are rebuilt as terms of the ambient ring by `poly_def`'s
 `PolyBuilder`, so the identity that reaches `algebra_norm_reflect` is
-term-for-term what a committed `poly_def` would have produced.  Coefficients
-have to be integers: the reflective path normalises over `Polynomial Int nv`,
-and there is nowhere to put a denominator.  Over `Rat` that means the
-generators want leading coefficient ±1; a non-integral cofactor is reported,
-not silently rounded.
+term-for-term what a committed `poly_def` would have produced.  The kernel's
+coefficients are integers -- the reflective path normalises over
+`Polynomial Int nv`, and a `Rat` coefficient would drag `Nat.gcd`, an
+out-of-line GMP call, onto the kernel's hot path -- so a `QQ` cofactor with a
+denominator is *scaled*, not rejected; see "Rational cofactors" below.
 
 ### `m2cert?` and keeping Macaulay2 out of the build
 
@@ -310,7 +439,21 @@ polynomials, serialises them as `Macaulean.Polynomial R n` over MRDI, sends one
 `m2cert` reads the monomials straight out of it.  Integer coefficients travel
 as decimal strings, like everything else on this wire -- a bare JSON number is
 unreadable to `MRDI.m2`, whose `fromMRDI` recursion knows hash tables, strings
-and lists only.
+and lists only; a rational travels as a numerator/denominator pair of strings.
+
+`R` above is the *coefficient* ring, `m2QuotientRemainderRaw`'s `coeffRing`
+argument, and it is what the ambient ring's `CertRing.m2BaseRing` names -- `Int`
+for `ZZ`, `Rat` for `QQ`.  It used to be the ambient ring itself, which is why
+`m2cert` only ever worked over `Int` and `Rat`: those are the types with `MRDI`
+instances.  It defaults to the ambient ring, so `m2idealmem` and `m2remainder`
+are unchanged.
+
+One limitation the class does not remove: `toPolynomialExpr?` recognises the
+goal's *free variables* as ring variables and nothing else, so a certificate
+over a polynomial ring whose variables are terms like `MvPolynomial.X 0` still
+has nowhere to put them on the Macaulay2 side.  The reflective half
+(`poly_cert`, `algebra_norm_reflect`) has no such limitation -- `Reify` takes
+any atom -- so committed certificates over such a ring work today.
 
 
 ## What consumers notice
@@ -338,6 +481,24 @@ and lists only.
 * `algebra_norm_reflect` warns when an `nv`-variable key would exceed `2^62`.
 * `algebra_norm_reflect` and `algebra_norm` take an optional `+native` flag.
   The kernel is still the default; `+native` warns.
+* The coefficient map is no longer `Macaulean.intDenote` by fiat: it is
+  `CertRing.ofInt` of the ambient ring's `Macaulean.CertRing` instance, or of
+  `CertRing.ofGrindCommRing A` when it has none.  `intDenote` is still what
+  those instances use; it now lives in `Macaulean/CertRing.lean`, which
+  `Macaulean/Grind/AlgPoly/Expr.lean` imports, so the name and statement of
+  `intDenote_isCoeffHom` are unchanged.
+* `Reify` reifies an application of `CertRing.ofInt` to an integer literal as
+  that *coefficient*, and `Reify.intLitValue?` reads the raw
+  `Int.ofNat`/`Int.negSucc` constructor form that `Meta.getIntValue?` does not.
+* `poly_cert` takes an optional `/ d` between the cofactor list and `in`;
+  `PolyCert.closeDvd` and `PolyCert.closeEq` take the same as a trailing `Nat`
+  argument, defaulting to 1.
+* `M2Cert.CertPoly`'s coefficients are `Rat`, not `Int`, and
+  `M2Cert.certify` returns the scale factor alongside the specs.
+* `m2QuotientRemainderRaw` takes an optional `coeffRing`, the Macaulay2 base
+  ring; `toPolynomialExpr?` translates numerals and unary minus instead of
+  embedding them as opaque constants, which is what lets it differ from the
+  ambient ring.
 * `AlgPoly.Tactic.proveEq lhs rhs native` builds the reflective proof of
   `lhs = rhs` and returns it without touching the goal state.  That is the
   entry point for tactics that state their own identity (`poly_cert`,
