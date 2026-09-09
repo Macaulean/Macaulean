@@ -23,9 +23,18 @@ newPackage(
          Email => "jay.k.yang@vanderbilt.edu",
          HomePage => "https://jkyang92.github.io/"}},
     Keywords => {"Interfaces"},
-    PackageImports => {"JSONRPC", "MRDI", "Parsing"})
+    PackageExports => {"JSONRPC", "MRDI"},
+    PackageImports => {"Parsing"})
 
-export {"macauleanStart"}
+export {
+    -- classes
+    "ConcretePoly",
+    "LeanGrindCommRingPoly",
+
+    -- methods
+    "macauleanServer",
+    "macauleanStart"
+}
 
 -----------------------------------------------------
 -- M2 classes to represent Lean polynomial objects --
@@ -208,58 +217,61 @@ macauleanMainLoop (JSONRPCServer, File) := (server, file) -> (
         )
     )
 
---setup the server, copied from example.m2
-server = new JSONRPCServer
---server#"logger" = (str) -> (stderr << str << endl)
+---------------------
+-- JSON-RPC server --
+---------------------
 
--- input:
---   polymrdi: MRDI-serialized ConcretePoly
---   idealmrdi: list of MRDI-serialized ConcretePoly's
--- output:
---   a hash table:
---     "quotient" => list of MRDI-serialized ConcretePoly's
---     "remainder" => MRDI-serialized ConcretePoly (hopefully 0)
+-- a function rather than a global so that each test gets a fresh server
+macauleanServer = () -> (
+    server := new JSONRPCServer;
+    -- setLogger(server, str -> stderr << str << endl);
 
-registerMethod(server, "quotientRemainder", (polymrdi, idealmrdi) -> (
-	f := value loadMRDI polymrdi;
-	R := ring f;
-	I := ideal apply(idealmrdi, g -> (
-	       sub(value loadMRDI g, R)));
-	(q, r) := quotientRemainder(matrix f, gens I);
-	hashTable {
-	    "quotient" => apply(flatten entries q,
-		g -> saveMRDI(g,
+    -- input:
+    --   polymrdi: MRDI-serialized ConcretePoly
+    --   idealmrdi: list of MRDI-serialized ConcretePoly's
+    -- output:
+    --   a hash table:
+    --     "quotient" => list of MRDI-serialized ConcretePoly's
+    --     "remainder" => MRDI-serialized ConcretePoly (hopefully 0)
+
+    registerMethod(server, "quotientRemainder", (polymrdi, idealmrdi) -> (
+	    f := value loadMRDI polymrdi;
+	    R := ring f;
+	    I := ideal apply(idealmrdi, g -> (
+		    sub(value loadMRDI g, R)));
+	    (q, r) := quotientRemainder(matrix f, gens I);
+	    hashTable {
+		"quotient" => apply(flatten entries q,
+		    g -> saveMRDI(g,
+			Namespace => "Lean",
+			ToString => false)),
+		"remainder" => saveMRDI(r_(0,0),
 		    Namespace => "Lean",
-		    ToString => false)),
-	    "remainder" => saveMRDI(r_(0,0),
-		Namespace => "Lean",
-		ToString => false)}))
+		    ToString => false)}));
 
-registerMethod(server, "factor", (nmrdi) -> (
-	n := loadMRDI nmrdi;
-	saveMRDI(toList \ toList factor n)))
+    registerMethod(server, "factor", (nmrdi) -> (
+	    n := loadMRDI nmrdi;
+	    saveMRDI(toList \ toList factor n)));
 
-registerMethod(server, "testMethod", (expr) -> (
-        toExternalString value expr
-        ))
+    registerMethod(server, "testMethod", (expr) -> (
+	    toExternalString value expr));
 
-registerMethod(server, "factorInt", (x) -> (
-        toList \ toList factor x
-    )
-)
+    registerMethod(server, "factorInt", (x) -> (
+	    toList \ toList factor x));
 
-registerMethod(server, "mrdiEcho", (mrdi) -> (
-        f := loadMRDI mrdi;
-        stderr << f << endl;
-        saveMRDI(f, Namespace => "Lean")
-    )
-)
+    registerMethod(server, "mrdiEcho", (mrdi) -> (
+	    f := loadMRDI mrdi;
+	    stderr << f << endl;
+	    saveMRDI(f, Namespace => "Lean")));
 
-registerMethod(server, "mrdiFactor", (mrdi) -> (
-        f := loadMRDI mrdi;
-        stderr << f << endl;
-        apply(toList \ toList factor f, term -> (saveMRDI(term#0, Namespace => "Lean"), term#1))
-    )
-)
+    registerMethod(server, "mrdiFactor", (mrdi) -> (
+	    f := loadMRDI mrdi;
+	    stderr << f << endl;
+	    apply(toList \ toList factor f, term -> (
+		    saveMRDI(term#0, Namespace => "Lean"), term#1))));
 
-macauleanStart = () -> macauleanMainLoop(server, stdio);
+    server)
+
+macauleanStart = () -> macauleanMainLoop(macauleanServer(), stdio);
+
+beginDocumentation()
