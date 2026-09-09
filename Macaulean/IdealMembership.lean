@@ -303,14 +303,17 @@ unsafe def makePolynomialSerializationPair (ring : Expr) (n : Nat) : MetaM Seral
   )
 
 /--
-This function implements the core of the tactic, serializing and deserializing
-the polynomials to Macaulay2. `ring` should be an expression for the ring
-`idealExprs` should be a list of generators for the ideal and `polyExpr` should be
-the candidate polynomial. The returned list of expressions is a list of
-coefficients such that the product with the generators in idealExprs gives polyExpr
+Reify `polyExpr` and `idealExprs` as `Macaulean.Polynomial`s over `ring`, ask
+Macaulay2 to divide the first by the rest, and hand back the reply *as it
+arrived* along with the free variables, in the index order both the request and
+the reply use.
+
+`m2QuotientRemainderImpl` deserializes that reply into `Polynomial.denote`
+expressions; `m2cert` (`Macaulean/M2Cert.lean`) reads the monomials out of it
+directly, to build the certificate in the ambient ring instead.
 -/
-unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
-  : MetaM (List Expr × Expr) := do
+unsafe def m2QuotientRemainderRaw (goal : MVarId) (ring : Expr) (idealExprs : Array Expr)
+  (polyExpr : Expr) : MetaM (Array FVarId × QuotientRemainder) := do
   dbg_trace "M2IdealMem Start"
 
   --TODO reimplement universalization in a more systematic way
@@ -320,15 +323,12 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
       polyExpr.collectFVars
       _ ← idealExprs.mapM (Expr.collectFVars)
     ).run Inhabited.default
-  let fvarsSorted := varsInfo.fvarSet.toList -- .mergeSort (le := fun a b => a.name.toString ≥ b.name.toString)
-  let vars : FVarIdMap Nat := .ofArray (cmp := _) <| fvarsSorted.toArray.mapIdx (fun a b => (b,a))
+  let fvarsSorted := varsInfo.fvarSet.toArray -- .mergeSort (le := fun a b => a.name.toString ≥ b.name.toString)
+  let vars : FVarIdMap Nat := .ofArray (cmp := _) <| fvarsSorted.mapIdx (fun a b => (b,a))
   let polyExprPoly ← toPolynomialExpr? vars ring polyExpr
   let idealExprsPolys ← idealExprs.mapM (toPolynomialExpr? vars ring)
-  let varContextExpr ← mkAppM ``RArray.ofArray
-    #[← mkArrayLit ring <| Array.toList <| varsInfo.fvarSet.toArray.map .fvar,
-      ← mkAppM ``Nat.succ_pos #[toExpr (varsInfo.fvarSet.size - 1)]]
 
-  let (serializer,deserializer) ← makePolynomialSerializationPair ring vars.size
+  let (serializer,_) ← makePolynomialSerializationPair ring vars.size
 
   let s ← IO.rand 0 (2^64-1)
   --I should be able to use the runMrdiIO variant
@@ -345,6 +345,24 @@ unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : A
     let .ok result ← m2QuotientRemainder serializedGens.toList serializedPoly
       | throwTacticEx `m2idealmem goal "Ideal membership failed"
     dbg_trace "Coefficients Returned"
+    pure (fvarsSorted, result)
+
+/--
+This function implements the core of the tactic, serializing and deserializing
+the polynomials to Macaulay2. `ring` should be an expression for the ring
+`idealExprs` should be a list of generators for the ideal and `polyExpr` should be
+the candidate polynomial. The returned list of expressions is a list of
+coefficients such that the product with the generators in idealExprs gives polyExpr
+-/
+unsafe def m2QuotientRemainderImpl (goal : MVarId) (ring : Expr) (idealExprs : Array Expr) (polyExpr : Expr)
+  : MetaM (List Expr × Expr) := do
+  let (fvars, result) ← m2QuotientRemainderRaw goal ring idealExprs polyExpr
+  let varContextExpr ← mkAppM ``RArray.ofArray
+    #[← mkArrayLit ring <| Array.toList <| fvars.map .fvar,
+      ← mkAppM ``Nat.succ_pos #[toExpr (fvars.size - 1)]]
+  let (_,deserializer) ← makePolynomialSerializationPair ring fvars.size
+  let s ← IO.rand 0 (2^64-1)
+  runMrdiWithSeed s do
     --deserialize the result
     let deserializedCoefficients ← ExceptT.run do
       result.quotient.mapM deserializer
