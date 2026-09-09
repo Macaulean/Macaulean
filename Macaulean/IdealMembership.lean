@@ -311,9 +311,14 @@ the reply use.
 `m2QuotientRemainderImpl` deserializes that reply into `Polynomial.denote`
 expressions; `m2cert` (`Macaulean/M2Cert.lean`) reads the monomials out of it
 directly, to build the certificate in the ambient ring instead.
+
+With `sortVars` the variables are indexed in the order of their *user* names
+rather than in the order `collectFVars` happens to visit them.  The tactics
+themselves do not care -- any consistent indexing works -- but `m2cert?` prints
+the variable list, and an unpredictable one is no use to a reader.
 -/
 unsafe def m2QuotientRemainderRaw (goal : MVarId) (ring : Expr) (idealExprs : Array Expr)
-  (polyExpr : Expr) : MetaM (Array FVarId × QuotientRemainder) := do
+  (polyExpr : Expr) (sortVars : Bool := false) : MetaM (Array FVarId × QuotientRemainder) := do
   dbg_trace "M2IdealMem Start"
 
   --TODO reimplement universalization in a more systematic way
@@ -323,7 +328,13 @@ unsafe def m2QuotientRemainderRaw (goal : MVarId) (ring : Expr) (idealExprs : Ar
       polyExpr.collectFVars
       _ ← idealExprs.mapM (Expr.collectFVars)
     ).run Inhabited.default
-  let fvarsSorted := varsInfo.fvarSet.toArray -- .mergeSort (le := fun a b => a.name.toString ≥ b.name.toString)
+  let collected := varsInfo.fvarSet.toArray
+  let fvarsSorted ←
+    if sortVars then
+      let keyed ← collected.mapM fun fv => do
+        pure (toString (← fv.getUserName).eraseMacroScopes ++ "\u0000" ++ fv.name.toString, fv)
+      pure <| (keyed.qsort (fun a b => a.1 < b.1)).map (·.2)
+    else pure collected
   let vars : FVarIdMap Nat := .ofArray (cmp := _) <| fvarsSorted.mapIdx (fun a b => (b,a))
   let polyExprPoly ← toPolynomialExpr? vars ring polyExpr
   let idealExprsPolys ← idealExprs.mapM (toPolynomialExpr? vars ring)
