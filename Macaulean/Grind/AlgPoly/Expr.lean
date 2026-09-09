@@ -8,7 +8,7 @@
 -/
 module
 
-public import Macaulean.Polynomial.Hom
+public import Macaulean.CertRing
 
 @[expose] public section
 
@@ -115,39 +115,6 @@ summands.  Denotation-preserving (`denote_rebalance`). -/
 def rebalance (e : AlgExpr Int) : AlgExpr Int := balance (addChain e [])
 
 end AlgExpr
-
-/-! ### The canonical coefficient map `Int → A` -/
-
-/--
-The canonical coefficient map `Int → A`.
-
-`Lean.Grind.CommRing.denoteInt` is grind's own canonical map: it produces
-`OfNat.ofNat |k|` (negated when `k < 0`) through grind's numeral instance, which
-is exactly what makes the tactic's denotation bridge reduce to the goal's own
-numerals.  Packaging it as a named definition keeps the `Grind.Ring` instance
-argument in one place, so the term the tactic emits and the term
-`intDenote_isCoeffHom` talks about are syntactically identical.
--/
-noncomputable def intDenote (A : Type) [Grind.CommRing A] : Int → A :=
-  fun k => Grind.CommRing.denoteInt k
-
-theorem intDenote_isCoeffHom (A : Type) [Grind.CommRing A] :
-    Polynomial.IsCoeffHom (intDenote A) where
-  map_zero := by
-    simp only [intDenote, Grind.CommRing.denoteInt_eq]
-    exact Grind.Ring.intCast_zero
-  map_one := by
-    simp only [intDenote, Grind.CommRing.denoteInt_eq]
-    exact Grind.Ring.intCast_one
-  map_add a b := by
-    simp only [intDenote, Grind.CommRing.denoteInt_eq]
-    exact Grind.Ring.intCast_add a b
-  map_mul a b := by
-    simp only [intDenote, Grind.CommRing.denoteInt_eq]
-    exact Grind.Ring.intCast_mul a b
-  map_neg a := by
-    simp only [intDenote, Grind.CommRing.denoteInt_eq]
-    exact Grind.Ring.intCast_neg a
 
 /-! ### Rebalancing preserves the denotation -/
 
