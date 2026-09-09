@@ -1,6 +1,31 @@
-needsPackage "JSONRPC"
-needsPackage "MRDI"
-needsPackage "Parsing"
+newPackage(
+    "Macaulean",
+    Version => "0.1",
+    Date => "September 2026",
+    Headline => "Macaulay2 <-> Lean interface",
+    Authors => {
+        {Name => "Matt Ballard",
+         Email => "ballard@math.sc.edu",
+         HomePage => "https://www.matthewrobertballard.com/"},
+        {Name => "Anton Leykin",
+         Email => "leykin@math.gatech.edu",
+         HomePage => "https://antonleykin.math.gatech.edu/"},
+        {Name => "Mike Stillman",
+         Email => "mes15@cornell.edu",
+         HomePage => "https://pi.math.cornell.edu/~mike/"},
+        {Name => "Damiano Testa",
+         Email => "D.Testa@warwick.ac.uk",
+         HomePage => "https://adomani.github.io/"},
+        {Name => "Doug Torrance",
+         Email => "dtorrance9@gatech.edu",
+         HomePage => "https://d-torrance.github.io"},
+        {Name => "Jay Yang",
+         Email => "jay.k.yang@vanderbilt.edu",
+         HomePage => "https://jkyang92.github.io/"}},
+    Keywords => {"Interfaces"},
+    PackageImports => {"JSONRPC", "MRDI", "Parsing"})
+
+export {"macauleanStart"}
 
 -----------------------------------------------------
 -- M2 classes to represent Lean polynomial objects --
@@ -159,6 +184,7 @@ readLSPHeaders File := (file) -> (
 --right now it uses the same file for input and output
 macauleanMainLoop = method();
 macauleanMainLoop (JSONRPCServer, File) := (server, file) -> (
+    echoOff file;
     while true do (
         wait file;
         if atEndOfFile file then return;
@@ -236,4 +262,4 @@ registerMethod(server, "mrdiFactor", (mrdi) -> (
     )
 )
 
-macauleanMainLoop(server, stdio);
+macauleanStart = () -> macauleanMainLoop(server, stdio);
