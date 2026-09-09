@@ -33,35 +33,65 @@ Measured on an M2 (Lean 4.33.1, `set_option Elab.async false`), where
 
 | identity          | monomials | tactic ms | kernel ms | peak RSS |
 |-------------------|-----------|-----------|-----------|----------|
-| perf_hess_sq      |        41 |       193 |        12 |          |
-| perf_redH2_sq     |       296 |      3498 |        63 |          |
-| perf_redH3_sq     |       755 |     19139 |       161 |          |
-| perf_theta3_step  |      1350 |     58105 |       344 |  20.6 GB |
+| perf_hess_sq      |        41 |       153 |        12 |          |
+| perf_redH2_sq     |       296 |      2447 |        62 |          |
+| perf_redH3_sq     |       755 |     13780 |       161 |          |
+| perf_theta3_step  |      1350 |     36104 |       340 |  14.3 GB |
 
 Essentially all of "tactic" is the `decide +kernel` certificate; the two
 denotation bridges cost a few hundred ms on the largest one, because they are
 `Eq.refl` handed to the *kernel* via `mkAuxLemma` rather than proved by
 `Meta.isDefEq`.
 
-These numbers are with monomials packed into a single `Nat` key
-(`Macaulean/Polynomial/Key.lean`).  Before that -- with `Mon n` an exponent
-*list* and `Mon.grevlex` comparing lists -- the same four identities cost
-271 / 6768 / 38513 / 114446 ms and 34.5 GB, so packing is worth about 2x in
-time and 1.7x in memory.  On the largest identity the packing itself took
-114446 ms to 71541 ms, and then spelling the comparison as `Nat.beq`/`Nat.ble`
-rather than `compare` took it to 58105: `compare` goes through `Decidable`
-instances, so every kernel comparison was building a `Nat.le` proof term that
-the whnf cache then held on to.
+## Where the time went
 
-The overflow guard the packing needs (`Polynomial.mulOk`, checked by the kernel
-at every product) costs about 3.5%: 58105 ms against 56093 ms with the check
-stubbed out.
+With `Mon n` an exponent *list* and `Mon.grevlex` comparing lists, the four
+identities cost 271 / 6768 / 38513 / 114446 ms and 34.5 GB.  Packing the
+exponent vector into a single `Nat` key (`Macaulean/Polynomial/Key.lean`) took
+the largest one to 71541 ms, and spelling the key comparison as
+`Nat.beq`/`Nat.ble` instead of `compare` -- which goes through `Decidable`
+instances, so every comparison was building a `Nat.le` proof term the whnf
+cache then held on to -- took it to 58105.
 
-What is left is no longer the monomials.  A Kronecker-packed
-`List (Nat x Int)` -- no `PolyTerm`/`Mon` structures, no `Grind.CommRing`
-coefficient projections -- did the same four in 196 / 2773 / 15009 / 38295 ms,
-so roughly another 1.5x is sitting in the term plumbing around the monomial,
-not in the monomial.
+The two steps after that were found by a kernel micro-harness that times the
+individual steps of the certificate (`decide +kernel` on `Nat.blt <step> 0`,
+one measurement per `addDecl`) and compares each against the corresponding step
+of a Kronecker-packed `List (Nat x Int)`.  On the 755-monomial identity that
+said, unambiguously, that the multiplication was *not* the problem -- the
+product `A * B` cost 4.4 s against the packed form's 4.9 s -- and that all the
+loss was in building an operand out of a sum of monomials: 13.6 s against 4.3 s
+for `Q * G + R`.  Two things were doing it:
+
+* `add` and `mul` each ended with `removeZeros`, a filter over the whole
+  accumulated polynomial, which on a left-nested sum of `m` monomials is a
+  second `O(m^2)` on top of the merge.  Stripping zeros once, in `checkPolyEq`,
+  is 26% of the whole check.
+
+* `mergeTermsF` matched on `Mon.grevlex x y`, so the kernel built an `Ordering`
+  and cased on it at every step.  Comparing the keys directly is another 6%.
+
+What is *not* the problem, measured the same way: the `PolyTerm`/`Mon`
+structures.  Rewriting the whole pipeline over bare `List (Nat x Int)` pairs,
+with no structure projections at all, was worth 1.6% -- the kernel unfolds a
+projection-of-constructor cheaply.
+
+## What is left
+
+A Kronecker-packed `List (Nat x Int)` does the same four in
+196 / 2773 / 15009 / 38295 ms, so this representation is now faster at every
+size.  The remaining difference is entirely in the sum-of-monomials build, and
+is measured to be:
+
+* the packing guard.  `Polynomial.mulOk` calls `Mon.wf`, which decodes a key
+  into an exponent list and re-encodes it, once per factor of every product --
+  including the one-monomial products that a sum is made of.  Stubbing the
+  guard out saves 12% of the right-hand side at 755 monomials.  Making it
+  cheaper means a digit-walk well-formedness check and a matching proof in
+  `Key.lean`.
+
+* the per-step cost of the merge itself, about 1.15x the packed form's, and
+  `Mon.fromVar` (which runs `List.ofFn` and `encodeKey`) where the packed form
+  computes one `powNat D i`.
 
 This file is not part of the `MacauleanTest` root (same convention as the
 other speed-test files); run it directly:
