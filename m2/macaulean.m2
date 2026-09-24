@@ -245,6 +245,15 @@ registerMethod(server, "testMethod", (expr) -> (
         toExternalString value expr
         ))
 
+-- input: a string of Macaulay2 source
+-- output: {"ok", class name, toExternalString of value}, or {"error", "", ""}
+registerMethod(server, "evalValue", (expr) -> (
+        try (
+            v := value expr;
+            {"ok", toString class v, toExternalString v})
+        else {"error", "", ""}
+        ))
+
 registerMethod(server, "factorInt", (x) -> (
         toList \ toList factor x
     )
