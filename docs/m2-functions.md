@@ -41,11 +41,16 @@ by ordinary users.
 | `(x,y) -> body` | Require exactly two arguments in a Sequence |
 | `() -> body` | Require an empty Sequence |
 
+M2 also accepts braces for the fixed-arity forms: `{x}->body`, `{x,y}->body`,
+and `{}->body` have the same calling conventions as their parenthesized versions.
+They do not request List unpacking. This less-common grammar is covered by
+native comparisons, kernel checks, and actual DSL parser/formatter tests.
+
 Lists are values, not argument packs. A fixed two-argument function rejects
 `f {1,2}` but accepts `f(1,2)`. `(x) -> x` accepts the List `{1,2}` as its one
 argument. By contrast, `x -> x` applied to `(1:7)` returns the singleton Sequence,
 while `(x) -> x` returns the integer 7. The concrete parser therefore retains
-parameter parentheses until it has determined the calling convention.
+parameter delimiters until it has determined the calling convention.
 
 Argument expressions are evaluated before arity checking, from left to right.
 The function expression is evaluated before its argument expression. Function
@@ -215,13 +220,14 @@ integer denotation in the new runtime for arbitrary expressions with sufficient
 budget. The retained loop-free proofs remain explicitly about `evalTerm`.
 
 The test driver includes the 80-input worksheet; a shared explicit kernel/native
-result and error corpus; additional lexical edge cases; independent native
-parser-shape and malformed-binder controls; UTF-8 positions and formatting;
-function-valued collection members; live captured-state aliases; old snapshots;
-recursion exhaustion and recovery; and cross-module isolation. Native comparisons
-require successful typed observations on both sides. Native syntax controls
-explicitly discard valid function results before serialization, so rejection of
-an unsupported wire class cannot masquerade as a syntax error.
+result and error corpus; additional lexical edge cases and brace parameters;
+independent native parser-shape and malformed-binder controls; UTF-8 positions
+and formatting; function-valued collection members; live captured-state aliases;
+old snapshots; recursion exhaustion and recovery; and cross-module isolation.
+Native comparisons require successful typed observations on both sides. Native
+syntax controls check parsing and binding, and discard valid function results
+before serialization, so rejection of an unsupported wire class cannot masquerade
+as a syntax error.
 
 The certificate interface proves equalities about `run` using the Lean kernel.
 A native M2 answer is only a comparison target, never an axiom. This does not
