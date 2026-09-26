@@ -18,3 +18,4 @@ import MacauleanTest.InterpreterCollectionsDSL
 import MacauleanTest.InterpreterCollectionsImport
 import MacauleanTest.InterpreterCollectionsM2
 import MacauleanTest.FunctionReference
+import MacauleanTest.InterpreterFunctions

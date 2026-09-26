@@ -1,7 +1,7 @@
 import Macaulean.Interpreter.Syntax
 import Macaulean.Interpreter.Lexer
 
-/-! # Shared concrete-tree Pratt grammar, including function binding and application
+/-! # Shared concrete-tree Pratt grammar
 
 Application is right-associative (46), below powers/indexing (50) and composition
 (48), above multiplication (40). Arrow and assignments share precedence 10.
@@ -96,14 +96,13 @@ def Tree.bounds : Tree → Nat × Nat
   | .ifThen i _ _ y => (i, y.bounds.2) | .ifElse i _ _ _ _ n => (i, n.bounds.2)
   | .discard i a => (a.bounds.1, i)
 
-/-- Parameter lists are syntax, not evaluated sequences. Nested parentheses are invalid. -/
 def Tree.parameterNames : Tree → Option (List String)
   | .var _ x => some [x]
   | .comma _ a (.var _ x) => (· ++ [x]) <$> a.parameterNames
   | _ => none
 
 def Tree.parameters (t : Tree) : Except String Parameters := do
-  let p ← match t with
+  let p : Parameters ← match t with
     | .var _ x => .ok (.variadic x)
     | .emptySequence .. => .ok (.fixed [])
     | .paren _ _ a => match a.parameterNames with
@@ -131,6 +130,7 @@ private def startsArgument : List Token → Bool
   | .sym .kwIf :: _ | .sym .kwLocal :: _ | .sym .kwReturn :: _ => true | _ => false
 
 mutual
+
 def parseTreeExpr : Nat → Nat → Bool → Cursor → TreeResult
   | 0, _, _, _ => .error "parser ran out of fuel"
   | fuel + 1, minBP, obey, c =>
@@ -157,8 +157,8 @@ def parseTreeExpr : Nat → Nat → Bool → Cursor → TreeResult
       let (a, tail) ← if missingOperand next.tokens then .ok (.missing c.index, next)
         else parseTreeExpr fuel branchBP obey next
       parseTreeLoop fuel minBP obey (.returnTerm c.index a) tail
-    | .sym .comma :: _ => if minBP ≤ commaBP then
-        parseTreeLoop fuel minBP obey (.missing c.index) c
+    | .sym .comma :: _ =>
+      if minBP ≤ commaBP then parseTreeLoop fuel minBP obey (.missing c.index) c
       else .error "unexpected comma in operand"
     | rest => .error s!"expected an expression but found {describe rest}"
 
@@ -168,14 +168,16 @@ def parseDelimited : Nat → Nat → Bool → Bool → Nat → Cursor → TreeRe
     let close := if braces then Sym.rbrace else Sym.rparen
     let c := c.skipNewlines
     match c.tokens with
-    | .sym s :: rest => if s = close then
+    | .sym s :: rest =>
+      if s = close then
         let t := if braces then Tree.emptyList left c.index else Tree.emptySequence left c.index
         return ← parseTreeLoop fuel minBP obey t ⟨rest, c.index + 1⟩
     | _ => pure ()
     let (body, tail) ← parseTreeBlock fuel close c
     let tail := tail.skipNewlines
     match tail.tokens with
-    | .sym s :: rest => if s = close then
+    | .sym s :: rest =>
+      if s = close then
         let t := if braces then Tree.listBody left tail.index body else Tree.paren left tail.index body
         parseTreeLoop fuel minBP obey t ⟨rest, tail.index + 1⟩
       else .error "mismatched collection or block delimiter"
@@ -233,36 +235,38 @@ def parseTreeLoop : Nat → Nat → Bool → Tree → Cursor → TreeResult
     if startsArgument c.tokens && minBP ≤ applicationBP then do
       let (rhs, tail) ← parseTreeExpr fuel applicationBP obey c
       parseTreeLoop fuel minBP obey (.apply lhs rhs) tail
-    else match c.tokens with
-    | .sym s :: rest =>
-      match infixInfo s with
-      | some (kind, lbp, rbp) => if minBP ≤ lbp then do
-          let next := Cursor.mk rest (c.index + 1)
-          match kind with
-          | .comma =>
-            let (rhs, tail) ← parseCommaRhs fuel obey c.index next
-            parseTreeLoop fuel minBP obey (.comma c.index lhs rhs) tail
-          | .arrow =>
-            let params ← lhs.parameters
-            let (rhs, tail) ← parseTreeExpr fuel rbp obey next
-            parseTreeLoop fuel minBP obey (.lambda c.index params lhs rhs) tail
-          | _ =>
-            let (rhs, tail) ← parseTreeExpr fuel rbp obey next
-            match kind, lhs.toTerm with
-            | .bin op, _ => parseTreeLoop fuel minBP obey (.binop c.index op lhs rhs) tail
-            | .logic op, _ => parseTreeLoop fuel minBP obey (.logic c.index op lhs rhs) tail
-            | .assign, .var x => parseTreeLoop fuel minBP obey (.assign c.index x lhs rhs) tail
-            | .localAssign, .var x => parseTreeLoop fuel minBP obey (.localAssign c.index x lhs rhs) tail
-            | .assign, .binop .index _ _ => parseTreeLoop fuel minBP obey (.indexAssign c.index lhs rhs) tail
-            | .assign, .sequence xs | .localAssign, .sequence xs =>
-              let some names := Term.variableNames xs | .error "expected variable names in multiple assignment"
-              let loc := match kind with | .localAssign => true | _ => false
-              parseTreeLoop fuel minBP obey (.assignMany c.index loc names lhs rhs) tail
-            | .assign, _ | .localAssign, _ => .error "invalid assignment target"
-            | _, _ => .error "internal operator dispatch"
-        else .ok (lhs, c)
-      | none => .ok (lhs, c)
-    | _ => .ok (lhs, c)
+    else
+      match c.tokens with
+      | .sym s :: rest =>
+        match infixInfo s with
+        | some (kind, lbp, rbp) =>
+          if minBP ≤ lbp then do
+            let next := Cursor.mk rest (c.index + 1)
+            match kind with
+            | .comma =>
+              let (rhs, tail) ← parseCommaRhs fuel obey c.index next
+              parseTreeLoop fuel minBP obey (.comma c.index lhs rhs) tail
+            | .arrow =>
+              let params ← lhs.parameters
+              let (rhs, tail) ← parseTreeExpr fuel rbp obey next
+              parseTreeLoop fuel minBP obey (.lambda c.index params lhs rhs) tail
+            | _ =>
+              let (rhs, tail) ← parseTreeExpr fuel rbp obey next
+              match kind, lhs.toTerm with
+              | .bin op, _ => parseTreeLoop fuel minBP obey (.binop c.index op lhs rhs) tail
+              | .logic op, _ => parseTreeLoop fuel minBP obey (.logic c.index op lhs rhs) tail
+              | .assign, .var x => parseTreeLoop fuel minBP obey (.assign c.index x lhs rhs) tail
+              | .localAssign, .var x => parseTreeLoop fuel minBP obey (.localAssign c.index x lhs rhs) tail
+              | .assign, .binop .index _ _ => parseTreeLoop fuel minBP obey (.indexAssign c.index lhs rhs) tail
+              | .assign, .sequence xs | .localAssign, .sequence xs =>
+                let some names := Term.variableNames xs | .error "expected variable names in multiple assignment"
+                let loc := match kind with | .localAssign => true | _ => false
+                parseTreeLoop fuel minBP obey (.assignMany c.index loc names lhs rhs) tail
+              | .assign, _ | .localAssign, _ => .error "invalid assignment target"
+              | _, _ => .error "internal operator dispatch"
+          else .ok (lhs, c)
+        | none => .ok (lhs, c)
+      | _ => .ok (lhs, c)
 end
 
 def parseExpr (fuel minBP : Nat) (obey : Bool) (ts : List Token) : Result := do
@@ -270,12 +274,14 @@ def parseExpr (fuel minBP : Nat) (obey : Bool) (ts : List Token) : Result := do
   return (t.toTerm, tail.tokens)
 def parseStatements : Nat → List Token → Except String Term
   | 0, _ => .error "parser ran out of fuel"
-  | fuel + 1, ts => match skipNewlines ts with
+  | fuel + 1, ts =>
+    match skipNewlines ts with
     | [] => .ok .empty
     | ts => do
       let (e, rest) ← parseExpr fuel 0 true ts
       let rest ← match rest with
-        | [] => .ok [] | .newline :: rest | .sym .semi :: rest => .ok rest
+        | [] => .ok []
+        | .newline :: rest | .sym .semi :: rest => .ok rest
         | rest => .error s!"unexpected {describe rest}"
       let next ← parseStatements fuel rest
       return match next with | .empty => e | e' => .seq e e'
@@ -284,7 +290,8 @@ def fuel (ts : List Token) : Nat := 16 * ts.length + 16
 def parseInputTree (ts : List Token) : Except String Tree := do
   let (tree, rest) ← parseTreeExpr (fuel ts) 0 true ⟨ts, 0⟩
   match rest.skipNewlines.tokens with
-  | [] => return tree | rest => .error s!"unexpected {describe rest}"
+  | [] => return tree
+  | rest => .error s!"unexpected {describe rest}"
 end Parser
 
 def parse (s : String) : Except String Term := do
