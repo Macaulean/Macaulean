@@ -8,6 +8,11 @@ both registered printer hooks rather than merely checking that the parser builds
 open Lean Elab Command
 
 run_cmd do
+  -- Lean's enclosing formatter may indent continuation lines. M2 does not care
+  -- about that indentation, but newlines and whitespace *within* each line
+  -- must survive (notably `- -3` must not become the comment `--3`).
+  let significantLines := fun (source : String) =>
+    (source.splitOn "\n").map fun line => line.trimAscii.copy
   for source in #[
     "0", "x = 3;", "- -3", "+ +3", "2 * -7 // 2", "2^-2^2",
     "(1\n+2)", "1 +\n2", "(1 + -- λ, 中文\n 2) * 3", "value$2 = 0x1F"
@@ -17,7 +22,7 @@ run_cmd do
       | .error error => throwError "M2 parser failed on {repr source}: {error}"
     let printed ← liftCoreM <| PrettyPrinter.ppCategory `m2 stx
     let rendered := printed.pretty
-    unless rendered == source do
+    unless significantLines rendered == significantLines source do
       throwError "M2 formatter changed significant source: {repr source} -> {repr rendered}"
     let reparsed ← match Parser.runParserCategory (← getEnv) `m2 rendered with
       | .ok stx => pure stx
