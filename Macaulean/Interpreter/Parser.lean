@@ -111,16 +111,34 @@ def Tree.parameters (t : Tree) : Except String Parameters := do
   if p.names.eraseDups.length != p.names.length then .error "duplicate function parameter"
   else return p
 
-/-- Assignment targets are validated independently of expression/operator dispatch. -/
-def assignmentTree (isLocal : Bool) (pos : Nat) (lhs rhs : Tree) : Except String Tree :=
-  match lhs.toTerm with
-  | .var name => .ok (if isLocal then .localAssign pos name lhs rhs else .assign pos name lhs rhs)
-  | .sequence xs => do
-    let some names := Term.variableNames xs | .error "expected variable names in multiple assignment"
-    return .assignMany pos isLocal names lhs rhs
-  | .binop .index _ _ =>
-    if isLocal then .error "invalid local assignment target" else .ok (.indexAssign pos lhs rhs)
+/-- Assignment forms are checked on concrete syntax, before brace/comma lowering. -/
+inductive Target where
+  | variable (name : String)
+  | multiple (names : List String)
+  | indexed
+  deriving Repr, DecidableEq
+
+def Tree.target : Tree → Except String Target
+  | .var _ name => .ok (.variable name)
+  | .paren _ _ body => body.target
+  | .emptySequence .. => .ok (.multiple [])
+  | .comma _ a b => do
+    let .variable right ← b.target | .error "expected variable names in multiple assignment"
+    match ← a.target with
+    | .variable left => return .multiple [left, right]
+    | .multiple names => return .multiple (names ++ [right])
+    | .indexed => .error "expected variable names in multiple assignment"
+  | .binop _ .index _ _ => .ok .indexed
   | _ => .error "invalid assignment target"
+
+/-- No value printing or coercion can turn a numeral or a List into a binding name. -/
+def assignmentTree (isLocal : Bool) (pos : Nat) (lhs rhs : Tree) : Except String Tree := do
+  match ← lhs.target with
+  | .variable name =>
+    return if isLocal then .localAssign pos name lhs rhs else .assign pos name lhs rhs
+  | .multiple names => return .assignMany pos isLocal names lhs rhs
+  | .indexed =>
+    if isLocal then .error "invalid local assignment target" else .ok (.indexAssign pos lhs rhs)
 
 structure Cursor where
   tokens : List Token
