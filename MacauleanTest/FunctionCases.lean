@@ -75,7 +75,8 @@ def successes : List (String × Value) := [
   ("(f=()->(g:=n->if n==0 then 1 else n*g(n-1);g 5);f())", .zz 120),
   ("(f=()->(local g;g=n->if n==0 then 1 else n*g(n-1);g 5);f())", .zz 120),
   ("(fib=n->if n<2 then n else fib(n-1)+fib(n-2);fib 8)", .zz 21),
-  ("(even=n->if n==0 then true else odd(n-1);odd=n->if n==0 then false else even(n-1);(even 8,odd 8))", .sequence [.bool true,.bool false]),
+  -- Fresh global names keep this distinct from native M2's library predicates.
+  ("(m2TestEven=n->if n==0 then true else m2TestOdd(n-1);m2TestOdd=n->if n==0 then false else m2TestEven(n-1);(m2TestEven 8,m2TestOdd 8))", .sequence [.bool true,.bool false]),
   ("(f=()->(local even;local odd;even=n->if n==0 then true else odd(n-1);odd=n->if n==0 then false else even(n-1);(even 6,odd 7));f())", .sequence [.bool true,.bool true]),
   ("(f=()->(local rec;rec=n->if n==0 then 0 else 1+rec(n-1);rec);g=f();g 10)", .zz 10),
   -- Return exits one invocation; all remaining operations are skipped.
