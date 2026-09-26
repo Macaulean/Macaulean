@@ -67,11 +67,22 @@ example : run "1;\n2" = .ok (.zz 2) := by decide +kernel
 example : run "y" = .error (.unboundVar "y") := by decide +kernel
 example : run "true = 3" = .error (.protectedSymbol "true") := by decide +kernel
 
--- Give concrete error witnesses rather than relying on elaborator unification
--- to discover them through the shared concrete-tree parser. The equalities are
--- still checked by kernel evaluation, including the expected error messages.
+-- Check the error constructor without forcing Repr's opaque pretty-printer.
+-- The soundness lemma recovers the original existential statement: a runtime
+-- error or successful result cannot satisfy the test.
+private def isParseError : Outcome → Bool
+  | .parseError _ => true
+  | _ => false
+
+private theorem isParseError_sound (o : Outcome) (h : isParseError o = true) :
+    ∃ msg, o = .parseError msg := by
+  cases o with
+  | parseError msg => exact ⟨msg, rfl⟩
+  | error e => cases h
+  | ok v => cases h
+
 example : ∃ msg, run "1;;" = .parseError msg :=
-  ⟨s!"expected an expression but found {Parser.describe [.sym .semi]}", by decide +kernel⟩
+  isParseError_sound _ (by decide +kernel)
 example : ∃ msg, run "(1 + 2" = .parseError msg :=
   ⟨"expected ')' but found end of input", by decide +kernel⟩
 example : ∃ msg, run "1.5" = .parseError msg := ⟨_, rfl⟩
