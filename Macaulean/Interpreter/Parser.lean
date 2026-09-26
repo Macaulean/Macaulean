@@ -42,12 +42,12 @@ def infixInfo : Sym → Option (Infix × Nat × Nat)
 
 /-- Concrete syntax, with indices into the original token stream. -/
 inductive Tree where
-  | num (at : Nat) (n : Nat)
-  | var (at : Nat) (name : String)
+  | num (tokenIndex : Nat) (n : Nat)
+  | var (tokenIndex : Nat) (name : String)
   | paren (left right : Nat) (body : Tree)
-  | unop (at : Nat) (op : UnOp) (arg : Tree)
-  | binop (at : Nat) (op : BinOp) (lhs rhs : Tree)
-  | assign (at : Nat) (name : String) (lhs rhs : Tree)
+  | unop (tokenIndex : Nat) (op : UnOp) (arg : Tree)
+  | binop (tokenIndex : Nat) (op : BinOp) (lhs rhs : Tree)
+  | assign (tokenIndex : Nat) (name : String) (lhs rhs : Tree)
   deriving Repr, DecidableEq, Inhabited
 
 /-- Forget source information, not M2 semantics. -/
@@ -114,9 +114,9 @@ def parseTreeExpr : Nat → Nat → Bool → Cursor → TreeResult
 
 def parseTreePrefix : Nat → Nat → Bool → Nat → UnOp → Cursor → TreeResult
   | 0, _, _, _, _, _ => .error "parser ran out of fuel"
-  | fuel + 1, minBP, obey, at, op, c =>
+  | fuel + 1, minBP, obey, tokenIndex, op, c =>
     match parseTreeExpr fuel (max minBP prefixBP) obey c with
-    | .ok (e, tail) => parseTreeLoop fuel minBP obey (.unop at op e) tail
+    | .ok (e, tail) => parseTreeLoop fuel minBP obey (.unop tokenIndex op e) tail
     | .error err => .error err
 
 def parseTreeLoop : Nat → Nat → Bool → Tree → Cursor → TreeResult
