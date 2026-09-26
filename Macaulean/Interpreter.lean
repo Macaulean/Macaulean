@@ -8,3 +8,4 @@ import Macaulean.Interpreter.Semantics
 import Macaulean.Interpreter.Check
 import Macaulean.Interpreter.DSL
 import Macaulean.Interpreter.ControlFlow
+import Macaulean.Interpreter.Collections
