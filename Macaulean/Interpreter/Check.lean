@@ -7,8 +7,8 @@ import Macaulean.Macaulay2
 # Differential checking and kernel certificates
 
 The native oracle sends typed data, not source for the M2 parser to reinterpret.
-`#m2_check` compares the result, then generates a kernel-checked equality about
-`run`. Structural reification supports arbitrary nested immutable collections.
+Function programs returning scalar/collection data use the same certificate path.
+Foreign function handles and lexical cells are never accepted by the wire decoder.
 -/
 namespace Macaulean.M2
 open Lean Elab Command Meta
@@ -24,6 +24,8 @@ def valueExpr : Value → Expr
   | .null => mkConst ``Value.null
   | .list xs => mkApp (mkConst ``Value.list) (valuesExpr xs)
   | .sequence xs => mkApp (mkConst ``Value.sequence) (valuesExpr xs)
+  | .closure id => mkApp (mkConst ``Value.closure) (toExpr id)
+  | .symbol name cell => mkApp2 (mkConst ``Value.symbol) (toExpr name) (toExpr cell)
 
 def valuesExpr : List Value → Expr
   | [] => mkApp (mkConst ``List.nil [0]) (mkConst ``Value)
