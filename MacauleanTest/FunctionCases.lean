@@ -148,10 +148,22 @@ def errors : List (String × Error) := [
   ("(counter=0;maker=()->(counter=counter+1;x->x);maker() (counter=counter+1);counter)", .noMethod "SPACE" ["Sequence","ZZ"])
 ]
 
+/-- Malformed syntax/binders, rejected by native M2 as well as this interpreter. -/
 def invalidSyntax : List String := [
   "x ->", "-> x", "(x,x)->x", "((x,y))->x", "(1)->1", "1->1",
-  "{x,x}->x", "(x,)->x", "(,x)->x", "local", "local 7", "local (x)",
+  "{x,x}->x", "(x,)->x", "(,x)->x", "local 7", "local (x)",
   "x :=", "1 := 7", "(x,1) := (2,3)", "(x,1) = (2,3)", "return (1+)",
-  "f(1,2", "(x)->(x+", "f = (x,y) -> (local; x)"
+  "f(1,2", "(x)->(x+"
 ]
+
+/-- Valid native keyword quotations outside the identifier-binding fragment.
+These are NOT malformed native M2 and are tested separately. In particular,
+`local;` quotes `;` rather than declaring an anonymous variable, and bare `local`
+quotes the EOF token. A function containing such a quote can be defined even if
+calling it will fail. Keep these rejected by this frontend without claiming
+native rejection; see FunctionLocalReference for independent native assertions. -/
+def unsupportedKeywordQuotes : List String := [
+  "local", "f = (x,y) -> (local; x)", "local;", "(local;)", "local if", "local +"
+]
+
 end Macaulean.M2.FunctionCases
