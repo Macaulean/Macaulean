@@ -10,13 +10,12 @@ inductive Value where
   | sequence (elements : List Value)
   deriving Repr, Inhabited
 
--- Lean's DecidableEq deriving handler does not handle nested inductives.
--- These mutually structural decisions are kernel-reducible, not native_decide.
+-- Nested inductives require explicit equality decisions. All recursive calls
+-- descend through constructors; no native decision procedure is trusted.
 mutual
 
 def Value.decEq (a b : Value) : Decidable (a = b) := by
   cases a <;> cases b
-  all_goals first | exact isFalse (by intro h; cases h) | skip
   case zz.zz n m => exact decidable_of_iff (n = m) (by simp only [Value.zz.injEq])
   case qq.qq p q => exact decidable_of_iff (p = q) (by simp only [Value.qq.injEq])
   case bool.bool p q => exact decidable_of_iff (p = q) (by simp only [Value.bool.injEq])
@@ -27,6 +26,8 @@ def Value.decEq (a b : Value) : Decidable (a = b) := by
   case sequence.sequence xs ys =>
     haveI := Value.listDecEq xs ys
     exact decidable_of_iff (xs = ys) (by simp only [Value.sequence.injEq])
+  all_goals exact isFalse (by intro h; cases h)
+termination_by structural a
 
 def Value.listDecEq (xs ys : List Value) : Decidable (xs = ys) := by
   cases xs with
@@ -39,6 +40,7 @@ def Value.listDecEq (xs ys : List Value) : Decidable (xs = ys) := by
       haveI := Value.decEq a b
       haveI := Value.listDecEq xs ys
       exact decidable_of_iff (a = b ∧ xs = ys) (by simp only [List.cons.injEq])
+termination_by structural xs
 
 end
 

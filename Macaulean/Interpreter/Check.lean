@@ -1,13 +1,14 @@
 import Lean
 import Macaulean.Interpreter.Run
+import Macaulean.Interpreter.Wire
 import Macaulean.Macaulay2
 
 /-!
 # Differential checking and kernel certificates
 
-`#m2_eval` runs the pure interpreter. `#m2_check` additionally compares a live M2
-result and constructs a kernel-checked equality about `run`. Reification of
-nested collections is structural and introduces no axioms or native shortcuts.
+The native oracle sends typed data, not source for the M2 parser to reinterpret.
+`#m2_check` compares the result, then generates a kernel-checked equality about
+`run`. Structural reification supports arbitrary nested immutable collections.
 -/
 namespace Macaulean.M2
 open Lean Elab Command Meta
@@ -51,7 +52,7 @@ inductive M2Reply where
   | ok (v : Value)
   deriving DecidableEq
 
-/-- Legacy scalar wire format, retained for callers using `evalValue`. -/
+/-- Legacy scalar transport, retained for callers of `evalValue`. -/
 def M2Reply.ofStrings : List String → Except String M2Reply
   | ["error", _, _] => .ok .error
   | ["ok", "ZZ", s] =>
@@ -71,14 +72,21 @@ def M2Reply.ofStrings : List String → Except String M2Reply
   | ["ok", cls, s] => .error s!"Macaulay2 returned {s} of class {cls}, which is not supported"
   | r => .error s!"unexpected reply from Macaulay2: {r}"
 
+/-- Decode typed values without invoking `run`, `parse`, or the DSL reader. -/
+def M2Reply.ofWire : List String → Except String M2Reply
+  | ["error"] => .ok .error
+  | "ok" :: tokens => M2Reply.ok <$> Value.ofWire tokens
+  | _ => .error "malformed typed M2 reply"
+
 def M2Reply.toM2String : M2Reply → String
   | .error => "error" | .ok v => v.toM2String
 
 def queryM2 (src : String) : IO (Except String M2Reply) := do
   let m2 ← globalM2Server
-  let reply : List String ← m2.sendRequest "evalValue" [src]
-  return M2Reply.ofStrings reply
+  let reply : List String ← m2.sendRequest "evalValueTree" [src]
+  return M2Reply.ofWire reply
 
+/-- Error/error remains a weaker legacy check; positive test suites require two successes. -/
 def agrees : Outcome → M2Reply → Bool
   | .ok v, .ok w => v == w
   | .error _, .error => true | .parseError _, .error => true
