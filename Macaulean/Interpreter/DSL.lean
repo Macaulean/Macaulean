@@ -78,7 +78,12 @@ def reader : Lean.Parser.Parser where
             let stop : String.Pos.Raw := ⟨base + tokens.stop⟩
             Syntax.atom (sourceInfo c.toInputContext start stop) ";"
           else Syntax.node .none nullKind #[]
-        let input := Syntax.node .none `Macaulean.M2.DSL.input #[body, silent]
+        -- ppCategory sanitizes identifier leaves. Keep an independent original
+        -- range on the input node so its significant whitespace still survives.
+        let inputStop := if tokens.silent then tokens.stop
+          else (tokens.located[tree.bounds.2]!).span.stop
+        let info := sourceInfo c.toInputContext ⟨base⟩ ⟨base + inputStop⟩
+        let input := Syntax.node info `Macaulean.M2.DSL.input #[body, silent]
         Lean.Parser.whitespace c ((s.setPos ⟨base + tokens.stop⟩).pushSyntax input)
 
 /-- Keep explicit M2 parentheses; Lean's term precedence is not applicable here. -/
