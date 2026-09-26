@@ -1,9 +1,4 @@
-/-!
-# Immutable runtime values
-
-Lists and sequences remain distinct, including when nested or empty. The nested
-inductive representation contains no references, identities, or mutable cells.
--/
+/-! # Immutable runtime values and structurally recursive equality -/
 namespace Macaulean.M2
 
 inductive Value where
@@ -13,7 +8,41 @@ inductive Value where
   | null
   | list (elements : List Value)
   | sequence (elements : List Value)
-  deriving DecidableEq, Repr, Inhabited
+  deriving Repr, Inhabited
+
+-- Lean's DecidableEq deriving handler does not handle nested inductives.
+-- These mutually structural decisions are kernel-reducible, not native_decide.
+mutual
+
+def Value.decEq (a b : Value) : Decidable (a = b) := by
+  cases a <;> cases b
+  all_goals first | exact isFalse (by intro h; cases h) | skip
+  case zz.zz n m => exact decidable_of_iff (n = m) (by simp only [Value.zz.injEq])
+  case qq.qq p q => exact decidable_of_iff (p = q) (by simp only [Value.qq.injEq])
+  case bool.bool p q => exact decidable_of_iff (p = q) (by simp only [Value.bool.injEq])
+  case null.null => exact isTrue rfl
+  case list.list xs ys =>
+    haveI := Value.listDecEq xs ys
+    exact decidable_of_iff (xs = ys) (by simp only [Value.list.injEq])
+  case sequence.sequence xs ys =>
+    haveI := Value.listDecEq xs ys
+    exact decidable_of_iff (xs = ys) (by simp only [Value.sequence.injEq])
+
+def Value.listDecEq (xs ys : List Value) : Decidable (xs = ys) := by
+  cases xs with
+  | nil => cases ys with
+    | nil => exact isTrue rfl
+    | cons b ys => exact isFalse (by intro h; cases h)
+  | cons a xs => cases ys with
+    | nil => exact isFalse (by intro h; cases h)
+    | cons b ys =>
+      haveI := Value.decEq a b
+      haveI := Value.listDecEq xs ys
+      exact decidable_of_iff (a = b ∧ xs = ys) (by simp only [List.cons.injEq])
+
+end
+
+instance : DecidableEq Value := Value.decEq
 
 inductive Error where
   | divByZero
@@ -70,9 +99,7 @@ def toM2String : Error → String
   | immutableCollection cls => s!"cannot modify immutable {cls}"
 
 instance : ToString Error := ⟨toM2String⟩
-
 end Error
 
 deriving instance DecidableEq for Except
-
 end Macaulean.M2
