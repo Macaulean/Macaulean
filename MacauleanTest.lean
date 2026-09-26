@@ -9,3 +9,7 @@ import MacauleanTest.InterpreterM2
 import MacauleanTest.InterpreterDSL
 import MacauleanTest.InterpreterDSLImport
 import MacauleanTest.InterpreterDSLPrinter
+import MacauleanTest.InterpreterBranching
+import MacauleanTest.InterpreterBranchingDSL
+import MacauleanTest.InterpreterBranchingImport
+import MacauleanTest.InterpreterBranchingM2
