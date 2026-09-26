@@ -90,9 +90,14 @@ values or the operand collections. Mixed List/Sequence concatenation is rejected
 
 `#a` returns the number of elements. `a#i` returns an element, with zero-based
 nonnegative indices and negative indices counting backward from the end.
-`a#?i` reports whether the index is valid. Both Lists and Sequences use the same
-bounds; an index must be a ZZ value, not an integral-valued QQ. Invalid access
-reports an error, while an integer existence check returns false.
+An access index must be a ZZ value, not an integral-valued QQ. Invalid access
+reports an error.
+
+`a#?i` is an existence query: for a List or Sequence it returns false both for an
+out-of-bounds integer and for a non-ZZ index, including Booleans, rationals, null,
+and collections. `null#?i` also returns false. The query still evaluates both
+operands, so an error in computing the index is not suppressed. Lists and
+Sequences use the same positive and negative index bounds.
 
 Prefix `#` binds below infix `#` and powers. For example, `#a#0` means `#(a#0)`.
 All three infix operators `^`, `#`, and `#?` have the same precedence and associate
