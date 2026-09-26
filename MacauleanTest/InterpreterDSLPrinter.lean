@@ -27,7 +27,8 @@ run_cmd do
 
 -- A source-less synthetic node must not silently get a made-up fuel budget.
 run_cmd do
-  let body := Syntax.node .none `Macaulean.M2.DSL.num #[mkNumLit "3"]
+  let numeral := Syntax.node .none numLitKind #[Syntax.atom .none "3"]
+  let body := Syntax.node .none `Macaulean.M2.DSL.num #[numeral]
   let input := Syntax.node .none `Macaulean.M2.DSL.input #[body, mkNullNode #[]]
   let stx := Syntax.node .none `Macaulean.M2.DSL.inputSyntax #[input]
   match Macaulean.M2.DSL.lowerInput ⟨stx⟩ with
