@@ -79,6 +79,8 @@ def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   | .index, .list xs, zz i | .index, .sequence xs, zz i => indexValue xs i
   | .hasIndex, .list xs, zz i | .hasIndex, .sequence xs, zz i =>
     .ok (.bool (normalizedIndex xs.length i).isSome)
+  | .hasIndex, .list _, _ | .hasIndex, .sequence _, _ | .hasIndex, .null, _ =>
+    .ok (.bool false)
   | .concat, .list xs, .list ys => .ok (.list (xs ++ ys))
   | .concat, .sequence xs, .sequence ys => .ok (.sequence (xs ++ ys))
   | .eq, .list xs, .list ys => .bool <$> Value.equalValue (.list xs) (.list ys)

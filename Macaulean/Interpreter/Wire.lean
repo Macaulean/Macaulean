@@ -3,10 +3,9 @@ import Macaulean.Interpreter.Value
 /-!
 # Typed value transport for independent differential checks
 
-This format is deliberately NOT M2 source: a preorder stream of class tags,
-lengths, and scalar payloads preserves all nested classes. Decoding invokes
-neither the interpreter nor either frontend parser. Malformed/truncated/extra
-payloads and unsupported classes fail explicitly.
+A preorder stream of class tags, lengths, and scalar payloads preserves nested
+classes without invoking the M2 grammar. Decimal parsing uses structural list
+recursion, so both executable tests and kernel reduction check the same decoder.
 -/
 namespace Macaulean.M2
 namespace Value
@@ -27,6 +26,23 @@ def elementsWire : List Value → List String
 
 end
 
+private def decimalDigits : List Char → Nat → Option Nat
+  | [], n => some n
+  | c :: cs, n =>
+    if c.isDigit then decimalDigits cs (10 * n + (c.toNat - '0'.toNat))
+    else none
+
+private def decimalNatChars : List Char → Option Nat
+  | [] => none
+  | cs => decimalDigits cs 0
+
+private def decimalNat (s : String) : Option Nat := decimalNatChars s.toList
+
+private def decimalInt (s : String) : Option Int :=
+  match s.toList with
+  | '-' :: cs => (fun n => -(Int.ofNat n)) <$> decimalNatChars cs
+  | cs => Int.ofNat <$> decimalNatChars cs
+
 mutual
 
 def readWire : Nat → List String → Except String (Value × List String)
@@ -34,10 +50,10 @@ def readWire : Nat → List String → Except String (Value × List String)
   | fuel + 1, tokens =>
     match tokens with
     | "ZZ" :: n :: rest =>
-      match n.toInt? with
+      match decimalInt n with
       | some n => .ok (.zz n, rest) | none => .error "invalid wire integer"
     | "QQ" :: n :: d :: rest =>
-      match n.toInt?, d.toNat? with
+      match decimalInt n, decimalNat d with
       | some n, some d =>
         if d = 0 then .error "zero wire denominator"
         else .ok (.qq (mkRat n d), rest)
@@ -46,11 +62,11 @@ def readWire : Nat → List String → Except String (Value × List String)
     | "Boolean" :: "false" :: rest => .ok (.bool false, rest)
     | "Nothing" :: rest => .ok (.null, rest)
     | "List" :: n :: rest => do
-      let some n := n.toNat? | .error "invalid wire list length"
+      let some n := decimalNat n | .error "invalid wire list length"
       let (xs, rest) ← readElements fuel n rest
       return (.list xs, rest)
     | "Sequence" :: n :: rest => do
-      let some n := n.toNat? | .error "invalid wire sequence length"
+      let some n := decimalNat n | .error "invalid wire sequence length"
       let (xs, rest) ← readElements fuel n rest
       return (.sequence xs, rest)
     | _ => .error "unsupported or truncated value wire data"

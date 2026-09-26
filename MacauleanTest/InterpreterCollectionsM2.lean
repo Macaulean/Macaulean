@@ -21,6 +21,7 @@ run_cmd do
         throwError "native discrepancy for {repr source}: {repr native}; expected {repr expected}"
     | .ok .error => throwError "native M2 rejected positive case {repr source}"
     | .error message => throwError "native value decoding failed for {repr source}: {message}"
+  logInfo m!"COLLECTION_SUCCESSES: {CollectionCases.successes.length} independently checked typed values"
 
 run_cmd do
   for (source, expected) in CollectionCases.errors do
@@ -28,6 +29,7 @@ run_cmd do
     let reply ← queryM2 source
     unless reply == .ok .error do
       throwError "native M2 unexpectedly accepted error control {repr source}"
+  logInfo m!"COLLECTION_ERRORS: {CollectionCases.errors.length} independent runtime-error controls"
 
 -- A grid checks range endpoint arithmetic and both positive/negative indexing.
 run_cmd do
@@ -40,15 +42,16 @@ run_cmd do
         unless native == expected do throwError "range mismatch for {source}"
   for container in ["{10,20,30}", "(10,20,30)", "{}", "()"] do
     for i in ([-5, -3, -2, -1, 0, 1, 2, 3, 5] : List Int) do
-      let exists := s!"{container}#?({i})"
-      let .ok expected := run exists | throwError "existence check rejected"
-      let .ok (.ok native) ← queryM2 exists | throwError "native existence check failed"
-      unless native == expected do throwError "index-existence mismatch: {exists}"
+      let sourceExists := s!"{container}#?({i})"
+      let .ok expected := run sourceExists | throwError "existence check rejected"
+      let .ok (.ok native) ← queryM2 sourceExists | throwError "native existence check failed"
+      unless native == expected do throwError "index-existence mismatch: {sourceExists}"
       if expected == .bool true then
         let source := s!"{container}#({i})"
         let .ok expected := run source | throwError "in-bounds index rejected"
         let .ok (.ok native) ← queryM2 source | throwError "native in-bounds index failed"
         unless native == expected do throwError "index mismatch: {source}"
+  logInfo "COLLECTION_GRIDS: 50 ranges, 36 index-existence queries, 12 successful accesses"
 
 -- Kernel-check the reified collection result through the real certificate path.
 run_cmd do
@@ -79,6 +82,7 @@ run_cmd do
     | .ok (.ok (.bool true)) => pure ()
     | .ok reply => throwError "native parser shape disagrees for {repr source}: {reply.toM2String}"
     | .error message => throwError "native parser probe failed: {message}"
+  logInfo "COLLECTION_PARSE_SHAPES: 6 native structural checks"
 
 -- The transport retains types that source printers sometimes omit.
 run_cmd do

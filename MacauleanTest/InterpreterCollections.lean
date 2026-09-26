@@ -59,7 +59,7 @@ private def malformed : List (List String) := [
   ["unsupported", "MutableList"], ["Sequence", "1", "List", "1"]
 ]
 
-example : malformed.all (fun w => (Value.ofWire w).isError) = true := by decide +kernel
+example : malformed.all (fun w => !(Value.ofWire w).isOk) = true := by decide +kernel
 
 set_option maxRecDepth 100000 in
 example : successes.all (fun (_, v) => Value.ofWire v.toWire == .ok v) = true := by decide +kernel

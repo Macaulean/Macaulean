@@ -166,7 +166,7 @@ def parseDelimited : Nat → Nat → Bool → Bool → Nat → Cursor → TreeRe
         let t := if braces then Tree.listBody left tail.index body else Tree.paren left tail.index body
         parseTreeLoop fuel minBP obey t ⟨rest, tail.index + 1⟩
       else .error "mismatched collection or block delimiter"
-    | _ => .error (if braces then "expected '}'" else "expected ')'")
+    | rest => .error ((if braces then "expected '}' but found " else "expected ')' but found ") ++ describe rest)
 
 def parseTreePrefix : Nat → Nat → Bool → Nat → UnOp → Cursor → TreeResult
   | 0, _, _, _, _, _ => .error "parser ran out of fuel"
