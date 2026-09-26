@@ -3,12 +3,10 @@ import Macaulean.Interpreter.Session
 /-!
 # Control-flow laws
 
-These are general evaluator equalities, not tests of a particular source string.
-In particular, the ignored expression is entirely arbitrary: it may assign,
-raise an error, or contain another conditional. The environment after evaluating
-the condition or first operand is the one passed to the selected expression.
+The first laws describe the loop-free reference `evalTerm`, retained for proofs
+about that fragment. Session laws use the lexical runtime actually run by the
+worksheet. General resolved-runtime laws are in `Functions.lean`.
 -/
-
 namespace Macaulean.M2
 namespace ControlFlow
 
@@ -42,7 +40,6 @@ theorem ifThen_condition_error (c yes : Term) (env : Env) (err : Error)
     evalTerm (.ifThen c yes) env = .error err := by
   simp [evalTerm, h, bind, Except.bind]
 
-/-- The skipped right operand cannot affect the result or the environment. -/
 theorem logic_short_circuit (op : LogicOp) (a skipped : Term) (env env' : Env)
     (h : evalTerm a env = .ok (.bool op.shortCircuit, env')) :
     evalTerm (.logic op a skipped) env = .ok (.bool op.shortCircuit, env') := by
@@ -82,14 +79,15 @@ theorem block_trailing_semicolon (a : Term) (env env' : Env) (v : Value)
     evalTerm (.seq a .empty) env = .ok (.null, env') := by
   simp [evalTerm, h, bind, Except.bind]
 
-/-- Null output suppression does not discard successful changes to variables. -/
-theorem session_null_env (s : Session) (t : Term) (env' : Env)
-    (h : evalTerm t s.env = .ok (.null, env')) :
-    (s.step t).session.env = env' := by
-  simp [Session.step, h]
+/-- Successful null inputs commit the actual runtime environment. -/
+theorem session_null_env (s : Session) (t : Term) (result : Runtime.InputResult)
+    (h : s.evaluate t = .ok result) (hv : result.value = .null) :
+    (s.step t).session.env = result.state.env := by
+  simp [Session.step, h, hv]
 
+/-- Failures preserve the previous global bindings; the heap is preserved as well. -/
 theorem session_error_env (s : Session) (t : Term) (err : Error)
-    (h : evalTerm t s.env = .error err) :
+    (h : s.evaluate t = .error err) :
     (s.step t).session.env = s.env := by
   simp [Session.step, h]
 

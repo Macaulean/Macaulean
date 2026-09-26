@@ -1,6 +1,5 @@
-/-! # Immutable runtime values and structurally recursive equality -/
+/-! # Immutable runtime values; function handles refer to a pure session store. -/
 namespace Macaulean.M2
-
 inductive Value where
   | zz (n : Int)
   | qq (q : Rat)
@@ -8,12 +7,10 @@ inductive Value where
   | null
   | list (elements : List Value)
   | sequence (elements : List Value)
+  | closure (id : Nat)
+  | symbol (name : String) (cell : Nat)
   deriving Repr, Inhabited
-
--- Nested inductives require explicit equality decisions. All recursive calls
--- descend through constructors; no native decision procedure is trusted.
 mutual
-
 def Value.decEq (a b : Value) : Decidable (a = b) := by
   cases a <;> cases b
   case zz.zz n m => exact decidable_of_iff (n = m) (by simp only [Value.zz.injEq])
@@ -26,6 +23,9 @@ def Value.decEq (a b : Value) : Decidable (a = b) := by
   case sequence.sequence xs ys =>
     haveI := Value.listDecEq xs ys
     exact decidable_of_iff (xs = ys) (by simp only [Value.sequence.injEq])
+  case closure.closure i j => exact decidable_of_iff (i = j) (by simp only [Value.closure.injEq])
+  case symbol.symbol x i y j =>
+    exact decidable_of_iff (x = y ∧ i = j) (by simp only [Value.symbol.injEq])
   all_goals exact isFalse (by intro h; cases h)
 termination_by structural a
 
@@ -41,9 +41,7 @@ def Value.listDecEq (xs ys : List Value) : Decidable (xs = ys) := by
       haveI := Value.listDecEq xs ys
       exact decidable_of_iff (a = b ∧ xs = ys) (by simp only [List.cons.injEq])
 termination_by structural xs
-
 end
-
 instance : DecidableEq Value := Value.decEq
 
 inductive Error where
@@ -54,54 +52,48 @@ inductive Error where
   | conditionNotBoolean (actualClass : String)
   | indexOutOfBounds (index : Int) (length : Nat)
   | immutableCollection (actualClass : String)
+  | arity (expected actual : Nat)
+  | assignmentArity (expected actual : Nat)
+  | invalidReference
+  | fuelExhausted
+  | needsRuntime
   deriving DecidableEq, Repr, Inhabited
-
 namespace Value
-
 def className : Value → String
   | zz _ => "ZZ" | qq _ => "QQ" | bool _ => "Boolean" | null => "Nothing"
   | list _ => "List" | sequence _ => "Sequence"
-
+  | closure _ => "FunctionClosure" | symbol .. => "Symbol"
 mutual
-
 def toM2String : Value → String
-  | zz n => toString n
-  | qq q => s!"{q.num}/{q.den}"
-  | bool b => toString b
-  | null => "null"
+  | zz n => toString n | qq q => s!"{q.num}/{q.den}" | bool b => toString b | null => "null"
   | list xs => "{" ++ ", ".intercalate (strings xs) ++ "}"
   | sequence [] => "()"
   | sequence [v] => s!"1:({toM2String v})"
   | sequence xs => "(" ++ ", ".intercalate (strings xs) ++ ")"
-
+  | closure i => s!"<function {i}>"
+  | symbol name _ => name
 def strings : List Value → List String
-  | [] => []
-  | v :: vs => toM2String v :: strings vs
-
+  | [] => [] | v :: vs => toM2String v :: strings vs
 end
-
 instance : ToString Value := ⟨toM2String⟩
-
 def elements? : Value → Option (List Value)
-  | list xs | sequence xs => some xs
-  | _ => none
-
+  | list xs | sequence xs => some xs | _ => none
 end Value
-
 namespace Error
-
 def toM2String : Error → String
   | divByZero => "division by zero"
   | unboundVar x => s!"unbound variable '{x}'"
   | protectedSymbol x => s!"attempted to modify a protected symbol '{x}'"
-  | noMethod op cs =>
-    s!"no method for operator {op} applied to objects of class {", ".intercalate cs}"
+  | noMethod op cs => s!"no method for operator {op} applied to objects of class {", ".intercalate cs}"
   | conditionNotBoolean cls => s!"expected a Boolean condition, got {cls}"
   | indexOutOfBounds i n => s!"index {i} out of bounds for collection of length {n}"
   | immutableCollection cls => s!"cannot modify immutable {cls}"
-
+  | arity n m => s!"expected {n} arguments, got {m}"
+  | assignmentArity n m => s!"expected {n} assignment values, got {m}"
+  | invalidReference => "invalid lexical cell or function handle"
+  | fuelExhausted => "M2 evaluation depth exhausted"
+  | needsRuntime => "function syntax requires the lexical runtime"
 instance : ToString Error := ⟨toM2String⟩
 end Error
-
 deriving instance DecidableEq for Except
 end Macaulean.M2
