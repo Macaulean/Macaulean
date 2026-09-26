@@ -3,29 +3,36 @@ import Macaulean.Interpreter.Run
 import Macaulean.Macaulay2
 
 /-!
-# Checking the interpreter against Macaulay2
+# Differential checking and kernel certificates
 
-* `#m2_eval "src"` runs the Lean interpreter and prints the outcome.
-* `#m2_check "src"` (or `#m2_check name : "src"`) also sends `src` to a live
-  Macaulay2 process, then asks the kernel to prove the theorem
-  `run "src" = o`, where `o` is the outcome Macaulay2 reported.  It fails if
-  the interpreter and Macaulay2 disagree, so each use is also a differential
-  test of the interpreter.
+`#m2_eval` runs the pure interpreter. `#m2_check` additionally compares a live M2
+result and constructs a kernel-checked equality about `run`. Reification of
+nested collections is structural and introduces no axioms or native shortcuts.
 -/
-
 namespace Macaulean.M2
-
 open Lean Elab Command Meta
 
 deriving instance ToExpr for Error
 
+mutual
+
+def valueExpr : Value → Expr
+  | .zz n => mkApp (mkConst ``Value.zz) (toExpr n)
+  | .qq q => mkApp (mkConst ``Value.qq) (mkApp2 (mkConst ``mkRat) (toExpr q.num) (toExpr q.den))
+  | .bool b => mkApp (mkConst ``Value.bool) (toExpr b)
+  | .null => mkConst ``Value.null
+  | .list xs => mkApp (mkConst ``Value.list) (valuesExpr xs)
+  | .sequence xs => mkApp (mkConst ``Value.sequence) (valuesExpr xs)
+
+def valuesExpr : List Value → Expr
+  | [] => mkApp (mkConst ``List.nil [0]) (mkConst ``Value)
+  | v :: vs => mkApp3 (mkConst ``List.cons [0]) (mkConst ``Value) (valueExpr v) (valuesExpr vs)
+
+end
+
 instance : ToExpr Value where
   toTypeExpr := mkConst ``Value
-  toExpr
-    | .zz n => mkApp (mkConst ``Value.zz) (toExpr n)
-    | .qq q => mkApp (mkConst ``Value.qq) (mkApp2 (mkConst ``mkRat) (toExpr q.num) (toExpr q.den))
-    | .bool b => mkApp (mkConst ``Value.bool) (toExpr b)
-    | .null => mkConst ``Value.null
+  toExpr := valueExpr
 
 instance : ToExpr Outcome where
   toTypeExpr := mkConst ``Outcome
@@ -39,24 +46,23 @@ def Outcome.toM2String : Outcome → String
   | .error e => s!"error: {e}"
   | .ok v => v.toM2String
 
-/-- What Macaulay2 reported. -/
 inductive M2Reply where
   | error
   | ok (v : Value)
   deriving DecidableEq
 
-/-- Convert Macaulay2's reply `{status, class, toExternalString}` into a value. -/
+/-- Legacy scalar wire format, retained for callers using `evalValue`. -/
 def M2Reply.ofStrings : List String → Except String M2Reply
   | ["error", _, _] => .ok .error
   | ["ok", "ZZ", s] =>
     match s.toInt? with
-    | some n => .ok (.ok (.zz n))
-    | none => .error s!"cannot parse ZZ value {s}"
+    | some n => .ok (.ok (.zz n)) | none => .error s!"cannot parse ZZ value {s}"
   | ["ok", "QQ", s] =>
     match s.splitOn "/" with
     | [n, d] =>
       match n.toInt?, d.toNat? with
-      | some n, some d => .ok (.ok (.qq (mkRat n d)))
+      | some n, some d => if d = 0 then .error "zero rational denominator"
+          else .ok (.ok (.qq (mkRat n d)))
       | _, _ => .error s!"cannot parse QQ value {s}"
     | _ => .error s!"cannot parse QQ value {s}"
   | ["ok", "Boolean", "true"] => .ok (.ok (.bool true))
@@ -66,23 +72,18 @@ def M2Reply.ofStrings : List String → Except String M2Reply
   | r => .error s!"unexpected reply from Macaulay2: {r}"
 
 def M2Reply.toM2String : M2Reply → String
-  | .error => "error"
-  | .ok v => v.toM2String
+  | .error => "error" | .ok v => v.toM2String
 
-/-- Ask a live Macaulay2 process to evaluate `src`. -/
 def queryM2 (src : String) : IO (Except String M2Reply) := do
   let m2 ← globalM2Server
   let reply : List String ← m2.sendRequest "evalValue" [src]
   return M2Reply.ofStrings reply
 
-/-- Does the interpreter's outcome agree with Macaulay2's? -/
 def agrees : Outcome → M2Reply → Bool
   | .ok v, .ok w => v == w
-  | .error _, .error => true
-  | .parseError _, .error => true
+  | .error _, .error => true | .parseError _, .error => true
   | _, _ => false
 
-/-- Add the theorem `name : run src = o`, checked by kernel evaluation. -/
 def addRunTheorem (name : Name) (src : String) (o : Outcome) (doc : String) : CommandElabM Unit :=
   liftTermElabM do
     let type ← mkEq (mkApp (mkConst ``run) (toExpr src)) (toExpr o)
@@ -92,7 +93,6 @@ def addRunTheorem (name : Name) (src : String) (o : Outcome) (doc : String) : Co
     addDecl <| .thmDecl { name, levelParams := [], type, value := proof }
     addDocStringCore name doc
 
-/-- `m2_check_1`, `m2_check_2`, ... in the current namespace, whichever is unused first. -/
 def freshName : CommandElabM Name := do
   let ns ← getCurrNamespace
   let env ← getEnv
@@ -104,23 +104,19 @@ def freshName : CommandElabM Name := do
   return go 100000 1
 
 syntax (name := m2Eval) "#m2_eval " str : command
-
 @[command_elab m2Eval] def elabM2Eval : CommandElab
   | `(#m2_eval $s:str) => logInfo (run s.getString).toM2String
   | _ => throwUnsupportedSyntax
 
 syntax (name := m2Check) "#m2_check " (ident " : ")? str : command
-
 @[command_elab m2Check] def elabM2Check : CommandElab
   | `(#m2_check $[$id? :]? $s:str) => do
     let src := s.getString
     let o := run src
     let reply : M2Reply ← match ← queryM2 src with
-      | .ok r => pure r
-      | .error msg => throwError msg
+      | .ok r => pure r | .error msg => throwError msg
     unless agrees o reply do
-      throwError m!"interpreter and Macaulay2 disagree on {repr src}:\n  \
-        interpreter: {o.toM2String}\n  Macaulay2:   {reply.toM2String}"
+      throwError m!"interpreter and Macaulay2 disagree on {repr src}:\n  interpreter: {o.toM2String}\n  Macaulay2: {reply.toM2String}"
     let name : Name ← match id? with
       | some id => pure ((← getCurrNamespace) ++ id.getId)
       | none => freshName

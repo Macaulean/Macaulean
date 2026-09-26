@@ -5,18 +5,8 @@ import Macaulean.Interpreter.Session
 /-!
 # A scoped, top-level Macaulay2 language
 
-```
-import Macaulean.Interpreter.DSL
-open M2
-
-x = -7;
-if x < 0 then (x = -x; x) else x
-```
-
-`m2` is a real syntax category. Its reader consumes one input and produces
-structured Lean syntax with original UTF-8 ranges. `open M2` enables the scoped
-command bridge. Pure evaluation uses immutable, non-exported session state in
-Lean's environment, so command snapshots are worksheet checkpoints.
+`open M2` enables bare M2 commands. The shared reader builds structured syntax
+with original UTF-8 ranges. All evaluation and worksheet state are pure Lean.
 -/
 
 declare_syntax_cat m2
@@ -24,8 +14,7 @@ declare_syntax_cat m2
 namespace Macaulean.M2.DSL
 open Lean
 
-private def sourceInfo (c : Lean.Parser.InputContext) (start stop : String.Pos.Raw) :
-    SourceInfo :=
+private def sourceInfo (c : Lean.Parser.InputContext) (start stop : String.Pos.Raw) : SourceInfo :=
   .original (c.substring start start) start (c.substring stop stop) stop
 
 private def tokenSyntax (c : Lean.Parser.InputContext) (base : Nat)
@@ -35,7 +24,7 @@ private def tokenSyntax (c : Lean.Parser.InputContext) (base : Nat)
   let stop : String.Pos.Raw := ⟨base + span.stop⟩
   .atom (sourceInfo c start stop) (c.extract start stop)
 
-/-- Every construct and keyword retains its own original source location. -/
+/-- Delimiters, commas, and omitted elements retain independent source locations. -/
 def treeSyntax (c : Lean.Parser.InputContext) (base : Nat)
     (tokens : Array Input.LocatedToken) : Parser.Tree → Syntax
   | .num i _ => .node .none `Macaulean.M2.DSL.num
@@ -48,6 +37,17 @@ def treeSyntax (c : Lean.Parser.InputContext) (base : Nat)
       #[.ident (sourceInfo c start stop) (c.substring start stop) (Name.mkSimple x) []]
   | .paren i j a => .node .none `Macaulean.M2.DSL.paren
       #[tokenSyntax c base tokens i, treeSyntax c base tokens a, tokenSyntax c base tokens j]
+  | .listBody i j a => .node .none `Macaulean.M2.DSL.listBody
+      #[tokenSyntax c base tokens i, treeSyntax c base tokens a, tokenSyntax c base tokens j]
+  | .emptyList i j => .node .none `Macaulean.M2.DSL.emptyList
+      #[tokenSyntax c base tokens i, tokenSyntax c base tokens j]
+  | .emptySequence i j => .node .none `Macaulean.M2.DSL.emptySequence
+      #[tokenSyntax c base tokens i, tokenSyntax c base tokens j]
+  | .missing i =>
+    let pos : String.Pos.Raw := ⟨base + (tokens[i]!).span.start⟩
+    .node (sourceInfo c pos pos) `Macaulean.M2.DSL.missing #[]
+  | .comma i a b => .node .none `Macaulean.M2.DSL.comma
+      #[treeSyntax c base tokens a, tokenSyntax c base tokens i, treeSyntax c base tokens b]
   | .unop i _ a => .node .none `Macaulean.M2.DSL.unop
       #[tokenSyntax c base tokens i, treeSyntax c base tokens a]
   | .binop i _ a b => .node .none `Macaulean.M2.DSL.binop
@@ -55,6 +55,8 @@ def treeSyntax (c : Lean.Parser.InputContext) (base : Nat)
   | .logic i _ a b => .node .none `Macaulean.M2.DSL.logic
       #[treeSyntax c base tokens a, tokenSyntax c base tokens i, treeSyntax c base tokens b]
   | .assign i _ a b => .node .none `Macaulean.M2.DSL.assign
+      #[treeSyntax c base tokens a, tokenSyntax c base tokens i, treeSyntax c base tokens b]
+  | .indexAssign i a b => .node .none `Macaulean.M2.DSL.indexAssign
       #[treeSyntax c base tokens a, tokenSyntax c base tokens i, treeSyntax c base tokens b]
   | .ifThen i j condition yes => .node .none `Macaulean.M2.DSL.ifThen
       #[tokenSyntax c base tokens i, treeSyntax c base tokens condition,
@@ -85,7 +87,6 @@ def reader : Lean.Parser.Parser where
             let stop : String.Pos.Raw := ⟨base + tokens.stop⟩
             Syntax.atom (sourceInfo c.toInputContext start stop) ";"
           else Syntax.node .none nullKind #[]
-        -- Retain an independent range through ppCategory's identifier sanitization.
         let inputStop := if tokens.silent then tokens.stop
           else (tokens.located[tree.bounds.2]!).span.stop
         let info := sourceInfo c.toInputContext ⟨base⟩ ⟨base + inputStop⟩
@@ -96,7 +97,6 @@ def reader : Lean.Parser.Parser where
 def readerParenthesizer : Lean.PrettyPrinter.Parenthesizer :=
   Lean.Syntax.MonadTraverser.goLeft
 
-/-- Preserve significant newlines and token separation, including `- -3`. -/
 @[combinator_formatter reader]
 def readerFormatter : Lean.PrettyPrinter.Formatter := do
   let stx ← Lean.Syntax.MonadTraverser.getCur
@@ -113,9 +113,12 @@ private def binOp? : String → Option BinOp
   | "/" => some .div | "//" => some .quot | "%" => some .rem | "^" => some .pow
   | "==" => some .eq | "!=" => some .ne | "<" => some .lt
   | "<=" => some .le | ">" => some .gt | ">=" => some .ge
+  | ".." => some .range | "..<" => some .rangeExclusive
+  | "#" => some .index | "#?" => some .hasIndex
+  | "|" => some .concat | ":" => some .repeat
   | _ => none
 
-/-- Direct structured lowering: no source printing or reparsing. -/
+/-- Lower structured syntax, never its printed source. -/
 def lowerTree : Nat → Syntax → Except String Term
   | 0, _ => .error "M2 syntax lowering ran out of fuel"
   | fuel + 1, stx => do
@@ -130,14 +133,22 @@ def lowerTree : Nat → Syntax → Except String Term
       | .ident _ raw _ _ => return .var raw.toString
       | _ => .error "invalid M2 identifier"
     | `Macaulean.M2.DSL.paren => lowerTree fuel stx[1]
+    | `Macaulean.M2.DSL.emptyList => return .listLit []
+    | `Macaulean.M2.DSL.emptySequence => return .sequence []
+    | `Macaulean.M2.DSL.missing => return .empty
+    | `Macaulean.M2.DSL.listBody =>
+      return Term.inBraces (stx[1].getKind == `Macaulean.M2.DSL.comma) (← lowerTree fuel stx[1])
+    | `Macaulean.M2.DSL.comma =>
+      return Term.comma (stx[0].getKind == `Macaulean.M2.DSL.comma)
+        (← lowerTree fuel stx[0]) (← lowerTree fuel stx[2])
     | `Macaulean.M2.DSL.unop =>
       let op ← match stx[0].getAtomVal with
-        | "-" => .ok UnOp.neg | "+" => .ok UnOp.pos | "not" => .ok UnOp.notOp
+        | "-" => .ok UnOp.neg | "+" => .ok UnOp.pos
+        | "not" => .ok UnOp.notOp | "#" => .ok UnOp.length
         | _ => .error "invalid M2 prefix operator"
       return .unop op (← lowerTree fuel stx[1])
     | `Macaulean.M2.DSL.binop =>
-      let some op := binOp? stx[1].getAtomVal
-        | .error "invalid M2 binary operator"
+      let some op := binOp? stx[1].getAtomVal | .error "invalid M2 binary operator"
       return .binop op (← lowerTree fuel stx[0]) (← lowerTree fuel stx[2])
     | `Macaulean.M2.DSL.logic =>
       let op ← match stx[1].getAtomVal with
@@ -147,35 +158,32 @@ def lowerTree : Nat → Syntax → Except String Term
     | `Macaulean.M2.DSL.ifThen =>
       return .ifThen (← lowerTree fuel stx[1]) (← lowerTree fuel stx[3])
     | `Macaulean.M2.DSL.ifElse =>
-      return .ifElse (← lowerTree fuel stx[1]) (← lowerTree fuel stx[3])
-        (← lowerTree fuel stx[5])
-    | `Macaulean.M2.DSL.seq =>
-      return .seq (← lowerTree fuel stx[0]) (← lowerTree fuel stx[2])
+      return .ifElse (← lowerTree fuel stx[1]) (← lowerTree fuel stx[3]) (← lowerTree fuel stx[5])
+    | `Macaulean.M2.DSL.seq => return .seq (← lowerTree fuel stx[0]) (← lowerTree fuel stx[2])
     | `Macaulean.M2.DSL.discard => return .seq (← lowerTree fuel stx[0]) .empty
     | `Macaulean.M2.DSL.assign =>
-      let .var name ← lowerTree fuel stx[0]
-        | .error "left side of '=' must be a variable"
+      let .var name ← lowerTree fuel stx[0] | .error "left side of '=' must be a variable"
       return .assign name (← lowerTree fuel stx[2])
+    | `Macaulean.M2.DSL.indexAssign =>
+      let .binop .index a i ← lowerTree fuel stx[0] | .error "expected an indexed collection"
+      return .indexAssign a i (← lowerTree fuel stx[2])
     | _ => .error s!"unsupported M2 syntax node {stx.getKind}"
 
 def lowerInput (stx : TSyntax `m2) : Except String (Term × Bool) := do
   let input := stx.raw[0]
-  if input.getKind != `Macaulean.M2.DSL.input then
-    .error "expected an M2 input"
+  if input.getKind != `Macaulean.M2.DSL.input then .error "expected an M2 input"
   else
     let body := input[0]
-    let some source := body.getSubstring? (withLeading := false) (withTrailing := false)
+    let some source := input.getSubstring? (withLeading := false) (withTrailing := false)
       | .error "M2 syntax has no original source range"
     let term ← lowerTree (source.toString.utf8ByteSize + 1) body
     return (term, input[1].getAtomVal == ";")
 
-initialize sessionExt : EnvExtension Session ←
-  registerEnvExtension (pure ({} : Session))
+initialize sessionExt : EnvExtension Session ← registerEnvExtension (pure ({} : Session))
 
 open Lean.Elab.Command
 
-def getSession : CommandElabM Session :=
-  return sessionExt.getState (← getEnv)
+def getSession : CommandElabM Session := return sessionExt.getState (← getEnv)
 
 def resetSession : CommandElabM Unit :=
   modifyEnv fun env => sessionExt.setState env ({} : Session)
@@ -193,8 +201,7 @@ open Lean Lean.Elab.Command
 def elabInput : CommandElab := fun stx => do
   let parsed : TSyntax `m2 := ⟨stx[0]⟩
   let (term, silent) ← match lowerInput parsed with
-    | .ok value => pure value
-    | .error error => throwErrorAt stx error
+    | .ok value => pure value | .error error => throwErrorAt stx error
   let state ← getSession
   let result := state.step term silent
   modifyEnv fun env => sessionExt.setState env result.session

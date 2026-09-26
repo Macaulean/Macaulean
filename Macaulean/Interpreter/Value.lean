@@ -1,16 +1,19 @@
 /-!
-# Runtime values of the Macaulay2 interpreter
--/
+# Immutable runtime values
 
+Lists and sequences remain distinct, including when nested or empty. The nested
+inductive representation contains no references, identities, or mutable cells.
+-/
 namespace Macaulean.M2
 
-/-- `ZZ` and `QQ` remain distinct even for integral-valued rationals. -/
 inductive Value where
   | zz (n : Int)
   | qq (q : Rat)
   | bool (b : Bool)
   | null
-  deriving DecidableEq, Inhabited
+  | list (elements : List Value)
+  | sequence (elements : List Value)
+  deriving DecidableEq, Repr, Inhabited
 
 inductive Error where
   | divByZero
@@ -18,27 +21,39 @@ inductive Error where
   | protectedSymbol (x : String)
   | noMethod (op : String) (classes : List String)
   | conditionNotBoolean (actualClass : String)
+  | indexOutOfBounds (index : Int) (length : Nat)
+  | immutableCollection (actualClass : String)
   deriving DecidableEq, Repr, Inhabited
 
 namespace Value
 
 def className : Value → String
   | zz _ => "ZZ" | qq _ => "QQ" | bool _ => "Boolean" | null => "Nothing"
+  | list _ => "List" | sequence _ => "Sequence"
+
+mutual
 
 def toM2String : Value → String
   | zz n => toString n
   | qq q => s!"{q.num}/{q.den}"
   | bool b => toString b
   | null => "null"
+  | list xs => "{" ++ ", ".intercalate (strings xs) ++ "}"
+  | sequence [] => "()"
+  | sequence [v] => s!"1:({toM2String v})"
+  | sequence xs => "(" ++ ", ".intercalate (strings xs) ++ ")"
+
+def strings : List Value → List String
+  | [] => []
+  | v :: vs => toM2String v :: strings vs
+
+end
 
 instance : ToString Value := ⟨toM2String⟩
 
-instance : Repr Value where
-  reprPrec
-    | zz n, p => Repr.addAppParen ("Value.zz " ++ reprArg n) p
-    | qq q, p => Repr.addAppParen ("Value.qq " ++ reprArg q) p
-    | bool b, p => Repr.addAppParen ("Value.bool " ++ reprArg b) p
-    | null, _ => "Value.null"
+def elements? : Value → Option (List Value)
+  | list xs | sequence xs => some xs
+  | _ => none
 
 end Value
 
@@ -51,6 +66,8 @@ def toM2String : Error → String
   | noMethod op cs =>
     s!"no method for operator {op} applied to objects of class {", ".intercalate cs}"
   | conditionNotBoolean cls => s!"expected a Boolean condition, got {cls}"
+  | indexOutOfBounds i n => s!"index {i} out of bounds for collection of length {n}"
+  | immutableCollection cls => s!"cannot modify immutable {cls}"
 
 instance : ToString Error := ⟨toM2String⟩
 
