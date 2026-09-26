@@ -340,7 +340,8 @@ run_cmd do
     throwError "rebinding mutated an old snapshot"
   let .ok mutation := Macaulean.M2.parse "snapshot#0=99" | throwError "parser failed"
   let refused := edited.session.step mutation
-  unless refused.outcome.isError && refused.session.env == edited.session.env do
+  unless refused.outcome == .error (.immutableCollection "List") &&
+      refused.session.env == edited.session.env do
     throwError "indexed assignment changed immutable state"
   for term in [Term.listLit [], Term.sequence []] do
     let result := old.step term
