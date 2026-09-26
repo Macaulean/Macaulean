@@ -15,17 +15,17 @@ namespace ControlFlow
 theorem ifElse_true (c yes no : Term) (env env' : Env)
     (h : evalTerm c env = .ok (.bool true, env')) :
     evalTerm (.ifElse c yes no) env = evalTerm yes env' := by
-  simp [evalTerm, h, bind, Except.bind, pure, Except.pure]
+  simp [evalTerm, h, bind, Except.bind]
 
 theorem ifElse_false (c yes no : Term) (env env' : Env)
     (h : evalTerm c env = .ok (.bool false, env')) :
     evalTerm (.ifElse c yes no) env = evalTerm no env' := by
-  simp [evalTerm, h, bind, Except.bind, pure, Except.pure]
+  simp [evalTerm, h, bind, Except.bind]
 
 theorem ifThen_true (c yes : Term) (env env' : Env)
     (h : evalTerm c env = .ok (.bool true, env')) :
     evalTerm (.ifThen c yes) env = evalTerm yes env' := by
-  simp [evalTerm, h, bind, Except.bind, pure, Except.pure]
+  simp [evalTerm, h, bind, Except.bind]
 
 theorem ifThen_false (c yes : Term) (env env' : Env)
     (h : evalTerm c env = .ok (.bool false, env')) :
