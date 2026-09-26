@@ -1,21 +1,17 @@
 import Macaulean.Interpreter.Check
+import Macaulean.Interpreter.Input
 import MacauleanTest.FunctionCases
 
-/-! Development observations. The completed extension replaces these with assertions. -/
+/-! Development observations, replaced by assertions before final publication. -/
 namespace Macaulean.M2.FunctionReference
 open Lean Elab Command
 run_cmd do
   for (src,expected) in FunctionCases.successes do
     unless run src == .ok expected do
       logError m!"FUNCTION_MISMATCH {repr src}: {(run src).toM2String}, expected {repr expected}"
-  for src in #["1 2", "{1 2}", "(x=1\nx+2)", "(1\n2)", "{1\n2}",
-    "{1;2 3}", "(f=x->x; f not false)", "(x:=local y;x==x)",
-    "(x:=local x;x)", "(x:=local x;x==x)", "(f=()->(x:=local x;x==x);f())",
-    "(x:=7;local x;x)", "(local x;x=7;local x;x)",
-    "(f=()->(local x;x=7;local x;x);f())",
-    "(counter=0;maker=()->(counter=counter+1;x->x);maker() (counter=counter+1);counter)",
-    "(counter=0;maker=()->(counter=counter+1;x->x);(maker()) (counter=counter+1);counter)"] do
-    let m2 ← globalM2Server
-    let reply : List String ← m2.sendRequest "evalValue" [src]
-    logInfo m!"FUNCTION_EXTRA {repr src}: {repr reply}"
+  for src in #["2 = 3", "1 := 7", "{1}=2", "{1 2}", "1 2", "(x,1)=(2,3)"] do
+    logInfo m!"STRING_AST {repr src}: {repr (parse src)}"
+    match Input.parse src with
+    | .ok p => logInfo m!"INPUT_AST {repr src}: {repr p.tree.toTerm}"
+    | .error e => logInfo m!"INPUT_ERROR {repr src}: {e}"
 end Macaulean.M2.FunctionReference

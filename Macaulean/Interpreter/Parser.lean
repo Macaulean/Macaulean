@@ -111,6 +111,17 @@ def Tree.parameters (t : Tree) : Except String Parameters := do
   if p.names.eraseDups.length != p.names.length then .error "duplicate function parameter"
   else return p
 
+/-- Assignment targets are validated independently of expression/operator dispatch. -/
+def assignmentTree (isLocal : Bool) (pos : Nat) (lhs rhs : Tree) : Except String Tree :=
+  match lhs.toTerm with
+  | .var name => .ok (if isLocal then .localAssign pos name lhs rhs else .assign pos name lhs rhs)
+  | .sequence xs => do
+    let some names := Term.variableNames xs | .error "expected variable names in multiple assignment"
+    return .assignMany pos isLocal names lhs rhs
+  | .binop .index _ _ =>
+    if isLocal then .error "invalid local assignment target" else .ok (.indexAssign pos lhs rhs)
+  | _ => .error "invalid assignment target"
+
 structure Cursor where
   tokens : List Token
   index : Nat := 0
@@ -127,7 +138,8 @@ private def missingOperand : List Token → Bool
   | .sym .rparen :: _ | .sym .rbrace :: _ | .sym .kwElse :: _ => true | _ => false
 private def startsArgument : List Token → Bool
   | .num _ :: _ | .ident _ :: _ | .sym .lparen :: _ | .sym .lbrace :: _
-  | .sym .kwIf :: _ | .sym .kwLocal :: _ | .sym .kwReturn :: _ => true | _ => false
+  | .sym .kwIf :: _ | .sym .kwLocal :: _ | .sym .kwReturn :: _ | .sym .kwNot :: _ => true
+  | _ => false
 
 mutual
 
@@ -250,20 +262,20 @@ def parseTreeLoop : Nat → Nat → Bool → Tree → Cursor → TreeResult
               let params ← lhs.parameters
               let (rhs, tail) ← parseTreeExpr fuel rbp obey next
               parseTreeLoop fuel minBP obey (.lambda c.index params lhs rhs) tail
-            | _ =>
+            | .assign =>
               let (rhs, tail) ← parseTreeExpr fuel rbp obey next
-              match kind, lhs.toTerm with
-              | .bin op, _ => parseTreeLoop fuel minBP obey (.binop c.index op lhs rhs) tail
-              | .logic op, _ => parseTreeLoop fuel minBP obey (.logic c.index op lhs rhs) tail
-              | .assign, .var x => parseTreeLoop fuel minBP obey (.assign c.index x lhs rhs) tail
-              | .localAssign, .var x => parseTreeLoop fuel minBP obey (.localAssign c.index x lhs rhs) tail
-              | .assign, .binop .index _ _ => parseTreeLoop fuel minBP obey (.indexAssign c.index lhs rhs) tail
-              | .assign, .sequence xs | .localAssign, .sequence xs =>
-                let some names := Term.variableNames xs | .error "expected variable names in multiple assignment"
-                let loc := match kind with | .localAssign => true | _ => false
-                parseTreeLoop fuel minBP obey (.assignMany c.index loc names lhs rhs) tail
-              | .assign, _ | .localAssign, _ => .error "invalid assignment target"
-              | _, _ => .error "internal operator dispatch"
+              let result ← assignmentTree false c.index lhs rhs
+              parseTreeLoop fuel minBP obey result tail
+            | .localAssign =>
+              let (rhs, tail) ← parseTreeExpr fuel rbp obey next
+              let result ← assignmentTree true c.index lhs rhs
+              parseTreeLoop fuel minBP obey result tail
+            | .bin op =>
+              let (rhs, tail) ← parseTreeExpr fuel rbp obey next
+              parseTreeLoop fuel minBP obey (.binop c.index op lhs rhs) tail
+            | .logic op =>
+              let (rhs, tail) ← parseTreeExpr fuel rbp obey next
+              parseTreeLoop fuel minBP obey (.logic c.index op lhs rhs) tail
           else .ok (lhs, c)
         | none => .ok (lhs, c)
       | _ => .ok (lhs, c)

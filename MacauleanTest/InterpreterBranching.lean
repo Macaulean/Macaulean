@@ -100,7 +100,11 @@ example : hasParseError "then = 3" = true := by decide +kernel
 example : hasParseError "else = 3" = true := by decide +kernel
 example : hasParseError "and = 3" = true := by decide +kernel
 example : hasParseError "not = 3" = true := by decide +kernel
-example : hasParseError "(x = 1\nx + 2)" = true := by decide +kernel
+-- Inside parentheses a newline is whitespace. Adjacency now means application,
+-- not an implicit semicolon, and is checked positively as such.
+example : parse "(x = 1\nx + 2)" = .ok
+    (.assign "x" (.binop .add (.apply (.int 1) (.var "x")) (.int 2))) := by decide +kernel
+example : run "x=4; (x = 1\nx + 2)" = .error (.noMethod "SPACE" ["ZZ", "ZZ"]) := by decide +kernel
 example : hasParseError "(1;;)" = true := by decide +kernel
 example : hasParseError "(;1)" = true := by decide +kernel
 -- The collection extension implements empty Sequence, still distinct from null.

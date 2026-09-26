@@ -311,7 +311,7 @@ run_cmd do
     "x->x", "(x)->x", "()->7", "(x,y)->x+y", "x->y->x+y", "f g 3", "f(3)^2",
     "(f 3)^2", "f@@g 3", "f(x,y)", "(x,y):=(2,3)", "local x", "return", "return 1,2",
     "return(1,2)", "f=x->\n x+1;", "(x,y)->(z:=x+y;\nz)", "{x->x,y->y+1}",
-    "(x, -- λ, 中文\n y) -> (z := x; z+y)"
+    "(x, -- λ, 中文\n y) -> (z := x; z+y)", "f not false", "x:=local x"
   ] do
     let .ok stx := Parser.runParserCategory (← getEnv) `m2 src
       | throwError "category rejected {repr src}"
@@ -354,7 +354,7 @@ run_cmd do
 -- Immutable environments are actual REPL checkpoints, including escaped cells.
 run_cmd do
   let original ← getEnv
-  let runInput := fun (s : Macaulean.M2.Session) (src : String) =>
+  let runInput : Macaulean.M2.Session → String → Macaulean.M2.Session.Result := fun s src =>
     match Macaulean.M2.parse src with
     | .ok t => s.step t
     | .error _ => { session := s, outcome := .error .invalidReference, output := none }
