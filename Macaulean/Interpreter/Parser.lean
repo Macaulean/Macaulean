@@ -21,7 +21,7 @@ Ranges (25) bind below addition; prefix length (45) binds below powers/indexing.
 The string interface and the native Lean `m2` category use this same grammar.
 Application is right-associative (46), below powers/indexing (50) and composition
 (48), above multiplication (40). Arrow and assignments share precedence 10.
-Parameter parentheses are retained until arity is determined, never erased early.
+Parameter delimiters are retained until arity is determined, never erased early.
 -/
 namespace Macaulean.M2
 namespace Parser
@@ -117,11 +117,13 @@ def Tree.parameterNames : Tree → Option (List String)
   | .comma _ a (.var _ x) => (· ++ [x]) <$> a.parameterNames
   | _ => none
 
+/-- M2's binder accepts braces as well as parentheses for fixed parameters.
+The delimiter changes neither arity nor argument unpacking. -/
 def Tree.parameters (t : Tree) : Except String Parameters := do
   let p : Parameters ← match t with
     | .var _ x => .ok (.variadic x)
-    | .emptySequence .. => .ok (.fixed [])
-    | .paren _ _ a => match a.parameterNames with
+    | .emptySequence .. | .emptyList .. => .ok (.fixed [])
+    | .paren _ _ a | .listBody _ _ a => match a.parameterNames with
       | some xs => .ok (.fixed xs) | none => .error "expected a list of parameter names"
     | _ => .error "invalid function parameter syntax"
   if p.names.eraseDups.length != p.names.length then .error "duplicate function parameter"

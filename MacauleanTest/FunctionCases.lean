@@ -150,7 +150,7 @@ def errors : List (String × Error) := [
 
 def invalidSyntax : List String := [
   "x ->", "-> x", "(x,x)->x", "((x,y))->x", "(1)->1", "1->1",
-  "{x}->x", "(x,)->x", "(,x)->x", "local", "local 7", "local (x)",
+  "{x,x}->x", "(x,)->x", "(,x)->x", "local", "local 7", "local (x)",
   "x :=", "1 := 7", "(x,1) := (2,3)", "(x,1) = (2,3)", "return (1+)",
   "f(1,2", "(x)->(x+", "f = (x,y) -> (local; x)"
 ]

@@ -1,6 +1,7 @@
 import Macaulean.Interpreter.Check
 import Macaulean.Interpreter.Input
 import Macaulean.Interpreter.Session
+import Macaulean.Interpreter.DSL
 import MacauleanTest.FunctionCases
 
 /-! Focused reference and incremental-session regressions. -/
@@ -54,10 +55,20 @@ private def edgeValues : List (String × Value) := [
   ("(mk=n->(get:=()->n;put:=x->(n=x;return get);put);f=mk 0;g=f 9;g())", .zz 9),
   ("(local x;a:=local x;x:=7;b:=local x;a==b)", .bool false),
   ("(mk=()->local x;a=mk();b=mk();a==b)", .bool false),
-  ("(f=()->(x:=local x;x==local x);f())", .bool true)
+  ("(f=()->(x:=local x;x==local x);f())", .bool true),
+  -- Native fixed-arity binding accepts braces, not just parentheses.
+  ("({x}->x)(1:7)", .zz 7),
+  ("({x}->x){1,2}", .list [.zz 1,.zz 2]),
+  ("({x,y}->x+y)(2,3)", .zz 5),
+  ("({}->7)()", .zz 7),
+  ("(mk={n}->{}->(n=n+1);f=mk 7;(f(),f()))", .sequence [.zz 8,.zz 9]),
+  ("(f={x,y}->(z:=x+y;return z;1/0);f(5,6))", .zz 11)
 ]
 
 example : (edgeValues.all fun (src,v) => run src == .ok v) = true := by decide +kernel
+example : parse "{x}->x" = .ok (.lambda (.fixed ["x"]) (.var "x")) := by decide +kernel
+example : parse "{}->7" = .ok (.lambda (.fixed []) (.int 7)) := by decide +kernel
+example : run "({x,y}->x+y){2,3}" = .error (.arity 2 1) := by decide +kernel
 
 run_cmd do
   let mut checked := 0
@@ -72,14 +83,14 @@ run_cmd do
     throwError "only {checked}/{edgeValues.length} lexical edge cases passed natively"
   logInfo m!"FUNCTION_LEXICAL_EDGES_COMPLETE: {checked} explicit typed cases"
 
--- Discard a successfully compiled function BEFORE serializing the observation.
--- Otherwise an unsupported FunctionClosure wire value could be mistaken for a
--- syntax/binding error and make every malformed-parameter test pass spuriously.
+-- Check parsing as well as binding: `value` alone may return after a parser
+-- failure. Discard valid function results before observing the Boolean, so an
+-- unsupported FunctionClosure wire class cannot masquerade as a binding error.
 run_cmd do
   let mut checked := 0
   for src in FunctionCases.invalidSyntax do
     let quoted := (Json.str src).compress
-    let probe := s!"try (value {quoted}; true) else false"
+    let probe := s!"try (#(parse {quoted}) > 0 and (value {quoted}; true)) else false"
     match ← queryM2 probe with
     | .ok (.ok (.bool false)) => checked := checked + 1
     | .ok (.ok (.bool true)) => logError m!"native M2 accepted supposedly invalid function syntax {repr src}"
@@ -88,5 +99,22 @@ run_cmd do
   unless checked == FunctionCases.invalidSyntax.length do
     throwError "only {checked}/{FunctionCases.invalidSyntax.length} native syntax/binder controls passed"
   logInfo m!"FUNCTION_INVALID_SYNTAX_COMPLETE: {checked} independent rejection controls"
+
+-- The editor adapter must recognize exactly the same parameter convention, and
+-- preserve braces in its native formatter while the AST printer may normalize.
+run_cmd do
+  for src in #["{x}->x", "{}->7", "{x,y}->x+y", "({x}->x)(1:7)",
+      "{x, -- λ, 中文\n y}->x+y", "f={x}->x;", "{n}->{}->n"] do
+    let .ok stx := Lean.Parser.runParserCategory (← getEnv) `m2 src
+      | throwError "brace-parameter category parser failed for {repr src}"
+    let .ok (term,silent) := DSL.lowerInput ⟨stx⟩
+      | throwError "brace-parameter lowering failed for {repr src}"
+    unless parse src == .ok term do throwError "brace-parameter AST mismatch"
+    unless parse term.toM2String == .ok term do throwError "brace-parameter AST printing mismatch"
+    let rendered := (← liftCoreM <| PrettyPrinter.ppCategory `m2 stx).pretty
+    let .ok printed := Lean.Parser.runParserCategory (← getEnv) `m2 rendered
+      | throwError "brace-parameter formatting failed"
+    unless DSL.lowerInput ⟨printed⟩ == .ok (term,silent) do
+      throwError "brace-parameter formatting changed arity or body"
 
 end Macaulean.M2.FunctionReference
