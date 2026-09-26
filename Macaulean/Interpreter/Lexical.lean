@@ -3,10 +3,11 @@ import Macaulean.Interpreter.Syntax
 /-!
 # Static, source-ordered lexical resolution
 
-A declaration allocates a new slot *before* resolving its initializer. References
-already resolved never change when the same spelling is declared later. Both
-branches are resolved, even if one is not executed. Parentheses and collections
-do not create scopes; function bodies do. No runtime name search decides capture.
+A := declaration allocates a new slot before resolving its initializer. Earlier
+references never change when the spelling is redeclared. In contrast, `local x`
+reuses x in the current scope, introducing it only if absent. Both branches are
+resolved, even if one is not executed. Only function bodies introduce new scopes;
+parentheses and collections do not. Runtime name search never decides capture.
 -/
 namespace Macaulean.M2.Lexical
 
@@ -15,7 +16,7 @@ inductive Ref where
   | slot (depth index : Nat)
   deriving Repr, DecidableEq, Inhabited
 
-/-- Resolved code is distinct from surface syntax; local names have disappeared. -/
+/-- Resolved code is distinct from surface syntax; local references have addresses. -/
 inductive Code where
   | int (n : Int)
   | read (ref : Ref)
@@ -57,12 +58,18 @@ def Resolver.lookup (r : Resolver) (name : String) : Ref :=
   match r.current.names.lookup name with
   | some i => .slot 0 i | none => findOuter name r.outers 1
 
-/-- Redeclaration creates a fresh binding, not an update of the previous slot. -/
+/-- := redeclaration creates a fresh binding, not an update of the previous slot. -/
 def Resolver.declare (r : Resolver) (name : String) : Ref × Resolver :=
   let i := r.current.count
   let warnings := if (r.current.names.lookup name).isSome then
       r.warnings ++ [s!"redeclaration of local variable '{name}'"] else r.warnings
   (.slot 0 i, { r with current := ⟨(name, i) :: r.current.names, i + 1⟩, warnings })
+
+/-- `local` quotes an existing current-scope binding without resetting its value. -/
+def Resolver.localRef (r : Resolver) (name : String) : Ref × Resolver :=
+  match r.current.names.lookup name with
+  | some i => (.slot 0 i, r)
+  | none => r.declare name
 
 def Resolver.declareMany : List String → Resolver → List Ref × Resolver
   | [], r => ([], r)
@@ -110,7 +117,7 @@ def resolve : Term → Resolver → Code × Resolver
     let (a, r) := resolve a r
     (.setMany refs a, r)
   | .localSymbol name, r =>
-    let (ref, r) := r.declare name
+    let (ref, r) := r.localRef name
     (.symbol name ref, r)
   | .indexAssign a i v, r =>
     let (a, r) := resolve a r

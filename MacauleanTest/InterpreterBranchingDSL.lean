@@ -270,7 +270,9 @@ run_cmd do
     "not 1 == 1", "true and false and true", "false or true and false",
     "(x = 3; x + 4)", "(1;)", "(1; 2;)", "(x = 1; (x = 2; x))",
     "if\n1 <\n2\nthen\n3", "(if true then 1\nelse 2)", "true and\nnot false",
-    "if true then (x = 1; -- λ, 中文\n x) else 0", "if true then 1;"
+    "if true then (x = 1; -- λ, 中文\n x) else 0", "if true then 1;",
+    -- Adjacency across a parenthesized newline is now application, not a semicolon.
+    "(x = 1\nx + 2)"
   ] do
     let .ok stx := Parser.runParserCategory (← getEnv) `m2 source
       | throwError "category rejected {repr source}"
@@ -302,7 +304,7 @@ run_cmd do
 run_cmd do
   for source in #["if true then 1 else (1 +)", "if true then 1 else (2 = 3)",
     "if = 3", "then = 3", "else = 3", "and = 3", "or = 3", "not = 3",
-    "if true then", "if true then 1 else", "(1;;)", "(x = 1\nx + 2)"] do
+    "if true then", "if true then 1 else", "(1;;)"] do
     if (Macaulean.M2.Input.parse source).isOk then
       throwError "accepted malformed input {repr source}"
 

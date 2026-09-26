@@ -98,7 +98,7 @@ def successes : List (String × Value) := [
   ("((x,y):={2,3})", .list [.zz 2,.zz 3]),
   ("(f=n->(n,n^2,n^3);(x,y,z)=f 3;{x,y,z})", .list [.zz 3,.zz 9,.zz 27]),
   ("(x=100;f=()->((x,y):=(2,3);x+y);(f(),x))", .sequence [.zz 5,.zz 100]),
-  -- Predicate closures short circuit *calls*, including their side effects.
+  -- Predicate closures short circuit calls, including their side effects.
   ("(f=x->x>0;g=x->x<5;(f and g)3)", .bool true),
   ("(f=x->x>0;g=x->x<5;(f and g)7)", .bool false),
   ("(f=x->x>0;(not f)3)", .bool false),
@@ -108,10 +108,17 @@ def successes : List (String × Value) := [
   ("(counter=0;f=x->(counter=counter+1;true);g=x->(counter=counter+1;true);(f and g)3;counter)", .zz 2),
   -- Argument expressions, including collections, run left to right exactly once.
   ("(counter=0;f=(x,y)->(x,y,counter);f((counter=counter+1),(counter=counter+1)))", .sequence [.zz 1,.zz 2,.zz 2]),
-  ("(counter=0;maker=()->(counter=counter+1;x->x);maker() (counter=counter+1);counter)", .zz 2),
+  ("(counter=0;maker=()->(counter=counter+1;x->x);(maker()) (counter=counter+1);counter)", .zz 2),
   ("(f=x->{x,1/1,(2,3),{}};f(5/6))", .list [.qq (mkRat 5 6),.qq (mkRat 1 1),.sequence [.zz 2,.zz 3],.list []]),
   ("(f=x->\n x+1;f 4)", .zz 5),
-  ("(f=(x,\ny)->(z:=x+y;\nz^2);f(2,3))", .zz 25)
+  ("(f=(x,\ny)->(z:=x+y;\nz^2);f(2,3))", .zz 25),
+  -- `local` reuses a current binding rather than redeclaring or resetting it.
+  ("(x:=7;local x;x)", .zz 7),
+  ("(local x;x=7;local x;x)", .zz 7),
+  ("(f=()->(local x;x=7;local x;x);f())", .zz 7),
+  ("(x:=local x;x==x)", .bool true),
+  ("(f=()->(x:=local x;x==x);f())", .bool true),
+  ("(f=x->x; f not false)", .bool true)
 ]
 
 def errors : List (String × Error) := [
@@ -134,7 +141,9 @@ def errors : List (String × Error) := [
   ("(f=x->true;g=x->7;(f and g)3)", .noMethod "and" ["Boolean","ZZ"]),
   ("(f=x->7;(not f)3)", .noMethod "not" ["ZZ"]),
   ("(f=()->{1}#0=9;f())", .immutableCollection "List"),
-  ("(f=()->return 1/0;f())", .divByZero)
+  ("(f=()->return 1/0;f())", .divByZero),
+  -- Right-associative application: parentheses are necessary around maker().
+  ("(counter=0;maker=()->(counter=counter+1;x->x);maker() (counter=counter+1);counter)", .noMethod "SPACE" ["Sequence","ZZ"])
 ]
 
 def invalidSyntax : List String := [
