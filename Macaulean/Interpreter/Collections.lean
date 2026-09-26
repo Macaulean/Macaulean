@@ -74,9 +74,10 @@ theorem repetition_length (n : Nat) (v : Value) : (List.replicate n v).length = 
 
 theorem normalizedIndex_nonnegative (n i : Nat) (h : i < n) :
     normalizedIndex n (Int.ofNat i) = some i := by
-  have h0 : ¬ Int.ofNat i < 0 := by omega
-  have hb : 0 ≤ Int.ofNat i ∧ Int.ofNat i < Int.ofNat n := by omega
-  simp only [normalizedIndex, if_neg h0, if_pos hb]
+  rw [Int.ofNat_eq_natCast]
+  have h0 : ¬ (i : Int) < 0 := by omega
+  have hb : 0 ≤ (i : Int) ∧ (i : Int) < (n : Int) := by omega
+  simp [normalizedIndex, h0, hb]
 
 /-- A returned index is always in bounds, including normalization of negative indices. -/
 theorem normalizedIndex_bounds (n : Nat) (i : Int) (j : Nat)
