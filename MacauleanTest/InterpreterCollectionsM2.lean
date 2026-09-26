@@ -4,7 +4,7 @@ import Macaulean.Interpreter.Check
 open Lean Elab Command Macaulean.M2
 
 run_cmd do
-  let m2 ← Macaulean.globalM2Server
+  let m2 ← globalM2Server
   for source in #[
     "{}", "{1,2}", "()", "(1)", "(1,)", "(,1)", "(,)", "{,}", "{1,}", "{,1}",
     "1,2,3", "((1,2),3)", "(1,(2,3))", "{(1,2)}", "{1..3}", "{1;2}", "{1;}",
@@ -18,7 +18,9 @@ run_cmd do
     "{1} != {1/1}", "{1,2} | {3}", "(1,2) | (3,4)", "{1} | (2,3)",
     "{1,2} + {3,4}", "{1,2} == {1}", "{1} < {2}", "(1,2) < (1,3)",
     "# {1,2} ^ 2", "# {{1,2},{3}} # 0", "1..1", "2..1", "1..<1",
-    "{(1;2),3}", "(1;2,3)", "(1,2;3)", "{1,2;}"
+    "{(1;2),3}", "(1;2,3)", "(1,2;3)", "{1,2;}",
+    "collectionProbe = {1,2}; collectionProbe#0 = 3", "(1,2)#0 = 3",
+    "{1}#9 = 2", "{1}#0 = 1/0", "{1}#true = 2", "0:(1/0)"
   ] do
     let reply : List String ← m2.sendRequest "evalValue" [source]
     logInfo m!"COLLECTION_REFERENCE {repr source}: {repr reply}"
