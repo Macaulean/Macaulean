@@ -41,7 +41,6 @@ mutual
 /-- Decidable equality for the nested syntax, by structural recursion. -/
 def Term.decEq (a b : Term) : Decidable (a = b) := by
   cases a <;> cases b
-  all_goals first | exact isFalse (by intro h; cases h) | skip
   case int.int n m => exact decidable_of_iff (n = m) (by simp only [Term.int.injEq])
   case var.var x y => exact decidable_of_iff (x = y) (by simp only [Term.var.injEq])
   case unop.unop op a op' b =>
@@ -83,6 +82,8 @@ def Term.decEq (a b : Term) : Decidable (a = b) := by
   case sequence.sequence xs ys =>
     haveI := Term.listDecEq xs ys
     exact decidable_of_iff (xs = ys) (by simp only [Term.sequence.injEq])
+  all_goals exact isFalse (by intro h; cases h)
+termination_by structural a
 
 def Term.listDecEq (xs ys : List Term) : Decidable (xs = ys) := by
   cases xs with
@@ -95,6 +96,7 @@ def Term.listDecEq (xs ys : List Term) : Decidable (xs = ys) := by
       haveI := Term.decEq a b
       haveI := Term.listDecEq xs ys
       exact decidable_of_iff (a = b ∧ xs = ys) (by simp only [List.cons.injEq])
+termination_by structural xs
 
 end
 
@@ -154,6 +156,7 @@ def Term.toM2String : Term → String
   | .listLit [.empty] => "{(null;)}"
   | .listLit xs => "{" ++ ", ".intercalate (Term.strings xs) ++ "}"
   | .sequence [] => "()"
+  | .sequence [.empty] => "(1:(null;))"
   | .sequence [a] => s!"(1:({a.toM2String}))"
   | .sequence xs => "(" ++ ", ".intercalate (Term.strings xs) ++ ")"
 

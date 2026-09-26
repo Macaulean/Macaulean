@@ -212,6 +212,8 @@ macauleanMainLoop (JSONRPCServer, File) := (server, file) -> (
 ---------------------
 
 -- a function rather than a global so that each test gets a fresh server
+load "./interpreter-values.m2"
+
 macauleanServer = () -> (
     server := new JSONRPCServer;
     -- setLogger(server, str -> stderr << str << endl);
@@ -267,6 +269,7 @@ macauleanServer = () -> (
 	    apply(toList \ toList factor f, term -> (
 		    saveMRDI(term#0, Namespace => "Macaulean"), term#1))));
 
+    macauleanRegisterInterpreterValues server;
     server)
 
 macauleanStart = () -> macauleanMainLoop(macauleanServer(), stdio);
