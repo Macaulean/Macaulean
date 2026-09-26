@@ -130,15 +130,17 @@ private def parameterNames : Nat → Syntax → Option (List String)
     else (fun x => [x]) <$> identifier? stx
 private def parameters (fuel : Nat) (stx : Syntax) : Except String Parameters := do
   let p ← if let some x := identifier? stx then .ok (.variadic x)
-    else if stx.getKind == `Macaulean.M2.DSL.emptySequence then .ok (.fixed [])
-    else if stx.getKind == `Macaulean.M2.DSL.paren then
+    else if stx.getKind == `Macaulean.M2.DSL.emptySequence ||
+        stx.getKind == `Macaulean.M2.DSL.emptyList then .ok (.fixed [])
+    else if stx.getKind == `Macaulean.M2.DSL.paren ||
+        stx.getKind == `Macaulean.M2.DSL.listBody then
       match parameterNames fuel stx[1] with
       | some xs => .ok (.fixed xs) | none => .error "invalid fixed parameters"
     else .error "invalid function parameters"
   if p.names.eraseDups.length != p.names.length then .error "duplicate function parameter"
   else return p
 
-/-- Lower structured syntax directly, including source-significant parameter parentheses. -/
+/-- Lower structured syntax directly, including source-significant parameter delimiters. -/
 def lowerTree : Nat → Syntax → Except String Term
   | 0, _ => .error "M2 syntax lowering ran out of fuel"
   | fuel + 1, stx => do
