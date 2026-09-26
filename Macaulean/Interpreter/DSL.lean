@@ -9,18 +9,14 @@ import Macaulean.Interpreter.Session
 import Macaulean.Interpreter.DSL
 open M2
 
-x = 7;
-x^2
-1/2 + 1/3
+x = -7;
+if x < 0 then (x = -x; x) else x
 ```
 
-`m2` is a real syntax category. Its reader consumes exactly one M2 input and
-produces a structured Lean syntax tree with original UTF-8 source ranges.
-The scoped bridge into `command` is enabled by `open M2`. Evaluation is the
-existing pure interpreter, never an external M2 process or `IO.Ref` session.
-
-The command environment owns the current session; elaboration snapshots own
-its history. The extension is deliberately not exported to `.olean` files.
+`m2` is a real syntax category. Its reader consumes one input and produces
+structured Lean syntax with original UTF-8 ranges. `open M2` enables the scoped
+command bridge. Pure evaluation uses immutable, non-exported session state in
+Lean's environment, so command snapshots are worksheet checkpoints.
 -/
 
 declare_syntax_cat m2
@@ -39,7 +35,7 @@ private def tokenSyntax (c : Lean.Parser.InputContext) (base : Nat)
   let stop : String.Pos.Raw := ⟨base + span.stop⟩
   .atom (sourceInfo c start stop) (c.extract start stop)
 
-/-- Structured syntax, not a source string disguised as a DSL node. -/
+/-- Every construct and keyword retains its own original source location. -/
 def treeSyntax (c : Lean.Parser.InputContext) (base : Nat)
     (tokens : Array Input.LocatedToken) : Parser.Tree → Syntax
   | .num i _ => .node .none `Macaulean.M2.DSL.num
@@ -56,13 +52,24 @@ def treeSyntax (c : Lean.Parser.InputContext) (base : Nat)
       #[tokenSyntax c base tokens i, treeSyntax c base tokens a]
   | .binop i _ a b => .node .none `Macaulean.M2.DSL.binop
       #[treeSyntax c base tokens a, tokenSyntax c base tokens i, treeSyntax c base tokens b]
+  | .logic i _ a b => .node .none `Macaulean.M2.DSL.logic
+      #[treeSyntax c base tokens a, tokenSyntax c base tokens i, treeSyntax c base tokens b]
   | .assign i _ a b => .node .none `Macaulean.M2.DSL.assign
       #[treeSyntax c base tokens a, tokenSyntax c base tokens i, treeSyntax c base tokens b]
+  | .ifThen i j condition yes => .node .none `Macaulean.M2.DSL.ifThen
+      #[tokenSyntax c base tokens i, treeSyntax c base tokens condition,
+        tokenSyntax c base tokens j, treeSyntax c base tokens yes]
+  | .ifElse i j k condition yes no => .node .none `Macaulean.M2.DSL.ifElse
+      #[tokenSyntax c base tokens i, treeSyntax c base tokens condition,
+        tokenSyntax c base tokens j, treeSyntax c base tokens yes,
+        tokenSyntax c base tokens k, treeSyntax c base tokens no]
+  | .seq i a b => .node .none `Macaulean.M2.DSL.seq
+      #[treeSyntax c base tokens a, tokenSyntax c base tokens i, treeSyntax c base tokens b]
+  | .discard i a => .node .none `Macaulean.M2.DSL.discard
+      #[treeSyntax c base tokens a, tokenSyntax c base tokens i]
 
-/-- This reader delegates precedence and associativity to the shared Pratt parser. -/
+/-- All grammar decisions are delegated to the shared Pratt parser. -/
 def reader : Lean.Parser.Parser where
-  -- M2 identifiers may be Lean keywords (e.g. `left` or `right`).
-  -- Do not let Lean's token classification reject these before our reader runs.
   info := { firstTokens := .unknown }
   fn := fun c s =>
     let base := s.pos.byteIdx
@@ -78,20 +85,18 @@ def reader : Lean.Parser.Parser where
             let stop : String.Pos.Raw := ⟨base + tokens.stop⟩
             Syntax.atom (sourceInfo c.toInputContext start stop) ";"
           else Syntax.node .none nullKind #[]
-        -- ppCategory sanitizes identifier leaves. Keep an independent original
-        -- range on the input node so its significant whitespace still survives.
+        -- Retain an independent range through ppCategory's identifier sanitization.
         let inputStop := if tokens.silent then tokens.stop
           else (tokens.located[tree.bounds.2]!).span.stop
         let info := sourceInfo c.toInputContext ⟨base⟩ ⟨base + inputStop⟩
         let input := Syntax.node info `Macaulean.M2.DSL.input #[body, silent]
         Lean.Parser.whitespace c ((s.setPos ⟨base + tokens.stop⟩).pushSyntax input)
 
-/-- Keep explicit M2 parentheses; Lean's term precedence is not applicable here. -/
 @[combinator_parenthesizer reader]
 def readerParenthesizer : Lean.PrettyPrinter.Parenthesizer :=
   Lean.Syntax.MonadTraverser.goLeft
 
-/-- Preserve significant newlines and spaces (in particular, `- -3` is not `--3`). -/
+/-- Preserve significant newlines and token separation, including `- -3`. -/
 @[combinator_formatter reader]
 def readerFormatter : Lean.PrettyPrinter.Formatter := do
   let stx ← Lean.Syntax.MonadTraverser.getCur
@@ -110,7 +115,7 @@ private def binOp? : String → Option BinOp
   | "<=" => some .le | ">" => some .gt | ">=" => some .ge
   | _ => none
 
-/-- The elaborator consumes the syntax tree, not a reprinted/reparsed source string. -/
+/-- Direct structured lowering: no source printing or reparsing. -/
 def lowerTree : Nat → Syntax → Except String Term
   | 0, _ => .error "M2 syntax lowering ran out of fuel"
   | fuel + 1, stx => do
@@ -127,20 +132,32 @@ def lowerTree : Nat → Syntax → Except String Term
     | `Macaulean.M2.DSL.paren => lowerTree fuel stx[1]
     | `Macaulean.M2.DSL.unop =>
       let op ← match stx[0].getAtomVal with
-        | "-" => .ok UnOp.neg | "+" => .ok UnOp.pos
+        | "-" => .ok UnOp.neg | "+" => .ok UnOp.pos | "not" => .ok UnOp.notOp
         | _ => .error "invalid M2 prefix operator"
       return .unop op (← lowerTree fuel stx[1])
     | `Macaulean.M2.DSL.binop =>
       let some op := binOp? stx[1].getAtomVal
         | .error "invalid M2 binary operator"
       return .binop op (← lowerTree fuel stx[0]) (← lowerTree fuel stx[2])
+    | `Macaulean.M2.DSL.logic =>
+      let op ← match stx[1].getAtomVal with
+        | "and" => .ok LogicOp.andOp | "or" => .ok LogicOp.orOp
+        | _ => .error "invalid M2 Boolean operator"
+      return .logic op (← lowerTree fuel stx[0]) (← lowerTree fuel stx[2])
+    | `Macaulean.M2.DSL.ifThen =>
+      return .ifThen (← lowerTree fuel stx[1]) (← lowerTree fuel stx[3])
+    | `Macaulean.M2.DSL.ifElse =>
+      return .ifElse (← lowerTree fuel stx[1]) (← lowerTree fuel stx[3])
+        (← lowerTree fuel stx[5])
+    | `Macaulean.M2.DSL.seq =>
+      return .seq (← lowerTree fuel stx[0]) (← lowerTree fuel stx[2])
+    | `Macaulean.M2.DSL.discard => return .seq (← lowerTree fuel stx[0]) .empty
     | `Macaulean.M2.DSL.assign =>
       let .var name ← lowerTree fuel stx[0]
         | .error "left side of '=' must be a variable"
       return .assign name (← lowerTree fuel stx[2])
     | _ => .error s!"unsupported M2 syntax node {stx.getKind}"
 
-/-- Decode a parsed value of category `m2`. Useful to downstream tools and tests. -/
 def lowerInput (stx : TSyntax `m2) : Except String (Term × Bool) := do
   let input := stx.raw[0]
   if input.getKind != `Macaulean.M2.DSL.input then
@@ -149,12 +166,9 @@ def lowerInput (stx : TSyntax `m2) : Except String (Term × Bool) := do
     let body := input[0]
     let some source := body.getSubstring? (withLeading := false) (withTrailing := false)
       | .error "M2 syntax has no original source range"
-    -- Every recursive descent crosses at least one source token. Unlike the
-    -- generated Syntax SizeOf instance, source byte length is executable.
     let term ← lowerTree (source.toString.utf8ByteSize + 1) body
     return (term, input[1].getAtomVal == ";")
 
-/-- Registration only; the value stored in every environment is immutable. -/
 initialize sessionExt : EnvExtension Session ←
   registerEnvExtension (pure ({} : Session))
 
@@ -163,14 +177,12 @@ open Lean.Elab.Command
 def getSession : CommandElabM Session :=
   return sessionExt.getState (← getEnv)
 
-/-- Explicit reset for tooling/tests. Ordinary namespace opens do not reset state. -/
 def resetSession : CommandElabM Unit :=
   modifyEnv fun env => sessionExt.setState env ({} : Session)
 
 end Macaulean.M2.DSL
 
 namespace M2
-/-- Activate bare M2 inputs as Lean commands with `open M2`. -/
 scoped syntax (name := inputCommand) (priority := low) m2 : command
 end M2
 

@@ -4,35 +4,27 @@
 
 namespace Macaulean.M2
 
-/-- Values of the supported fragment of Macaulay2.  `ZZ` and `QQ` are kept
-distinct, as in Macaulay2: `7/7` is `1/1 : QQ`, not `1 : ZZ`. -/
+/-- `ZZ` and `QQ` remain distinct even for integral-valued rationals. -/
 inductive Value where
-  /-- an element of `ZZ` -/
   | zz (n : Int)
-  /-- an element of `QQ` -/
   | qq (q : Rat)
-  /-- a `Boolean` -/
   | bool (b : Bool)
-  /-- `null` -/
   | null
   deriving DecidableEq, Inhabited
 
-/-- Runtime errors. -/
 inductive Error where
   | divByZero
   | unboundVar (x : String)
   | protectedSymbol (x : String)
-  /-- no method for an operator applied to values of these classes -/
   | noMethod (op : String) (classes : List String)
+  | conditionNotBoolean (actualClass : String)
   deriving DecidableEq, Repr, Inhabited
 
 namespace Value
 
-/-- The name of the Macaulay2 class of a value. -/
 def className : Value → String
   | zz _ => "ZZ" | qq _ => "QQ" | bool _ => "Boolean" | null => "Nothing"
 
-/-- Imitates Macaulay2's `toExternalString`. -/
 def toM2String : Value → String
   | zz n => toString n
   | qq q => s!"{q.num}/{q.den}"
@@ -58,6 +50,7 @@ def toM2String : Error → String
   | protectedSymbol x => s!"attempted to modify a protected symbol '{x}'"
   | noMethod op cs =>
     s!"no method for operator {op} applied to objects of class {", ".intercalate cs}"
+  | conditionNotBoolean cls => s!"expected a Boolean condition, got {cls}"
 
 instance : ToString Error := ⟨toM2String⟩
 
