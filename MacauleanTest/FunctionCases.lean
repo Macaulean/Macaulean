@@ -66,7 +66,8 @@ def successes : List (String × Value) := [
   ("(mk=()->(p:=0; (()->p,i->p=i));fs=mk();(fs#1)555;(fs#0)())", .zz 555),
   ("(mk=n->()->(n=n+1);a=mk 0;b=mk 10;(a(),a(),b(),a(),b()))", .sequence [.zz 1,.zz 2,.zz 11,.zz 3,.zz 12]),
   ("(mk=n->()->(n=n+1);a=mk 0;b=a;(a(),b(),a()))", .sequence [.zz 1,.zz 2,.zz 3]),
-  ("(mk=n->(get=()->n;set=x->n=x;{get,set});fs=mk 7;(fs#1)12;(fs#0)())", .zz 12),
+  -- Local names avoid overwriting native M2's protected `set` library binding.
+  ("(mk=n->(getter:=()->n;setter:=x->n=x;{getter,setter});fs=mk 7;(fs#1)12;(fs#0)())", .zz 12),
   ("(mk=x->y->()->(x=x+y);g=mk 10;a=g 2;b=g 3;(a(),b(),a()))", .sequence [.zz 12,.zz 15,.zz 17]),
   -- Global and local recursion; mutually recursive functions share declared cells.
   ("(fac=n->if n==0 then 1 else n*fac(n-1);fac 6)", .zz 720),
