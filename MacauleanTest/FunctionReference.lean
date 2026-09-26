@@ -10,6 +10,9 @@ run_cmd do
       logError m!"FUNCTION_MISMATCH {repr src}: {(run src).toM2String}, expected {repr expected}"
   for src in #["1 2", "{1 2}", "(x=1\nx+2)", "(1\n2)", "{1\n2}",
     "{1;2 3}", "(f=x->x; f not false)", "(x:=local y;x==x)",
+    "(x:=local x;x)", "(x:=local x;x==x)", "(f=()->(x:=local x;x==x);f())",
+    "(x:=7;local x;x)", "(local x;x=7;local x;x)",
+    "(f=()->(local x;x=7;local x;x);f())",
     "(counter=0;maker=()->(counter=counter+1;x->x);maker() (counter=counter+1);counter)",
     "(counter=0;maker=()->(counter=counter+1;x->x);(maker()) (counter=counter+1);counter)"] do
     let m2 ← globalM2Server

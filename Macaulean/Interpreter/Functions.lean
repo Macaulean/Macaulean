@@ -9,7 +9,7 @@ the retained loop-free reference evaluator. They cover static binding, captured
 frames, return propagation, rollback, and preservation of integer semantics.
 -/
 namespace Macaulean.M2.Functions
-open Lexical Runtime
+open Lexical Macaulean.M2.Runtime
 
 theorem variadic_arguments (x : String) (v : Value) :
     arguments (.variadic x) v = .ok [v] := rfl
@@ -30,7 +30,7 @@ theorem declare_fresh (r : Resolver) (x : String) :
 
 theorem declare_visible (r : Resolver) (x : String) :
     (r.declare x).2.lookup x = .slot 0 r.current.count := by
-  simp [Resolver.declare, Resolver.lookup, List.lookup]
+  simp [Resolver.declare, Resolver.lookup]
 
 /-- A nested function's declarations cannot enlarge its parent's lexical scope. -/
 theorem lambda_scope (params : Parameters) (body : Term) (r : Resolver) :
@@ -44,7 +44,7 @@ theorem global_ignores_frames (x : String) (fs gs : Frames) (s : State) :
 theorem read_captured_cell (fs : Frames) (s : State) (d i cell : Nat) (v : Value)
     (hf : cellAt fs d i = some cell) (hv : s.heap.cells[cell]? = some v) :
     readRef (.slot d i) fs s = .ok v := by
-  simp [readRef, hf, hv, bind, Except.bind, pure, Except.pure]
+  simp [readRef, hf, hv, pure, Except.pure]
 
 theorem allocation_length (s : State) (vs : List Value) :
     (s.allocate vs).2.heap.cells.length = s.heap.cells.length + vs.length := by
@@ -67,7 +67,7 @@ theorem call_closure (fuel id slots : Nat) (params : Parameters) (body : Code)
     call (fuel + 1) (.closure id) arg s =
       let (frame, next) := s.allocate (vs ++ List.replicate (slots - vs.length) .null)
       catchReturn (eval fuel body (frame :: captured) next) := by
-  simp [call, hf, ha, liftResult, Except.mapError, bind, Except.bind, pure, Except.pure]
+  simp [call, hf, ha, liftResult, Except.mapError, bind, Except.bind]
 
 theorem eval_zero (code : Code) (fs : Frames) (s : State) :
     eval 0 code fs s = .error (.error .fuelExhausted) := rfl
@@ -113,7 +113,7 @@ theorem session_error_state (s : Session) (t : Term) (fuel : Nat) (error : Error
 end Macaulean.M2.Functions
 
 namespace Macaulean.M2.IntExpr
-open Lexical Runtime
+open Lexical Macaulean.M2.Runtime
 
 /-- Resolved form of the existing mathematical integer-expression language. -/
 def code : IntExpr → Code
@@ -198,7 +198,9 @@ theorem runtime_eval (t : IntExpr) (fuel : Nat) (fs : Frames) (s : State)
       have ha : a.depth < k := by simp [depth] at h; omega
       have hk : 0 < k := by omega
       have hn : eval k (.int n) fs s = .ok (.zz n, s) := by
-        cases k <;> simp_all [eval]
+        cases k with
+        | zero => omega
+        | succ j => rfl
       simp [code, eval, ih k ha, hn, denote, evalBinOp, liftResult, Except.mapError,
         bind, Except.bind, pure, Except.pure]
 
