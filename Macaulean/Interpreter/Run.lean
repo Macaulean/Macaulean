@@ -1,26 +1,19 @@
 import Macaulean.Interpreter.Parser
-import Macaulean.Interpreter.Eval
-
-/-!
-# Running Macaulay2 source
--/
+import Macaulean.Interpreter.Runtime
 
 namespace Macaulean.M2
-
-/-- Outcome of running a program: a parse error, a runtime error, or a value. -/
 inductive Outcome where
   | parseError (msg : String)
   | error (e : Error)
   | ok (v : Value)
-  deriving DecidableEq, Repr, Inhabited
+  deriving Repr, DecidableEq, Inhabited
 
-/-- Parse and evaluate Macaulay2 source. -/
-def run (s : String) : Outcome :=
-  match parse s with
-  | .error msg => .parseError msg
-  | .ok t =>
-    match evalProgram t with
-    | .ok v => .ok v
-    | .error e => .error e
+/-- Execute with an explicit evaluation-depth budget; exhaustion is never success. -/
+def runWithFuel (fuel : Nat) (source : String) : Outcome :=
+  match parse source with
+  | .error message => .parseError message
+  | .ok term => match Runtime.evaluate term (fuel := fuel) with
+    | .error error => .error error | .ok result => .ok result.value
 
+def run (source : String) : Outcome := runWithFuel Runtime.defaultFuel source
 end Macaulean.M2
