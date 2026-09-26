@@ -67,9 +67,13 @@ example : run "1;\n2" = .ok (.zz 2) := by decide +kernel
 example : run "y" = .error (.unboundVar "y") := by decide +kernel
 example : run "true = 3" = .error (.protectedSymbol "true") := by decide +kernel
 
--- parse errors
-example : ∃ msg, run "1;;" = .parseError msg := ⟨_, rfl⟩
-example : ∃ msg, run "(1 + 2" = .parseError msg := ⟨_, rfl⟩
+-- Give concrete error witnesses rather than relying on elaborator unification
+-- to discover them through the shared concrete-tree parser. The equalities are
+-- still checked by kernel evaluation, including the expected error messages.
+example : ∃ msg, run "1;;" = .parseError msg :=
+  ⟨s!"expected an expression but found {Parser.describe [.sym .semi]}", by decide +kernel⟩
+example : ∃ msg, run "(1 + 2" = .parseError msg :=
+  ⟨"expected ')' but found end of input", by decide +kernel⟩
 example : ∃ msg, run "1.5" = .parseError msg := ⟨_, rfl⟩
 
 /-- info: -11/4 -/
