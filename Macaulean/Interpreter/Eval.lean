@@ -58,7 +58,7 @@ def indexValue (xs : List Value) (index : Int) : Except Error Value := do
 
 /-- Explicit finite integer range; no machine-word conversion or hidden truncation. -/
 def rangeValues (first : Int) (count : Nat) : List Value :=
-  (List.range count).map (fun k => .zz (first + (k : Int)))
+  (List.range count).map (fun (k : Nat) => .zz (first + Int.ofNat k))
 
 def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   match op, a, b with

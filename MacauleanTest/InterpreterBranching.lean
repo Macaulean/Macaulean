@@ -33,8 +33,8 @@ example : run "if false then 1 else 2 + 3 * 4" = .ok (.zz 14) := by decide +kern
 example : run "false and 1/0" = .ok (.bool false) := by decide +kernel
 example : run "true or 1/0" = .ok (.bool true) := by decide +kernel
 example : run "false and 99" = .ok (.bool false) := by decide +kernel
-example : run "true or 99" = .ok (.bool true) := by decide +kernel
 example : run "true and false" = .ok (.bool false) := by decide +kernel
+example : run "true or 99" = .ok (.bool true) := by decide +kernel
 example : run "false or true" = .ok (.bool true) := by decide +kernel
 example : run "true and 1/0" = .error .divByZero := by decide +kernel
 example : run "false or 1/0" = .error .divByZero := by decide +kernel
@@ -103,8 +103,8 @@ example : hasParseError "not = 3" = true := by decide +kernel
 example : hasParseError "(x = 1\nx + 2)" = true := by decide +kernel
 example : hasParseError "(1;;)" = true := by decide +kernel
 example : hasParseError "(;1)" = true := by decide +kernel
--- Empty parentheses are a Sequence, outside this scalar fragment, not null.
-example : hasParseError "()" = true := by decide +kernel
+-- The collection extension implements empty Sequence, still distinct from null.
+example : run "()" = .ok (.sequence []) := by decide +kernel
 
 -- Structural parser checks, not just truth tables (which conceal association).
 example : parse "true and false and true" = .ok
