@@ -2,13 +2,13 @@ import Macaulean.Interpreter.Syntax
 import Macaulean.Interpreter.Value
 
 /-!
-# Structurally recursive scalar evaluation
+# Pure, structurally recursive M2 evaluation
 
-All computation is pure and kernel-executable. Control-flow operands are
-selected before evaluation. Blocks sequence in the same environment; they do
-not create lexical scopes. As before, `Except` makes each input transactional.
+Nested collections are immutable values. Literal elements and ordinary operator
+operands evaluate left to right; `n:x` evaluates `x` once, including for n ≤ 0.
+Only Boolean control flow skips evaluation. Errors retain the existing
+transactional per-input contract.
 -/
-
 namespace Macaulean.M2
 
 abbrev Env := List (String × Value)
@@ -16,16 +16,49 @@ abbrev Env := List (String × Value)
 namespace Value
 
 def toRat? : Value → Option Rat
-  | zz n => some n
-  | qq q => some q
-  | _ => none
+  | zz n => some n | qq q => some q | _ => none
 
+mutual
+
+/-- M2 equality, not constructor equality: numeric promotion applies inside collections. -/
+def equalValue : Value → Value → Except Error Bool
+  | .list xs, .list ys | .sequence xs, .sequence ys =>
+    if xs.length = ys.length then equalElements xs ys else .ok false
+  | .bool a, .bool b => .ok (a == b)
+  | .null, .null => .ok true
+  | a, b =>
+    match a.toRat?, b.toRat? with
+    | some p, some q => .ok (decide (p = q))
+    | _, _ => .error (.noMethod "==" [a.className, b.className])
+
+def equalElements : List Value → List Value → Except Error Bool
+  | [], [] => .ok true
+  | a :: xs, b :: ys => do
+    if ← equalValue a b then equalElements xs ys else return false
+  | _, _ => .ok false
+
+end
 end Value
 
 open Value
 
 def ratZPow (q : Rat) (n : Int) : Except Error Value :=
   if n < 0 ∧ q = 0 then .error .divByZero else .ok (qq (q ^ n))
+
+/-- Negative indices count from the end. The returned index is always in bounds. -/
+def normalizedIndex (length : Nat) (index : Int) : Option Nat :=
+  let j := if index < 0 then index + (length : Int) else index
+  if 0 ≤ j ∧ j < (length : Int) then some j.toNat else none
+
+def indexValue (xs : List Value) (index : Int) : Except Error Value := do
+  let some j := normalizedIndex xs.length index
+    | .error (.indexOutOfBounds index xs.length)
+  let some v := xs[j]? | .error (.indexOutOfBounds index xs.length)
+  return v
+
+/-- Explicit finite integer range; no machine-word conversion or hidden truncation. -/
+def rangeValues (first : Int) (count : Nat) : List Value :=
+  (List.range count).map (fun (k : Nat) => .zz (first + Int.ofNat k))
 
 def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   match op, a, b with
@@ -40,6 +73,21 @@ def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   | .rem, qq p, qq q => .ok (qq (if q = 0 then p else 0))
   | .pow, zz m, zz n => if 0 ≤ n then .ok (zz (m ^ n.toNat)) else ratZPow m n
   | .pow, qq p, zz n => ratZPow p n
+  | .range, zz m, zz n => .ok (.sequence (rangeValues m (n - m + 1).toNat))
+  | .rangeExclusive, zz m, zz n => .ok (.sequence (rangeValues m (n - m).toNat))
+  | .repeat, zz n, v => .ok (.sequence (List.replicate n.toNat v))
+  | .index, .list xs, zz i | .index, .sequence xs, zz i => indexValue xs i
+  | .hasIndex, .list xs, zz i | .hasIndex, .sequence xs, zz i =>
+    .ok (.bool (normalizedIndex xs.length i).isSome)
+  | .hasIndex, .list _, _ | .hasIndex, .sequence _, _ | .hasIndex, .null, _ =>
+    .ok (.bool false)
+  | .concat, .list xs, .list ys => .ok (.list (xs ++ ys))
+  | .concat, .sequence xs, .sequence ys => .ok (.sequence (xs ++ ys))
+  | .eq, .list xs, .list ys => .bool <$> Value.equalValue (.list xs) (.list ys)
+  | .eq, .sequence xs, .sequence ys => .bool <$> Value.equalValue (.sequence xs) (.sequence ys)
+  | .ne, .list xs, .list ys => (fun b => .bool (!b)) <$> Value.equalValue (.list xs) (.list ys)
+  | .ne, .sequence xs, .sequence ys =>
+    (fun b => .bool (!b)) <$> Value.equalValue (.sequence xs) (.sequence ys)
   | .eq, .bool x, .bool y => .ok (.bool (x == y))
   | .ne, .bool x, .bool y => .ok (.bool (x != y))
   | .eq, .null, .null => .ok (.bool true)
@@ -59,24 +107,23 @@ def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
     | _, _, _ => .error (.noMethod op.symbol [a.className, b.className])
 
 def evalUnOp : UnOp → Value → Except Error Value
-  | .neg, zz n => .ok (zz (-n))
-  | .neg, qq q => .ok (qq (-q))
-  | .pos, zz n => .ok (zz n)
-  | .pos, qq q => .ok (qq q)
+  | .neg, zz n => .ok (zz (-n)) | .neg, qq q => .ok (qq (-q))
+  | .pos, zz n => .ok (zz n) | .pos, qq q => .ok (qq q)
   | .notOp, .bool b => .ok (.bool (!b))
+  | .length, .list xs | .length, .sequence xs => .ok (.zz xs.length)
   | op, v => .error (.noMethod op.symbol [v.className])
 
-/-- Dispatch after the non-short-circuited operands have been evaluated. -/
 def evalLogicOp (op : LogicOp) (a b : Value) : Except Error Value :=
   match a, b with
   | .bool x, .bool y => .ok (.bool (match op with
-      | .andOp => x && y
-      | .orOp => x || y))
+      | .andOp => x && y | .orOp => x || y))
   | _, _ => .error (.noMethod op.symbol [a.className, b.className])
 
 def prelude : Env := [("true", .bool true), ("false", .bool false), ("null", .null)]
 
 def protectedNames : List String := prelude.map (·.1)
+
+mutual
 
 def evalTerm : Term → Env → Except Error (Value × Env)
   | .int n, env => .ok (zz n, env)
@@ -112,10 +159,32 @@ def evalTerm : Term → Env → Except Error (Value × Env)
     if x ∈ protectedNames then throw (.protectedSymbol x)
     let (v, env) ← evalTerm e env
     return (v, (x, v) :: env)
+  | .indexAssign a i v, env => do
+    let (a, env) ← evalTerm a env
+    let (i, env) ← evalTerm i env
+    let (v, _) ← evalTerm v env
+    match a with
+    | .list _ | .sequence _ => throw (.immutableCollection a.className)
+    | _ => throw (.noMethod "#=" [a.className, i.className, v.className])
   | .seq s e, env => do
     let (_, env) ← evalTerm s env
     evalTerm e env
   | .empty, env => .ok (null, env)
+  | .listLit elements, env => do
+    let (values, env) ← evalTerms elements env
+    return (.list values, env)
+  | .sequence elements, env => do
+    let (values, env) ← evalTerms elements env
+    return (.sequence values, env)
+
+def evalTerms : List Term → Env → Except Error (List Value × Env)
+  | [], env => .ok ([], env)
+  | t :: ts, env => do
+    let (v, env) ← evalTerm t env
+    let (vs, env) ← evalTerms ts env
+    return (v :: vs, env)
+
+end
 
 def evalProgram (t : Term) : Except Error Value :=
   (·.1) <$> evalTerm t prelude

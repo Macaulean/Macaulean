@@ -1,16 +1,11 @@
-/-!
-# Total lexer for the scalar Macaulay2 fragment
-
-`identifierToken` is shared with the located worksheet reader. Keywords are
-recognized only as whole words; `ifx`, `then$1`, and `not'` remain identifiers.
--/
-
+/-! # Total lexer shared with the located M2 worksheet reader -/
 namespace Macaulean.M2
 
 inductive Sym where
   | plus | minus | star | slash | slashslash | percent | caret
   | eqeq | ne | lt | le | gt | ge | assign
-  | lparen | rparen | semi
+  | lparen | rparen | lbrace | rbrace | semi | comma
+  | dotdot | dotdotless | sharp | sharpQuestion | bar | colon
   | kwIf | kwThen | kwElse | kwAnd | kwOr | kwNot
   deriving Repr, DecidableEq, Inhabited
 
@@ -75,24 +70,31 @@ def number : List Char → Nat × List Char
     | none => digits 10 0 ('0' :: b :: c :: cs)
   | cs => digits 10 0 cs
 
+/-- A range following a numeral is not a floating point suffix. -/
+def floatSuffix : List Char → Bool
+  | '.' :: '.' :: _ => false
+  | '.' :: _ | 'p' :: _ | 'e' :: _ | 'E' :: _ => true
+  | _ => false
+
 def symbol : List Char → Option (Sym × List Char)
+  | '.' :: '.' :: '<' :: cs => some (.dotdotless, cs)
+  | '.' :: '.' :: cs => some (.dotdot, cs)
+  | '#' :: '?' :: cs => some (.sharpQuestion, cs)
   | '/' :: '/' :: cs => some (.slashslash, cs)
   | '=' :: '=' :: cs => some (.eqeq, cs)
   | '!' :: '=' :: cs => some (.ne, cs)
   | '<' :: '=' :: cs => some (.le, cs)
   | '>' :: '=' :: cs => some (.ge, cs)
-  | '+' :: cs => some (.plus, cs)
-  | '-' :: cs => some (.minus, cs)
-  | '*' :: cs => some (.star, cs)
-  | '/' :: cs => some (.slash, cs)
-  | '%' :: cs => some (.percent, cs)
-  | '^' :: cs => some (.caret, cs)
-  | '<' :: cs => some (.lt, cs)
-  | '>' :: cs => some (.gt, cs)
+  | '+' :: cs => some (.plus, cs) | '-' :: cs => some (.minus, cs)
+  | '*' :: cs => some (.star, cs) | '/' :: cs => some (.slash, cs)
+  | '%' :: cs => some (.percent, cs) | '^' :: cs => some (.caret, cs)
+  | '<' :: cs => some (.lt, cs) | '>' :: cs => some (.gt, cs)
   | '=' :: cs => some (.assign, cs)
-  | '(' :: cs => some (.lparen, cs)
-  | ')' :: cs => some (.rparen, cs)
-  | ';' :: cs => some (.semi, cs)
+  | '(' :: cs => some (.lparen, cs) | ')' :: cs => some (.rparen, cs)
+  | '{' :: cs => some (.lbrace, cs) | '}' :: cs => some (.rbrace, cs)
+  | ';' :: cs => some (.semi, cs) | ',' :: cs => some (.comma, cs)
+  | '#' :: cs => some (.sharp, cs) | '|' :: cs => some (.bar, cs)
+  | ':' :: cs => some (.colon, cs)
   | _ => none
 
 def lexAux : Nat → List Char → Except String (List Token)
@@ -104,8 +106,7 @@ def lexAux : Nat → List Char → Except String (List Token)
     else if c = '-' ∧ cs.head? = some '-' then lexAux fuel (dropComment cs)
     else if c.isDigit then
       let (n, rest) := number (c :: cs)
-      if rest.head?.any (fun d => d = '.' ∨ d = 'p' ∨ d = 'e' ∨ d = 'E') then
-        .error "floating point literals are not supported"
+      if floatSuffix rest then .error "floating point literals are not supported"
       else (Token.num n :: ·) <$> lexAux fuel rest
     else if isIdentStart c then
       let (x, rest) := span isIdentChar cs

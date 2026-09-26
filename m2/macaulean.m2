@@ -273,6 +273,8 @@ registerMethod(server, "mrdiFactor", (mrdi) -> (
     )
 )
 
+load "./interpreter-values.m2"
+
 macauleanMainLoop(server, stdio);
 -- inputJSON = fromJSONStream stdio;
 -- stdio << toExternalString sum inputJSON << endl;
