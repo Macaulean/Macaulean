@@ -13,3 +13,4 @@ import MacauleanTest.InterpreterBranching
 import MacauleanTest.InterpreterBranchingDSL
 import MacauleanTest.InterpreterBranchingImport
 import MacauleanTest.InterpreterBranchingM2
+import MacauleanTest.InterpreterCollectionsM2
