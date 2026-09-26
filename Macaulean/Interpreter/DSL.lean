@@ -81,6 +81,21 @@ def reader : Lean.Parser.Parser where
         let input := Syntax.node .none `Macaulean.M2.DSL.input #[body, silent]
         Lean.Parser.whitespace c ((s.setPos ⟨base + tokens.stop⟩).pushSyntax input)
 
+/-- Keep explicit M2 parentheses; Lean's term precedence is not applicable here. -/
+@[combinator_parenthesizer reader]
+def readerParenthesizer : Lean.PrettyPrinter.Parenthesizer :=
+  Lean.Syntax.MonadTraverser.goLeft
+
+/-- Preserve significant newlines and spaces (in particular, `- -3` is not `--3`). -/
+@[combinator_formatter reader]
+def readerFormatter : Lean.PrettyPrinter.Formatter := do
+  let stx ← Lean.Syntax.MonadTraverser.getCur
+  let some source := stx.getSubstring? (withLeading := false) (withTrailing := false)
+    | throwError "M2 syntax has no original source range"
+  Lean.PrettyPrinter.Formatter.push (.text source.toString)
+  Lean.PrettyPrinter.Formatter.resetLeadWord
+  Lean.Syntax.MonadTraverser.goLeft
+
 syntax (name := inputSyntax) reader : m2
 
 private def binOp? : String → Option BinOp
@@ -120,14 +135,18 @@ def lowerTree : Nat → Syntax → Except String Term
       return .assign name (← lowerTree fuel stx[2])
     | _ => .error s!"unsupported M2 syntax node {stx.getKind}"
 
-/-- Decode a value of category `m2`. Useful to downstream tools and tests. -/
+/-- Decode a parsed value of category `m2`. Useful to downstream tools and tests. -/
 def lowerInput (stx : TSyntax `m2) : Except String (Term × Bool) := do
   let input := stx.raw[0]
   if input.getKind != `Macaulean.M2.DSL.input then
     .error "expected an M2 input"
   else
     let body := input[0]
-    let term ← lowerTree (sizeOf body + 1) body
+    let some source := body.getSubstring? (withLeading := false) (withTrailing := false)
+      | .error "M2 syntax has no original source range"
+    -- Every recursive descent crosses at least one source token. Unlike the
+    -- generated Syntax SizeOf instance, source byte length is executable.
+    let term ← lowerTree (source.toString.utf8ByteSize + 1) body
     return (term, input[1].getAtomVal == ";")
 
 /-- Registration only; the value stored in every environment is immutable. -/
