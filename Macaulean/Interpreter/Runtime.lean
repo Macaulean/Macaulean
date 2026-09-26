@@ -4,14 +4,10 @@ import Macaulean.Interpreter.Lexical
 /-!
 # Pure lexical runtime
 
-Closures contain code and lists of cell numbers, never copied captured values.
-Heap updates return fresh Lean values. No IO.Ref, unsafe code, host callbacks,
-external interpreter, or native decision axiom is used. Recursion is bounded by
-an explicit evaluation-depth parameter; exhaustion is an error, not a value.
-
-The original loop-free `evalTerm` is retained as a reference semantics. The
-source `run` and worksheet session use this resolved-code runtime for all inputs.
-Arithmetic, collection operations, and scalar Boolean dispatch are shared.
+Closures contain code and cell numbers, never copied captured values. Heap
+updates return fresh Lean data. Recursion is bounded by an explicit depth budget;
+exhaustion is an error, never a fabricated result. The original `evalTerm` remains
+the loop-free reference evaluator. Both evaluators share all primitive operations.
 -/
 namespace Macaulean.M2.Runtime
 open Lexical
@@ -28,13 +24,11 @@ structure Heap where
   cells : List Value := []
   functions : List Function := []
   deriving Repr, Inhabited
-
 structure State where
   env : Env := prelude
   heap : Heap := {}
   deriving Repr, Inhabited
 
-/-- Frame allocation is fresh even when closures from earlier calls escape. -/
 def State.allocate (s : State) (values : List Value) : List Nat × State :=
   let base := s.heap.cells.length
   ((List.range values.length).map (base + ·),
@@ -51,7 +45,8 @@ def cellAt (frames : Frames) (depth index : Nat) : Option Nat := do
 def readRef (ref : Ref) (frames : Frames) (s : State) : Except Error Value :=
   match ref with
   | .global name => match s.env.lookup name with
-    | some value => .ok value | none => .error (.unboundVar name)
+    | some value => .ok value
+    | none => .error (.unboundVar name)
   | .slot d i => do
     let some cell := cellAt frames d i | .error .invalidReference
     let some value := s.heap.cells[cell]? | .error .invalidReference
@@ -77,7 +72,7 @@ def writeMany : List Ref → List Value → Frames → State → Except Error St
     writeMany rs vs frames (← writeRef r v frames s)
   | rs, vs, _, _ => .error (.assignmentArity rs.length vs.length)
 
-/-- A bare parameter receives the entire operand; fixed arity unpacks a Sequence only. -/
+/-- Fixed arity unpacks only a Sequence, never a List. -/
 def arguments (params : Parameters) (arg : Value) : Except Error (List Value) :=
   match params with
   | .variadic _ => .ok [arg]
@@ -86,7 +81,6 @@ def arguments (params : Parameters) (arg : Value) : Except Error (List Value) :=
     if names.length = values.length then .ok values
     else .error (.arity names.length values.length)
 
-/-- Return carries its heap updates while skipping all remaining expression evaluation. -/
 inductive Signal where
   | error (error : Error)
   | returned (value : Value) (state : State)
@@ -101,14 +95,14 @@ def finish (r : Result Value) : Except Error (Value × State) :=
   | .error (.returned value state) => .ok (value, state)
   | .error (.error error) => .error error
 
-/-- Calls catch return, but operator evaluation and literal construction do not. -/
 def catchReturn (r : Result Value) : Result Value :=
   match r with
-  | .error (.returned v s) => .ok (v, s) | other => other
+  | .error (.returned v s) => .ok (v, s)
+  | other => other
 
 mutual
 
-def eval : Nat → Code → Frames → State → Result Value
+def eval : Nat → Code → Frames → State → Except Signal (Value × State)
   | 0, _, _, _ => .error (.error .fuelExhausted)
   | fuel + 1, code, frames, s => do
     match code with
@@ -186,7 +180,7 @@ def eval : Nat → Code → Frames → State → Result Value
       let (v, s) ← eval fuel a frames s
       .error (.returned v s)
 
-def evalMany : Nat → List Code → Frames → State → Result (List Value)
+def evalMany : Nat → List Code → Frames → State → Except Signal (List Value × State)
   | 0, _, _, _ => .error (.error .fuelExhausted)
   | _ + 1, [], _, s => .ok ([], s)
   | fuel + 1, x :: xs, frames, s => do
@@ -194,7 +188,7 @@ def evalMany : Nat → List Code → Frames → State → Result (List Value)
     let (vs, s) ← evalMany fuel xs frames s
     return (v :: vs, s)
 
-def call : Nat → Value → Value → State → Result Value
+def call : Nat → Value → Value → State → Except Signal (Value × State)
   | 0, _, _, _ => .error (.error .fuelExhausted)
   | fuel + 1, fn, arg, s => do
     let .closure id := fn
@@ -218,9 +212,7 @@ def call : Nat → Value → Value → State → Result Value
       return (← liftResult (evalUnOp .notOp v), s)
 end
 
-/-- Explicit budget. It bounds evaluation depth, not arithmetic magnitude. -/
 def defaultFuel : Nat := 4096
-
 structure InputResult where
   value : Value
   state : State
@@ -236,5 +228,4 @@ def evaluate (t : Term) (s : State := {}) (scope : Scope := {})
   let frame := fileFrame ++ fresh
   let (value, s) ← finish (eval fuel code [frame] s)
   return ⟨value, s, scope, frame, warnings⟩
-
 end Macaulean.M2.Runtime
