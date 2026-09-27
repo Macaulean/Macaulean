@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/macaulay2/testbot
-
     steps:
       - uses: actions/checkout@v7
       - name: Install dependencies
@@ -18,3 +17,29 @@ jobs:
           apt-get update
           apt-get install -y curl
       - uses: leanprover/lean-action@v1
+        with:
+          test: 'false'
+      - name: Run complete test suite and retain diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-evidence
+          git -c safe.directory="$PWD" rev-parse HEAD > ci-evidence/commit.txt
+          lean --version > ci-evidence/lean-version.txt
+          M2 --version > ci-evidence/m2-version.txt
+          set +e
+          lake test > ci-evidence/lake-test.log 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" > ci-evidence/lake-test.exit
+          grep -E '(^error:|^Some required|^Build completed|^.*Built MacauleanTest|COMPLETE:)' ci-evidence/lake-test.log || true
+          if [ "$status" -ne 0 ]; then tail -n 120 ci-evidence/lake-test.log; fi
+          exit "$status"
+      - name: Upload complete test evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lean-test-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-evidence/
+          retention-days: 7
+          if-no-files-found: warn

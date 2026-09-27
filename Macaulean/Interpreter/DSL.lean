@@ -75,8 +75,10 @@ def treeSyntax (c : Lean.Parser.InputContext) (base : Nat)
       #[tokenSyntax c base tokens i, treeSyntax c base tokens a]
   | .returnTerm i a => .node .none `Macaulean.M2.DSL.returnTerm
       #[tokenSyntax c base tokens i, treeSyntax c base tokens a]
+  | .polyRing i j _ a vars => .node .none `Macaulean.M2.DSL.polyRing
+      #[treeSyntax c base tokens a, tokenSyntax c base tokens i,
+        treeSyntax c base tokens vars, tokenSyntax c base tokens j]
 
-/-- Grammar decisions belong to the shared Pratt parser, not this editor adapter. -/
 def reader : Lean.Parser.Parser where
   info := { firstTokens := .unknown }
   fn := fun c s =>
@@ -111,11 +113,11 @@ syntax (name := inputSyntax) reader : m2
 private def binOp? : String → Option BinOp
   | "+" => some .add | "-" => some .sub | "*" => some .mul | "/" => some .div
   | "//" => some .quot | "%" => some .rem | "^" => some .pow
+  | "===" => some .strictEq | "=!=" => some .strictNe
   | "==" => some .eq | "!=" => some .ne | "<" => some .lt | "<=" => some .le
   | ">" => some .gt | ">=" => some .ge | ".." => some .range | "..<" => some .rangeExclusive
   | "#" => some .index | "#?" => some .hasIndex | "|" => some .concat
   | ":" => some .repeat | "@@" => some .compose | _ => none
-
 private def identifier? (stx : Syntax) : Option String :=
   if stx.getKind == `Macaulean.M2.DSL.var then
     match stx[0] with | .ident _ raw _ _ => some raw.toString | _ => none
@@ -140,7 +142,6 @@ private def parameters (fuel : Nat) (stx : Syntax) : Except String Parameters :=
   if p.names.eraseDups.length != p.names.length then .error "duplicate function parameter"
   else return p
 
-/-- Lower structured syntax directly, including source-significant parameter delimiters. -/
 def lowerTree : Nat → Syntax → Except String Term
   | 0, _ => .error "M2 syntax lowering ran out of fuel"
   | fuel + 1, stx => do
@@ -199,6 +200,13 @@ def lowerTree : Nat → Syntax → Except String Term
       let some x := identifier? stx[1] | .error "expected a local symbol name"
       return .localSymbol x
     | `Macaulean.M2.DSL.returnTerm => return .returnTerm (← lowerTree fuel stx[1])
+    | `Macaulean.M2.DSL.polyRing =>
+      let names ← if stx[2].getKind == `Macaulean.M2.DSL.missing then .ok []
+        else match parameterNames fuel stx[2] with
+          | some names => .ok names | none => .error "expected polynomial variable names"
+      if names.eraseDups.length != names.length then
+        .error "duplicate polynomial names require the indexed-variable extension"
+      else return .polyRing (← lowerTree fuel stx[0]) names
     | _ => .error s!"unsupported M2 syntax node {stx.getKind}"
 
 def lowerInput (stx : TSyntax `m2) : Except String (Term × Bool) := do
@@ -212,7 +220,6 @@ def lowerInput (stx : TSyntax `m2) : Except String (Term × Bool) := do
 
 initialize sessionExt : EnvExtension Session ← registerEnvExtension (pure ({} : Session))
 open Lean.Elab.Command
-
 def getSession : CommandElabM Session := return sessionExt.getState (← getEnv)
 def resetSession : CommandElabM Unit := modifyEnv fun env => sessionExt.setState env ({} : Session)
 end Macaulean.M2.DSL
