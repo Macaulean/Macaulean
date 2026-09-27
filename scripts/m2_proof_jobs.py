@@ -155,7 +155,7 @@ class Limits:
     seconds: int = 120
     memory_bytes: int = 4 * 1024**3
     disk_bytes: int = 64 * 1024**2
-    processes: int = 64
+    processes: int = 4096
 
     def __post_init__(self) -> None:
         if self.seconds < 1 or self.memory_bytes < 64 * 1024**2 or self.disk_bytes < MAX_PACKET:
@@ -310,8 +310,7 @@ class Sandbox:
     def run(self, context: Context, inputs: Path, logdir: Path) -> RunResult:
         logdir.mkdir(parents=True, exist_ok=False)
         stdout, stderr = logdir / "stdout", logdir / "stderr"
-        baseline_tasks = uid_task_count()
-        nproc_limit = baseline_tasks + self.limits.processes
+        nproc_limit = self.limits.processes
         with stdout.open("xb") as out, stderr.open("xb") as err:
             proc = subprocess.Popen(
                 self.command(context, inputs), stdin=subprocess.DEVNULL, stdout=out, stderr=err,
