@@ -11,6 +11,7 @@ def elabSourceFile : TermElab := fun stx _ => do
   let ctx ← readThe Lean.Core.Context
   let some directory := (System.FilePath.mk ctx.fileName).parent
     | throwErrorAt stx "cannot locate the source module"
-  let contents ← IO.FS.readFile (directory / stx[1].getString)
+  let file : TSyntax `str := ⟨stx[1]⟩
+  let contents ← IO.FS.readFile (directory / file.getString)
   return mkStrLit contents
 end Macaulean.M2
