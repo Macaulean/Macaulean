@@ -268,9 +268,8 @@ report J
 #guard_msgs in
 {ring saved === R,ring(holder#1) === S}
 
-open Lean Elab Command in
 run_cmd do
   let state ← Macaulean.M2.DSL.getSession
-  unless state.nextInput == 69 do throwError "Buchberger worksheet input boundaries changed"
-  logInfo "BUCHBERGER_WORKSHEET_COMPLETE: 68 annotated inputs"
+  unless state.nextInput == 69 do Lean.throwError "Buchberger worksheet input boundaries changed"
+  Lean.logInfo "BUCHBERGER_WORKSHEET_COMPLETE: 68 annotated inputs"
 end GroebnerWorksheet

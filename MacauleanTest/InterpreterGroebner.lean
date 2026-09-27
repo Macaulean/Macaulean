@@ -85,8 +85,8 @@ run_cmd do
     unless actual == .error expected do throwError "wrong error for {source}: {repr actual}"
   let r : Polynomials.RingInfo := ⟨0,["x"]⟩
   let malformed := Value.algebra (.matrix r 2 [[[(1,[1])]]])
-  unless Polynomials.asMatrix malformed == .error (.algebra "invalid matrix dimensions") do
-    throwError "malformed matrix dimensions were truncated"
+  let .error (.algebra "invalid matrix dimensions") := Polynomials.asMatrix malformed
+    | throwError "malformed matrix dimensions were truncated or misclassified"
   logInfo m!"BUCHBERGER_ERROR_CONTROLS_COMPLETE: {errors.length} source cases and malformed matrix data"
 
 private def execute (s : Session) (source : String) (fuel := Runtime.defaultFuel) : Except String Session.Result := do
