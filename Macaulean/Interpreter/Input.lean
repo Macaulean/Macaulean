@@ -1,6 +1,6 @@
 import Macaulean.Interpreter.Parser
 
-/-! # Located single-input reader with function continuation and lexical keywords -/
+/-! # Located input with function, branch, and bracket continuation -/
 namespace Macaulean.M2
 namespace Input
 structure Span where
@@ -60,8 +60,8 @@ private def scanAux : Nat → List Char → Nat → Nat → Nat → Bool → Arr
         let stop := pos + consumedBytes (c :: cs) tail
         if sym = .semi ∧ depth = 0 then .ok ⟨acc, stop, true⟩
         else
-          let depth := if sym = .lparen ∨ sym = .lbrace then depth + 1
-            else if sym = .rparen ∨ sym = .rbrace then depth - 1 else depth
+          let depth := if sym = .lparen ∨ sym = .lbrace ∨ sym = .lbracket then depth + 1
+            else if sym = .rparen ∨ sym = .rbrace ∨ sym = .rbracket then depth - 1 else depth
           scanAux fuel tail stop depth predicates (continues (.sym sym)) (push acc (.sym sym) pos stop)
 def scan (source : String) : Except String Tokens :=
   let chars := source.toList

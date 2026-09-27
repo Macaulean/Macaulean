@@ -10,3 +10,4 @@ import Macaulean.Interpreter.DSL
 import Macaulean.Interpreter.ControlFlow
 import Macaulean.Interpreter.Collections
 import Macaulean.Interpreter.Functions
+import Macaulean.Interpreter.Polynomial

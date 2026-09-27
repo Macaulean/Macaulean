@@ -1,12 +1,14 @@
 import Macaulean.Interpreter.Syntax
 import Macaulean.Interpreter.Value
+import Macaulean.Interpreter.Algebra
+import Macaulean.Interpreter.Library
 
 /-!
 # Shared value operations and loop-free reference semantics
 
-`evalTerm` is the original structurally recursive reference evaluator. The source
-and worksheet entry points use `Runtime.evaluate`, which adds lexical resolution,
-closures, return, and explicit recursion fuel. Both use the value operations here.
+`evalTerm` remains the structurally recursive reference evaluator. The source
+and worksheet entry points use `Runtime.evaluate`, with lexical resolution,
+closures, ring creation, and explicit recursion fuel. Both share value operations.
 -/
 namespace Macaulean.M2
 abbrev Env := List (String × Value)
@@ -20,6 +22,12 @@ def equalValue : Value → Value → Except Error Bool
   | .bool a, .bool b => .ok (a == b)
   | .null, .null => .ok true
   | .symbol a i, .symbol b j => .ok (a == b && i == j)
+  | .globalSymbol a, .globalSymbol b => .ok (a == b)
+  | .polynomial p, b => Algebra.polynomialEqual (.polynomial p) b
+  | a, .polynomial q => Algebra.polynomialEqual a (.polynomial q)
+  | .ring a, .ring b => .ok (a == b)
+  | .coefficientRing a, .coefficientRing b => .ok (a == b)
+  | .matrix a, .matrix b => .ok (a == b)
   | a, b => match a.toRat?, b.toRat? with
     | some p, some q => .ok (decide (p = q))
     | _, _ => .error (.noMethod "==" [a.className, b.className])
@@ -89,19 +97,24 @@ def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
     | .le, some p, some q => .ok (.bool (decide (p ≤ q)))
     | .gt, some p, some q => .ok (.bool (decide (q < p)))
     | .ge, some p, some q => .ok (.bool (decide (q ≤ p)))
-    | _, _, _ => .error (.noMethod op.symbol [a.className, b.className])
+    | _, _, _ => Algebra.binary op a b
 
 def evalUnOp : UnOp → Value → Except Error Value
   | .neg, zz n => .ok (zz (-n)) | .neg, qq q => .ok (qq (-q))
   | .pos, zz n => .ok (zz n) | .pos, qq q => .ok (qq q)
   | .notOp, .bool b => .ok (.bool (!b))
   | .length, .list xs | .length, .sequence xs => .ok (.zz xs.length)
-  | op, v => .error (.noMethod op.symbol [v.className])
+  | op, v => Algebra.unary op v
+
 def evalLogicOp (op : LogicOp) (a b : Value) : Except Error Value :=
   match a, b with
   | .bool x, .bool y => .ok (.bool (match op with | .andOp => x && y | .orOp => x || y))
   | _, _ => .error (.noMethod op.symbol [a.className, b.className])
-def prelude : Env := [("true", .bool true), ("false", .bool false), ("null", .null)]
+
+def prelude : Env := [("true", .bool true), ("false", .bool false), ("null", .null),
+    ("QQ", .coefficientRing .rationals), ("ZZ", .coefficientRing .integers)] ++
+  Algebra.Primitive.bindings.map (fun (name,op) => (name,Value.primitive op)) ++
+  Library.names.map (fun name => (name,Value.library name))
 def protectedNames : List String := prelude.map (·.1)
 
 mutual
@@ -153,7 +166,7 @@ def evalTerm : Term → Env → Except Error (Value × Env)
     let (values, env) ← evalTerms elements env
     return (.sequence values, env)
   | .lambda .., _ | .apply .., _ | .localAssign .., _ | .assignMany .., _
-  | .localSymbol .., _ | .returnTerm .., _ => .error .needsRuntime
+  | .localSymbol .., _ | .returnTerm .., _ | .ringNew .., _ => .error .needsRuntime
 
 def evalTerms : List Term → Env → Except Error (List Value × Env)
   | [], env => .ok ([], env)

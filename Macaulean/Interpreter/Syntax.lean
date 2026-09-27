@@ -4,7 +4,7 @@ namespace Macaulean.M2
 inductive BinOp where
   | add | sub | mul | div | quot | rem | pow
   | eq | ne | lt | le | gt | ge
-  | range | rangeExclusive | index | hasIndex | concat | repeat | compose
+  | range | rangeExclusive | index | hasIndex | concat | repeat | compose | subscript
   deriving Repr, DecidableEq, Inhabited
 inductive UnOp where
   | neg | pos | notOp | length
@@ -45,6 +45,7 @@ inductive Term where
   | assignMany (declareLocal : Bool) (names : List String) (rhs : Term)
   | localSymbol (name : String)
   | returnTerm (value : Term)
+  | ringNew (base specifications : Term)
   deriving Repr, Inhabited
 
 mutual
@@ -110,6 +111,10 @@ def Term.decEq (a b : Term) : Decidable (a = b) := by
   case returnTerm.returnTerm a b =>
     haveI := Term.decEq a b
     exact decidable_of_iff (a = b) (by simp only [Term.returnTerm.injEq])
+  case ringNew.ringNew a b c d =>
+    haveI := Term.decEq a c
+    haveI := Term.decEq b d
+    exact decidable_of_iff (a = c ∧ b = d) (by simp only [Term.ringNew.injEq])
   all_goals exact isFalse (by intro h; cases h)
 termination_by structural a
 
@@ -134,7 +139,7 @@ def symbol : BinOp → String
   | rem => "%" | pow => "^" | eq => "==" | ne => "!=" | lt => "<"
   | le => "<=" | gt => ">" | ge => ">=" | range => ".."
   | rangeExclusive => "..<" | index => "#" | hasIndex => "#?"
-  | concat => "|" | .repeat => ":" | compose => "@@"
+  | concat => "|" | .repeat => ":" | compose => "@@" | subscript => "_"
 end BinOp
 namespace UnOp
 def symbol : UnOp → String
@@ -154,7 +159,6 @@ def Term.inBraces (commaBody : Bool) (a : Term) : Term :=
   match commaBody, a with
   | true, .sequence xs => .listLit xs | _, _ => .listLit [a]
 
-/-- Bare variable sequences are the supported multiple-assignment targets. -/
 def Term.variableNames : List Term → Option (List String)
   | [] => some []
   | .var x :: ts => (x :: ·) <$> Term.variableNames ts
@@ -189,6 +193,8 @@ def Term.toM2String : Term → String
   | .localSymbol x => s!"(local {x})"
   | .returnTerm .empty => "(return)"
   | .returnTerm a => s!"(return {a.toM2String})"
+  | .ringNew base (.sequence []) => s!"({base.toM2String}[])"
+  | .ringNew base specs => s!"({base.toM2String}[{specs.toM2String}])"
 def Term.strings : List Term → List String
   | [] => [] | a :: xs => a.toM2String :: Term.strings xs
 end

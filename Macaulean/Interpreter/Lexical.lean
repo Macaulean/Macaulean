@@ -16,7 +16,6 @@ inductive Ref where
   | slot (depth index : Nat)
   deriving Repr, DecidableEq, Inhabited
 
-/-- Resolved code is distinct from surface syntax; local references have addresses. -/
 inductive Code where
   | int (n : Int)
   | read (ref : Ref)
@@ -36,7 +35,22 @@ inductive Code where
   | apply (fn arg : Code)
   | symbol (name : String) (ref : Ref)
   | returnTerm (arg : Code)
+  | ringNew (base specifications : Code)
+  | ringName (name : String)
   deriving Repr, Inhabited
+
+mutual
+/-- Only bare unbound globals in a ring specification denote fresh symbols.
+Bound values, local nulls, explicit local quotes, and expression evaluation are
+not replaced with the spelling of their source. -/
+def ringSpecifications : Code → Code
+  | .read (.global name) => .ringName name
+  | .listLit xs => .listLit (ringSpecificationsMany xs)
+  | .sequence xs => .sequence (ringSpecificationsMany xs)
+  | other => other
+def ringSpecificationsMany : List Code → List Code
+  | [] => [] | x :: xs => ringSpecifications x :: ringSpecificationsMany xs
+end
 
 structure Scope where
   names : List (String × Nat) := []
@@ -146,6 +160,10 @@ def resolve : Term → Resolver → Code × Resolver
   | .returnTerm a, r =>
     let (a, r) := resolve a r
     (.returnTerm a, r)
+  | .ringNew base specs, r =>
+    let (base, r) := resolve base r
+    let (specs, r) := resolve specs r
+    (.ringNew base (ringSpecifications specs), r)
 
 def resolveMany : List Term → Resolver → List Code × Resolver
   | [], r => ([], r)
@@ -155,7 +173,6 @@ def resolveMany : List Term → Resolver → List Code × Resolver
     (a :: xs, r)
 end
 
-/-- The current file scope is extended; nested function scopes are never exported. -/
 def prepare (t : Term) (scope : Scope := {}) : Code × Scope × List String :=
   let (code, r) := resolve t { current := scope }
   (code, r.current, r.warnings)
