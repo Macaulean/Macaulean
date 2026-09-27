@@ -151,9 +151,9 @@ run_cmd do
       "R=QQ[x,y];", "R_0", "0_R", "(gens gb I)_(0,1)",
       "QQ[\nlocal x, -- λ, 中文\nlocal y\n]", "gens gb ideal(x^2-y,x*y-1)"] do
     let .ok expected := Macaulean.M2.parse source | throwError "string parser failed: {source}"
-    let .ok syntax := Parser.runParserCategory (← getEnv) `m2 source
+    let .ok stx := Parser.runParserCategory (← getEnv) `m2 source
       | throwError "category parser failed: {source}"
-    let .ok (actual,_) := Macaulean.M2.DSL.lowerInput ⟨syntax⟩
+    let .ok (actual,_) := Macaulean.M2.DSL.lowerInput ⟨stx⟩
       | throwError "lowering failed: {source}"
     unless actual == expected do throwError "different ASTs: {source}"
     let .ok printed := Macaulean.M2.parse actual.toM2String
@@ -162,9 +162,9 @@ run_cmd do
 
 run_cmd do
   let source := "QQ[local x, -- λ, 中文\nlocal y]"
-  let .ok syntax := Parser.runParserCategory (← getEnv) `m2 source
+  let .ok stx := Parser.runParserCategory (← getEnv) `m2 source
     | throwError "ring category parser failed"
-  let body := syntax[0][0]
+  let body := stx[0][0]
   unless body.getKind == `Macaulean.M2.DSL.ringNew do throwError "ring syntax is opaque"
   for (index,text) in #[(1,"["),(3,"]")] do
     let some a := body[index].getPos? | throwError "missing bracket position"
