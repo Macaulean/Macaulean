@@ -4,8 +4,10 @@ import Macaulean.Interpreter.Lexer
 /-! # Shared concrete-tree Pratt grammar
 
 Application is right-associative (46), below powers/indexing (50) and composition
-(48), above multiplication (40). Arrow and assignments share precedence 10.
-Parameter delimiters are retained until arity is determined, never erased early.
+(48), above multiplication (40). Ring brackets bind below multiplication (38),
+so `f QQ[x]` means `(f QQ)[x]`, not `f (QQ[x])`, as in native M2.
+Arrow and assignments share precedence 10. Parameter delimiters are retained
+until arity is determined, never erased early.
 -/
 namespace Macaulean.M2
 namespace Parser
@@ -15,6 +17,7 @@ def notBP : Nat := 19
 def branchBP : Nat := 10
 def commaBP : Nat := 5
 def applicationBP : Nat := 46
+def bracketBP : Nat := 38
 inductive Infix where
   | bin (op : BinOp) | logic (op : LogicOp) | assign | comma | arrow | localAssign
 
@@ -286,7 +289,7 @@ def parseTreeLoop : Nat → Nat → Bool → Tree → Cursor → TreeResult
     else
       match c.tokens with
       | .sym .lbracket :: rest =>
-        if minBP ≤ 50 then parseRing fuel minBP obey c.index lhs ⟨rest, c.index + 1⟩
+        if minBP ≤ bracketBP then parseRing fuel minBP obey c.index lhs ⟨rest, c.index + 1⟩
         else .ok (lhs, c)
       | .sym s :: rest =>
         match infixInfo s with
