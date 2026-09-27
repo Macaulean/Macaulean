@@ -29,3 +29,4 @@ import MacauleanTest.InterpreterPolynomialsM2
 import MacauleanTest.InterpreterPolynomialsDSL
 import MacauleanTest.InterpreterPolynomialsImport
 import MacauleanTest.PolynomialCIReference
+import MacauleanTest.GroebnerSmoke
