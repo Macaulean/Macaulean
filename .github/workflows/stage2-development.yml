@@ -1,0 +1,37 @@
+name: Stage 2 development replay
+on:
+  push:
+    branches: [feature/m2-proof-stage2-20260927]
+    paths: [.github/workflows/stage2-development.yml]
+permissions:
+  contents: read
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: leanprover/lean-action@v1
+        with:
+          test: 'false'
+      - name: Archive public toolchain and exact source for offline proof development
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir replay
+          lean --version > replay/lean-version.txt
+          git rev-parse HEAD > replay/commit.txt
+          prefix="$HOME/.elan/toolchains/leanprover--lean4---v4.33.1"
+          test -x "$prefix/bin/lean"
+          tar -C "$prefix" --exclude='*.a' --exclude='*.o' --exclude='*.c' --exclude='*.bc' -czf replay/toolchain.tar.gz bin lib
+          git archive HEAD | gzip > replay/source.tar.gz
+          tar --exclude='*.a' --exclude='*.o' --exclude='*.c' -czf replay/build.tar.gz .lake/build
+          sha256sum replay/*.tar.gz > replay/SHA256SUMS
+          du -h replay/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stage2-offline-replay-${{ github.sha }}
+          path: replay/
+          retention-days: 1
+          compression-level: 0
