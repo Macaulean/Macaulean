@@ -38,3 +38,4 @@ import MacauleanTest.VerificationViews
 import MacauleanTest.VerificationIntent
 import MacauleanTest.VerificationDSL
 import MacauleanTest.VerificationImport
+import MacauleanTest.VerificationWidget
