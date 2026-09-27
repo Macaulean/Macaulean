@@ -23,8 +23,9 @@ magnitude = if x < 0 then -x else x
 #guard_msgs in
 magnitude == 7
 
+-- Shadow the library function lexically, without overwriting its global binding.
 #guard_msgs in
-denominator = 0;
+denominator := 0;
 
 /-- info: o5 = false : Boolean -/
 #guard_msgs in
