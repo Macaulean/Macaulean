@@ -10,27 +10,41 @@ set_option maxRecDepth 20000
 set_option maxHeartbeats 10000000
 
 run_cmd do
+  let mut failures := 0
   for (source,expected) in PolynomialCases.successes do
-    unless run source == .ok expected do
-      throwError "polynomial result mismatch {repr source}: {repr (run source)} versus {repr expected}"
+    let ours := run source
+    unless ours == .ok expected do
+      failures := failures + 1
+      logError m!"polynomial result mismatch {repr source}: {repr ours} versus {repr expected}"
     let native ← queryM2 source
     unless native == .ok (.ok expected) do
-      throwError "native polynomial result mismatch {repr source}: {repr native} versus {repr expected}"
+      failures := failures + 1
+      logError m!"native polynomial result mismatch {repr source}: {repr native} versus {repr expected}"
+  unless failures == 0 do throwError "{failures} polynomial value comparisons failed"
   logInfo m!"POLYNOMIAL_TYPED_RESULTS_COMPLETE: {PolynomialCases.successes.length} exact observations"
 
 run_cmd do
+  let mut failures := 0
   for source in PolynomialCases.errors do
     match run source with
     | .error _ => pure ()
-    | result => throwError "expected runtime error, got {repr result} for {repr source}"
+    | result =>
+      failures := failures + 1
+      logError m!"expected runtime error, got {repr result} for {repr source}"
     unless (← queryM2 source) == .ok .error do
-      throwError "native M2 did not raise the expected runtime error: {repr source}"
+      failures := failures + 1
+      logError m!"native M2 did not raise the expected runtime error: {repr source}"
   for source in PolynomialCases.unsupported do
     match run source with
     | .error _ => pure ()
-    | result => throwError "unsupported algebra was silently accepted: {repr source}, {repr result}"
+    | result =>
+      failures := failures + 1
+      logError m!"unsupported algebra was silently accepted: {repr source}, {repr result}"
   for source in PolynomialCases.invalidSyntax do
-    if (parse source).isOk then throwError "accepted malformed syntax: {repr source}"
+    if (parse source).isOk then
+      failures := failures + 1
+      logError m!"accepted malformed syntax: {repr source}"
+  unless failures == 0 do throwError "{failures} polynomial rejection controls failed"
   logInfo m!"POLYNOMIAL_REJECTIONS_COMPLETE: {PolynomialCases.errors.length} native errors, {PolynomialCases.unsupported.length} explicit scope rejections, {PolynomialCases.invalidSyntax.length} parser errors"
 
 /-- Compare monic reduced bases, not display strings or generator order. -/
