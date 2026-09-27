@@ -17,7 +17,22 @@ jobs:
         with:
           persist-credentials: false
       - name: Install isolated worker support
-        run: sudo apt-get update && sudo apt-get install -y bubblewrap python3
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap python3 apparmor-profiles apparmor-utils
+      - name: Permit the distribution sandbox to create its isolated namespaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-evidence
+          setting=/proc/sys/kernel/apparmor_restrict_unprivileged_userns
+          if [[ -e "$setting" ]]; then
+            cat "$setting" > ci-evidence/userns-policy-before.txt
+            profile=/usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+            test -f "$profile"
+            sudo install -m 0644 "$profile" /etc/apparmor.d/bwrap-userns-restrict
+            sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
+            cat "$setting" > ci-evidence/userns-policy-after.txt
+            cmp ci-evidence/userns-policy-before.txt ci-evidence/userns-policy-after.txt
+          fi
       - uses: leanprover/lean-action@v1
         with:
           build: 'false'
