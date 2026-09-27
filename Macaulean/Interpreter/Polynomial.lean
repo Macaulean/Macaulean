@@ -81,7 +81,7 @@ private theorem Poly.eq_iff_data (p q : Poly) :
 instance : DecidableEq Poly := fun p q =>
   decidable_of_iff (p.ring = q.ring ∧ p.termData = q.termData) (Poly.eq_iff_data p q)
 
-/-- First-order, total arithmetic in the existing polynomial representation.
+/-! First-order, total arithmetic in the existing polynomial representation.
 Normalization does not assume its input is sorted or free of zero terms. -/
 namespace KernelPolynomial
 
