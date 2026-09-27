@@ -1,65 +1,29 @@
 import Macaulean.Verification.Contracts
-import Macaulean.Verification.Fingerprint
+import Macaulean.Verification.ExpressionGraph
 import Macaulean.Interpreter.Check
 import Macaulean.Interpreter.LibraryCompiler
 
 /-!
-# Semantic snapshots, not source-text guesses
+# Semantic snapshots
 
-Keys retain constructor structure, resolved code, reachable global bindings,
-captured cells, library bodies and ring identities. Comments and source offsets
-are deliberately absent. Theory fingerprints traverse actual declaration bodies,
-including the formal contract. Missing dependencies or exhausted budgets fail
-closed. Session-relative handles are deliberately not portable.
+Declaration types and bodies are encoded as shared constructor graphs before
+hashing. The retained manifest contains each declaration's name and SHA-256,
+not exponentially expanded copies of every expression tree. Every referenced
+declaration is visited, including proof bodies and recursor rules. Hash equality
+relies on collision resistance; missing dependencies and exhausted budgets fail
+closed. Exact proposed runtime expressions are still checked when installed.
 -/
 namespace Macaulean.M2.Verification.Snapshot
 open Lean Fingerprint Lexical
 
-def nameKey : Name → String
-  | .anonymous => frame ["name"]
-  | .str p s => frame ["str",nameKey p,s]
-  | .num p n => frame ["num",nameKey p,toString n]
+def nameKey := ExpressionGraph.nameKey
+def levelKey := ExpressionGraph.levelKey
+def binderKey := ExpressionGraph.binderKey
+def exprKey := ExpressionGraph.key
+def exprNames (e : Expr) := (ExpressionGraph.encodeMany [e]).constants
 
-def levelKey : Level → String
-  | .zero => "zero"
-  | .succ u => frame ["succ",levelKey u]
-  | .max u v => frame ["max",levelKey u,levelKey v]
-  | .imax u v => frame ["imax",levelKey u,levelKey v]
-  | .param n => frame ["param",nameKey n]
-  | .mvar n => frame ["mvar",nameKey n.name]
-
-def binderKey : BinderInfo → String
-  | .default => "default" | .implicit => "implicit"
-  | .strictImplicit => "strictImplicit" | .instImplicit => "instImplicit"
-
-def exprKey : Expr → String
-  | .bvar i => frame ["bvar",toString i]
-  | .fvar i => frame ["fvar",nameKey i.name]
-  | .mvar i => frame ["mvar",nameKey i.name]
-  | .sort u => frame ["sort",levelKey u]
-  | .const n us => frame ["const",nameKey n,frame (us.map levelKey)]
-  | .app f a => frame ["app",exprKey f,exprKey a]
-  | .lam _ t b bi => frame ["lam",binderKey bi,exprKey t,exprKey b]
-  | .forallE _ t b bi => frame ["forall",binderKey bi,exprKey t,exprKey b]
-  | .letE _ t v b nondep => frame ["let",toString nondep,exprKey t,exprKey v,exprKey b]
-  | .lit (.natVal n) => frame ["nat",toString n]
-  | .lit (.strVal s) => frame ["string",s]
-  | .mdata _ e => exprKey e
-  | .proj n i e => frame ["proj",nameKey n,toString i,exprKey e]
-
-/-- Repeated references in generated code are one graph edge, not repeated work.
-The declaration body itself is still serialized in full. -/
-def exprNameSet : Expr → NameSet → NameSet
-  | .const n _, names => names.insert n
-  | .app f a, names => exprNameSet a (exprNameSet f names)
-  | .lam _ t b _, names | .forallE _ t b _, names => exprNameSet b (exprNameSet t names)
-  | .letE _ t v b _, names => exprNameSet b (exprNameSet v (exprNameSet t names))
-  | .mdata _ e, names => exprNameSet e names
-  | .proj n _ e, names => exprNameSet e (names.insert n)
-  | _, names => names
-
-def exprNames (e : Expr) : List Name := (exprNameSet e {}).toArray.toList
-
+/-- Non-expression declaration fields and additional semantic edges. Recursor
+rule expressions are encoded together with the type/body below. -/
 def declarationExtra (c : ConstantInfo) : List String × List Name :=
   match c with
   | .axiomInfo _ => (["axiom"],[])
@@ -75,40 +39,42 @@ def declarationExtra (c : ConstantInfo) : List String × List Name :=
   | .recInfo v =>
     (["recursor",toString v.numParams,toString v.numIndices,toString v.numMotives,
       toString v.numMinors,frame (v.rules.map fun rule =>
-        frame [nameKey rule.ctor,toString rule.nfields,exprKey rule.rhs])],
-      v.rules.flatMap fun rule => rule.ctor :: exprNames rule.rhs)
+        frame [nameKey rule.ctor,toString rule.nfields])],v.rules.map (·.ctor))
 
 structure Theory where
+  /-- Complete, ordered declaration-name/digest manifest. -/
   payload : String
   digest : String
   declarations : List String
   axioms : List String
   deriving Inhabited
 
-private def theoryWalk : Nat → Environment → List Name → NameSet → List String → List String →
-    Except String (List Name × List String × List String)
-  | 0, _, _, _, _, _ => .error "semantic dependency traversal exhausted"
-  | _+1, _, [], seen, entries, axioms => .ok (seen.toArray.toList,entries,axioms)
-  | fuel+1, env, n::todo, seen, entries, axioms => do
-    if seen.contains n then theoryWalk fuel env todo seen entries axioms
-    else
-      let some c := env.find? n | .error s!"missing semantic declaration {n}"
-      let (extra,more) := declarationExtra c
-      let value := c.value? true
-      let key := frame ([nameKey n,frame (c.levelParams.map nameKey),exprKey c.type,
-        toString c.isUnsafe,match value with | none => "no-value" | some e => frame ["value",exprKey e]] ++ extra)
-      let refs := exprNameSet c.type {}
-      let refs := match value with | none => refs | some e => exprNameSet e refs
-      let refs := more.foldl (fun names n => names.insert n) refs
-      let seen := seen.insert n
-      let fresh := refs.toArray.toList.filter (fun ref => !seen.contains ref)
-      theoryWalk fuel env (fresh ++ todo) seen (key::entries)
-        (if c.isAxiom then n.toString::axioms else axioms)
+private def theoryWalk : Nat → Environment → List Name → NameSet → List Name →
+    List String → List String → Except String (List Name × List String × List String)
+  | 0, _, _, _, _, _, _ => .error "semantic dependency traversal exhausted"
+  | _+1, _, [], _, visited, entries, axioms => .ok (visited,entries,axioms)
+  | fuel+1, env, n::todo, scheduled, visited, entries, axioms => do
+    let some c := env.find? n | .error s!"missing semantic declaration {n}"
+    let (extra,more) := declarationExtra c
+    let value := c.value? true
+    let ruleExprs := match c with | .recInfo v => v.rules.map (·.rhs) | _ => []
+    let expressions := c.type :: (value.toList ++ ruleExprs)
+    let graph := ExpressionGraph.encodeMany expressions
+    let key := frame ([nameKey n,frame (c.levelParams.map nameKey),
+      toString c.isUnsafe,toString value.isSome,graph.payload] ++ extra)
+    let refs := (graph.constants ++ more).foldl (fun names ref => names.insert ref) ({} : NameSet)
+    let fresh := refs.toArray.toList.filter (fun ref => !scheduled.contains ref)
+    let scheduled := fresh.foldl (fun names ref => names.insert ref) scheduled
+    let manifestEntry := frame [nameKey n,sha256 key]
+    theoryWalk fuel env (fresh ++ todo) scheduled (n::visited) (manifestEntry::entries)
+      (if c.isAxiom then n.toString::axioms else axioms)
 
-/-- Exact declaration payload is retained; digest is the portable attestation key. -/
+/-- All edges are scheduled exactly once. The budget counts unique declarations,
+not repeated references in generated code. -/
 def sealTheory (env : Environment) (roots : List Name) (fuel : Nat := 500000) : Except String Theory := do
-  let (seen,entries,axioms) ← theoryWalk fuel env roots {} [] []
-  let payload := frame ["lean-declarations-v1",Lean.versionString,frame entries]
+  let initial := roots.foldl (fun names n => names.insert n) ({} : NameSet)
+  let (seen,entries,axioms) ← theoryWalk fuel env initial.toArray.toList initial [] [] []
+  let payload := frame ["lean-declaration-manifest-v2",Lean.versionString,frame entries]
   return ⟨payload,sha256 payload,seen.map Name.toString,axioms⟩
 
 def roots : List Name := [
@@ -210,7 +176,7 @@ private def walk : Nat → Runtime.State → List Work → List String → List 
 
 def reachable (fn : Value) (state : Runtime.State) : Except String String := do
   let entries ← walk 100000 state [.value fn] [] []
-  return frame ["m2-reachable-v1",toString state.heap.nextRing,frame entries]
+  return frame ["m2-reachable-v2",toString state.heap.nextRing,frame entries]
 
 def bindingId (moduleName : Name) (name : String) : String :=
   sha256 (frame ["m2-binding-v1",nameKey moduleName,name])
