@@ -12,8 +12,13 @@ run_cmd do
     ("x=3;R=QQ[x];gens R", ["ok","List","{p_0,p_1,p_2}"]),
     ("local x;R=QQ[x];numgens R", ["ok","ZZ","0"]),
     ("R=QQ[x,y];old=x+y;QQ[old]", ["error"]),
-    ("x=2;QQ[x,y]", ["error"])
+    ("x=2;QQ[x,y]", ["error"]),
+    -- Native polynomial powering is totalized at zero; it is not inversion in
+    -- the coefficient field. Inspect exact coefficients, not just the class.
+    ("R=QQ[x];listForm((x-x)^(-1))", ["ok","List","{}"]),
+    ("R=QQ[x];listForm((x-x)^(-2))", ["ok","List","{}"]),
+    ("R=QQ[x,y];listForm((0_R)^(-3))", ["ok","List","{}"])
   ] do
     let actual ← NativePolynomialOracle.raw ("(" ++ source ++ ")") true
     unless actual == expected do throwError "native reference changed: {source}: {repr actual}"
-  logInfo "POLYNOMIAL_REFERENCE_COMPLETE: 9 fresh-process native assertions"
+  logInfo "POLYNOMIAL_REFERENCE_COMPLETE: 12 fresh-process native assertions"
