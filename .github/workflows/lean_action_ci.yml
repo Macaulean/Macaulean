@@ -33,7 +33,7 @@ jobs:
           status=$?
           set -e
           printf '%s\n' "$status" > ci-evidence/lake-test.exit
-          grep -E '(^error:|^Some required|^Build completed|^.*Built MacauleanTest|COMPLETE:|POLYNOMIAL_FRESH_REFERENCE|depends on axioms)' ci-evidence/lake-test.log || true
+          grep -E '(^error:|^Some required|^Build completed|^.*Built MacauleanTest|COMPLETE:)' ci-evidence/lake-test.log || true
           if [ "$status" -ne 0 ]; then tail -n 120 ci-evidence/lake-test.log; fi
           exit "$status"
       - name: Upload complete test evidence
