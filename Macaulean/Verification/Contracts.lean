@@ -35,7 +35,7 @@ def Domain : Kind → Value → Prop
   | .orderedRemainder, arg => ∃ r f generators fv gv,
       arg = .sequence [fv,gv] ∧ readPolynomial r fv = .ok f ∧
       readRow r generators.length gv = .ok (Row.mk generators rfl)
-  | .linearCombination, arg => ∃ r n (row gs : Row r n) rv gv,
+  | .linearCombination, arg => ∃ r n, ∃ (row gs : Row r n), ∃ rv gv,
       arg = .sequence [rv,gv] ∧ readRow r n rv = .ok row ∧ readRow r n gv = .ok gs
 
 /-- Equality of polynomials, not equality of their chosen sparse representations. -/
@@ -48,7 +48,7 @@ def RemainderPost (arg result : Value) : Prop := ∃ r f remainder generators fv
   readRow r generators.length gv = .ok (Row.mk generators rfl) ∧
   readPolynomial r result = .ok remainder ∧ OrderedRemainder f remainder generators
 
-def CombinationPost (arg result : Value) : Prop := ∃ r n (row gs : Row r n) p rv gv,
+def CombinationPost (arg result : Value) : Prop := ∃ r n, ∃ (row gs : Row r n), ∃ p rv gv,
   arg = .sequence [rv,gv] ∧ readRow r n rv = .ok row ∧ readRow r n gv = .ok gs ∧
   readPolynomial r result = .ok p ∧
   ∀ powers, p.coeff powers = linearCoefficient row.values gs.values powers
@@ -75,7 +75,7 @@ structure Description where
 def describe (kind : Kind) : Description := {
   title := match kind with
     | .polynomialIdentity => "Polynomial identity"
-    | .orderedRemainder => "Ordered polynomial remainder"
+    | .orderedRemainder => "Polynomial remainder (no canonical choice)"
     | .linearCombination => "Coefficient-row linear combination"
   inputs := match kind with
     | .polynomialIdentity => ["One polynomial p in a fixed runtime QQ polynomial ring R."]
@@ -94,7 +94,7 @@ def describe (kind : Kind) : Description := {
         "p equals the sum of a_i * G_i, coefficient by coefficient; no row entries are discarded."]
   limitations := ["Partial correctness only: termination and error-freedom are not claimed.",
     "No heap/frame/effect-preservation property is claimed.",
-    "No unique or order-independent remainder is claimed.",
+    "No reduction strategy, unique remainder or order independence is claimed.",
     "Intent approval is not a proof, an axiom, or authentication of a person's identity."]
   formal := "Macaulean.M2.Verification.Contracts.Statement " ++ kind.name ++ " fn state"
 }
