@@ -1,0 +1,25 @@
+name: Retain Buchberger Source
+on:
+  push:
+    branches: [verification/m2-ci-environment-20260927]
+permissions:
+  contents: read
+jobs:
+  retain-buchberger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: 8f0f48390146abb286d0bab4889c580f48b96939
+          persist-credentials: false
+      - name: Archive exact donor source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git archive --format=tar.gz -o /tmp/buchberger-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: buchberger-source
+          path: /tmp/buchberger-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
