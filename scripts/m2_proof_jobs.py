@@ -2,16 +2,12 @@
 """Frozen M2 proof jobs: sandboxed synthesis, separate kernel validation, replay.
 
 This program does not grant intent approval and never runs Lean tactics on the
-host. A candidate is an untrusted Lean *term*, not a Lean module. Publication of
-a checked packet is not editor acceptance: #m2_replay_proof repeats the check.
-
-Linux and bubblewrap with unprivileged user namespaces are required. There is no
-unsandboxed fallback. No model/provider credential is inherited by a subprocess.
-An external agent supplies successive candidate files; diagnostics are retained
-for that agent. A live model-provider integration is not part of this runner.
+host. A candidate is an untrusted Lean term, not a Lean module. Publication of a
+checked packet is not editor acceptance: #m2_replay_proof repeats the check.
+Linux and bubblewrap are required. There is no unsandboxed fallback. No model
+credential is inherited. An external coding agent supplies successive candidates.
 """
 from __future__ import annotations
-
 import argparse
 import ctypes
 import errno
@@ -33,36 +29,27 @@ from typing import Any, Callable, Iterable
 JOB_FORMAT = "macaulean.proof-job.v1"
 PROOF_FORMAT = "macaulean.proof-term.v1"
 RECEIPT_FORMAT = "macaulean.proof-receipt.v1"
-JOB_FIELDS = {
-    "format", "jobId", "bindingId", "bindingName", "schema", "approvalSource",
-    "approvalDigest", "theoryDigest", "leanVersion", "targetKey", "target",
-}
+JOB_FIELDS = {"format", "jobId", "bindingId", "bindingName", "schema", "approvalSource",
+              "approvalDigest", "theoryDigest", "leanVersion", "targetKey", "target"}
 PROOF_FIELDS = {"format", "jobId", "targetKey", "term"}
-RECEIPT_FIELDS = {
-    "format", "jobId", "targetKey", "proofKey", "theoryDigest", "theoremName",
-    "theoremRef", "axioms", "leanVersion", "status",
-}
+RECEIPT_FIELDS = {"format", "jobId", "targetKey", "proofKey", "theoryDigest", "theoremName",
+                  "theoremRef", "axioms", "leanVersion", "status"}
 AXIOMS = {"propext", "Quot.sound", "Classical.choice"}
 SCHEMAS = {"polynomialIdentity", "orderedRemainder", "linearCombination"}
 MAX_PACKET = 16 * 1024 * 1024
 MAX_CANDIDATE = 1024 * 1024
 
-
 class JobError(RuntimeError):
     pass
-
 
 class StaleJob(JobError):
     pass
 
-
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
-
 def is_digest(value: Any) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(c in "0123456789abcdef" for c in value)
-
 
 def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     result: dict[str, Any] = {}
@@ -72,10 +59,8 @@ def _pairs(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         result[key] = value
     return result
 
-
 def _constant(value: str) -> Any:
     raise JobError(f"non-JSON numeric constant: {value}")
-
 
 def decode_json(data: bytes, fields: set[str]) -> dict[str, Any]:
     if not data or len(data) > MAX_PACKET:
@@ -87,7 +72,6 @@ def decode_json(data: bytes, fields: set[str]) -> dict[str, Any]:
     if type(value) is not dict or set(value) != fields:
         raise JobError("wrong packet fields; no optional success flags are accepted")
     return value
-
 
 def read_regular(path: Path, limit: int = MAX_PACKET) -> bytes:
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -102,7 +86,6 @@ def read_regular(path: Path, limit: int = MAX_PACKET) -> bytes:
         return value
     finally:
         os.close(fd)
-
 
 def parse_job(data: bytes) -> dict[str, Any]:
     job = decode_json(data, JOB_FIELDS)
@@ -122,7 +105,6 @@ def parse_job(data: bytes) -> dict[str, Any]:
         raise JobError("missing closed target expression")
     return job
 
-
 def parse_proof(data: bytes, job: dict[str, Any]) -> dict[str, Any]:
     packet = decode_json(data, PROOF_FIELDS)
     if packet["format"] != PROOF_FORMAT:
@@ -132,7 +114,6 @@ def parse_proof(data: bytes, job: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(packet["term"], list):
         raise JobError("proof is not a serialized kernel expression")
     return packet
-
 
 def parse_receipt(data: bytes, job: dict[str, Any]) -> dict[str, Any]:
     receipt = decode_json(data, RECEIPT_FIELDS)
@@ -151,7 +132,6 @@ def parse_receipt(data: bytes, job: dict[str, Any]) -> dict[str, Any]:
         raise JobError("proof contains unapproved dependency assumptions")
     return receipt
 
-
 def write_once(path: Path, data: bytes) -> None:
     """Idempotent immutable write; a different prior object is never replaced."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -169,7 +149,6 @@ def write_once(path: Path, data: bytes) -> None:
     except BaseException:
         path.unlink(missing_ok=True)
         raise
-
 
 @dataclass(frozen=True)
 class Limits:
@@ -191,17 +170,20 @@ class Limits:
         resource.setrlimit(resource.RLIMIT_NPROC, (self.processes, self.processes))
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
-
 @dataclass(frozen=True)
 class Context:
     root: Path
     digest: str
 
-
 def context_files(project: Path) -> list[tuple[Path, Path]]:
-    """Only source and built Lean libraries; never .git, credentials or outputs."""
+    """Only source and built Lean libraries; never .git, credentials or outputs.
+
+    Include both the .olean directory and its linked native library parent. The
+    same frozen libraries accelerate both processes; proof acceptance still uses
+    the kernel and not a native-evaluation axiom.
+    """
     answer: list[tuple[Path, Path]] = []
-    for root in (project / "Macaulean", project / ".lake/build/lib/lean"):
+    for root in (project / "Macaulean", project / ".lake/build/lib"):
         if root.is_symlink() or not root.resolve().is_relative_to(project):
             raise JobError("proof context root escapes its project")
         if not root.is_dir():
@@ -227,7 +209,6 @@ def context_files(project: Path) -> list[tuple[Path, Path]]:
             answer.append((Path(name), source))
     return sorted(answer, key=lambda p: p[0].as_posix())
 
-
 def context_digest(files: Iterable[tuple[Path, Path]]) -> str:
     digest = hashlib.sha256()
     for relative, source in files:
@@ -238,7 +219,6 @@ def context_digest(files: Iterable[tuple[Path, Path]]) -> str:
         digest.update(len(data).to_bytes(8, "big"))
         digest.update(hashlib.sha256(data).digest())
     return digest.hexdigest()
-
 
 def snapshot_context(project: Path, destination: Path) -> Context:
     files = context_files(project)
@@ -255,7 +235,6 @@ def snapshot_context(project: Path, destination: Path) -> Context:
         raise StaleJob("context changed while it was being snapshotted")
     return Context(destination, before)
 
-
 @dataclass(frozen=True)
 class RunResult:
     code: int
@@ -267,7 +246,6 @@ class RunResult:
         if self.timed_out or self.code != 0:
             raise JobError(f"Lean process did not complete successfully: exit={self.code}, timeout={self.timed_out}")
         return read_regular(self.stdout)
-
 
 class Sandbox:
     def __init__(self, toolchain: Path, limits: Limits = Limits()) -> None:
@@ -299,8 +277,11 @@ class Sandbox:
             "--setenv", "LEAN_PATH", "/project/.lake/build/lib/lean",
             "--setenv", "LANG", "C.UTF-8", "--",
             "/bin/sh", "-c",
-            "set -eu\n/toolchain/bin/lean --root=/input -DmaxRecDepth=32768 "
-            "-DmaxHeartbeats=20000000 /input/Run.lean >&2\nexec /bin/cat /work/result.json",
+            "set -eu\n/toolchain/bin/lean --root=/input "
+            "--load-dynlib=/project/.lake/build/lib/libMacaulean_MRDI.so "
+            "--load-dynlib=/project/.lake/build/lib/libMacaulean_Macaulean.so "
+            "-DmaxRecDepth=32768 -DmaxHeartbeats=20000000 /input/Run.lean >&2\n"
+            "exec /bin/cat /work/result.json",
         ]
         return cmd
 
@@ -323,16 +304,14 @@ class Sandbox:
         write_once(logdir / "process.json", json.dumps({"exit": code, "timedOut": timeout}).encode())
         return RunResult(code, timeout, stdout, stderr)
 
-
 def assert_current(manifest: Path, original: bytes, project: Path, context: Context) -> None:
     if read_regular(manifest) != original:
         raise StaleJob("job manifest changed before publication")
     if context_digest(context_files(project)) != context.digest:
         raise StaleJob("source/build context changed before publication")
 
-
 def rename_no_replace(source: Path, destination: Path) -> None:
-    """Linux atomic no-replace rename; even an empty competing directory survives."""
+    """Atomic no-replace rename; even an empty competing directory survives."""
     library = ctypes.CDLL(None, use_errno=True)
     operation = getattr(library, "renameat2", None)
     if operation is None:
@@ -343,9 +322,8 @@ def rename_no_replace(source: Path, destination: Path) -> None:
         code = ctypes.get_errno()
         raise OSError(code, os.strerror(code), str(destination))
 
-
 def publish_evidence(destination: Path, files: dict[str, bytes], recheck: Callable[[], None]) -> None:
-    """Publish an entire immutable receipt, with identical concurrent writes allowed."""
+    """Publish an entire immutable receipt; identical concurrent writes are allowed."""
     expected = {"target.json", "proof.json", "receipt.json", "context.sha256"}
     if set(files) != expected:
         raise JobError("incomplete evidence manifest")
@@ -379,7 +357,6 @@ def publish_evidence(destination: Path, files: dict[str, bytes], recheck: Callab
     finally:
         if staging.exists():
             shutil.rmtree(staging)
-
 
 def run_job(manifest: Path, candidate: Path, project: Path, toolchain: Path,
             output: Path, limits: Limits = Limits()) -> Path:
@@ -428,7 +405,6 @@ def run_job(manifest: Path, candidate: Path, project: Path, toolchain: Path,
         }, lambda: assert_current(manifest, original, project, context))
         return destination
 
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
@@ -454,7 +430,6 @@ def main() -> int:
             print(json.dumps(failures[-1]), file=sys.stderr)
     print(json.dumps({"status": "no-accepted-proof", "attempts": failures}), file=sys.stderr)
     return 1
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

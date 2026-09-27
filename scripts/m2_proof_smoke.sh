@@ -20,7 +20,10 @@ run_logged() {
 }
 lean --version > ci-evidence/stage2-lean-version.txt
 run_logged stage2-protocol python3 -m unittest discover -s scripts -p test_m2_proof_jobs.py -v
-run_logged stage2-build lake build Macaulean.Verification.Proofs Macaulean.Verification.ProofJobs.Prover MacauleanTest.ProofJobKernel
-run_logged stage2-export lake env lean MacauleanTest/ProofJobExport.lean
+run_logged stage2-build lake build Macaulean:shared MRDI:shared Macaulean.Verification.Proofs Macaulean.Verification.ProofJobs.Prover MacauleanTest.ProofJobKernel
+run_logged stage2-export lake env lean \
+  --load-dynlib="$PWD/.lake/build/lib/libMacaulean_MRDI.so" \
+  --load-dynlib="$PWD/.lake/build/lib/libMacaulean_Macaulean.so" \
+  MacauleanTest/ProofJobExport.lean
 run_logged stage2-native python3 scripts/test_m2_proof_jobs_native.py
 printf '%s\n' 'M2_PROOF_SMOKE_COMPLETE: synthesis, independent checking, fresh replay and rejection controls passed.'
