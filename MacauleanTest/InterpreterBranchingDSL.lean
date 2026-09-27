@@ -23,13 +23,13 @@ magnitude = if x < 0 then -x else x
 #guard_msgs in
 magnitude == 7
 
--- Shadow the library function lexically, without overwriting its global binding.
+-- This guard variable is distinct from the denominator library function.
 #guard_msgs in
-denominator := 0;
+guardDenominator = 0;
 
 /-- info: o5 = false : Boolean -/
 #guard_msgs in
-safe = denominator != 0 and 1/denominator > 0
+safe = guardDenominator != 0 and 1/guardDenominator > 0
 
 /-- info: o6 = 7 : ZZ -/
 #guard_msgs in
