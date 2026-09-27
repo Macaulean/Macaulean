@@ -98,8 +98,13 @@ run_cmd do
   let original ← getEnv
   let name := `Macaulean.M2.Verification.IntentTests.syntheticDefinition
   let add (n : Nat) : CommandElabM Unit := liftTermElabM do
-    addDecl (.defnDecl { name, levelParams := [], type := mkConst ``Nat,
-      value := toExpr n, hints := .opaque, safety := .safe })
+    addDecl (.defnDecl {
+      name := name
+      levelParams := []
+      type := mkConst ``Nat
+      value := toExpr n
+      hints := .opaque
+      safety := .safe })
   add 1
   let .ok first := Snapshot.sealTheory (← getEnv) [name] | throwError "first theory seal failed"
   setEnv original
@@ -113,5 +118,34 @@ run_cmd do
     throwError "exhausted semantic traversal silently accepted"
   setEnv original
   logInfo "INTENT_THEORY_SEALS_COMPLETE: changed definition bodies, missing dependencies and exhaustion"
+
+-- An existing target name cannot be occupied by True or silently switched to
+-- another schema, even if an untrusted caller supplies the same digest.
+run_cmd do
+  let original ← getEnv
+  let digest := "synthetic-target-collision"
+  liftTermElabM do
+    addDecl (.defnDecl {
+      name := Targets.name digest
+      levelParams := []
+      type := mkSort .zero
+      value := mkConst ``True
+      hints := .opaque
+      safety := .safe })
+  let rejected ← try
+    discard <| Targets.install .polynomialIdentity (.closure 0) {} digest
+    pure false
+  catch _ => pure true
+  unless rejected do throwError "weakened proposition reused an approved target name"
+  setEnv original
+  discard <| Targets.install .polynomialIdentity (.closure 0) {} digest
+  discard <| Targets.install .polynomialIdentity (.closure 0) {} digest
+  let changedRejected ← try
+    discard <| Targets.install .linearCombination (.closure 0) {} digest
+    pure false
+  catch _ => pure true
+  unless changedRejected do throwError "same target name accepted a different schema"
+  setEnv original
+  logInfo "INTENT_TARGET_COLLISIONS_COMPLETE: no replacement with True, schema switching or duplicate declarations"
 
 end Macaulean.M2.Verification.IntentTests
