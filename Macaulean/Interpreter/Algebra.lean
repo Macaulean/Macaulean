@@ -90,8 +90,10 @@ def binary (op : BinOp) (a b : Value) : Except Error Value := do
   | .pow, .polynomial p, .zz n =>
     if 0 ≤ n then return .polynomial (p.pow n.toNat)
     else do
-      let c ← checked "negative powers require a constant unit" p.constant?
-      if c = 0 then .error .divByZero else return .polynomial (Poly.constant p.ring (c ^ n))
+      let c ← checked "negative powers require a constant polynomial" p.constant?
+      -- Native polynomial inversion uses zero for the zero polynomial. This
+      -- is deliberately different from scalar QQ division by zero.
+      return .polynomial (Poly.constant p.ring (c ^ n))
   | _, _, _ =>
     let isPolynomial := match a,b with | .polynomial _,_ | _,.polynomial _ => true | _,_ => false
     if !isPolynomial then .error (.noMethod op.symbol [a.className,b.className]) else do
