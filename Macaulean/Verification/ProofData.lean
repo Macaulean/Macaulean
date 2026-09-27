@@ -66,7 +66,7 @@ private def encodeExpr (e : Expr) : StateT EncodeState (Except String) Nat := do
   let data ← match e with
     | .bvar i => pure [Json.str "bvar", toJson i]
     | .const n us => do
-      let us ← us.mapM levelJson
+      let us ← liftM (us.mapM levelJson)
       pure [Json.str "const", nameJson n, toJson us]
     | .sort u => pure [Json.str "sort", ← levelJson u]
     | .app f a => pure [Json.str "app", toJson (← encodeExpr f), toJson (← encodeExpr a)]
@@ -85,7 +85,7 @@ private def encodeExpr (e : Expr) : StateT EncodeState (Except String) Nat := do
   let i := (← get).nodes.size
   modify fun s => { nodes := s.nodes.push (toJson data), seen := s.seen.insert e i }
   return i
-termination_by e
+termination_by structural e
 
 def encode (e : Expr) : Except String Json := do
   let (root,s) ← (encodeExpr e).run {}
