@@ -39,8 +39,13 @@ def systems : List Case := [
 def Case.setup (c : Case) : String :=
   "rr:=QQ[" ++ c.variables ++ "];ii:=ideal(" ++ c.generators ++ ");"
 def Case.source (c : Case) : String := "(" ++ c.setup ++ "gb ii)"
+
+/-- Native QQ bases may clear denominators, whereas our contract is monic.
+Normalize only by the leading scalar; every exponent and remaining coefficient
+is still compared exactly. No reduction or ideal-membership test is hidden here. -/
 def formsFunction : String :=
-  "observe:=(xs,j)->if j==#xs then {} else {listForm (xs#j)}|observe(xs,j+1);"
+  "observe:=(xs,j)->if j==#xs then {} else " ++
+  "{listForm ((xs#j)/(leadCoefficient (xs#j)))}|observe(xs,j+1);"
 def Case.observation (c : Case) : String :=
   "(" ++ c.setup ++ formsFunction ++ "observe((entries gens gb ii)#0,0))"
 end Macaulean.M2.GroebnerCases
