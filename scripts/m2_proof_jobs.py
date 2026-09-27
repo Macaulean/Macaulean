@@ -153,7 +153,7 @@ def write_once(path: Path, data: bytes) -> None:
 @dataclass(frozen=True)
 class Limits:
     seconds: int = 120
-    memory_bytes: int = 4 * 1024**3
+    memory_bytes: int = 8 * 1024**3
     disk_bytes: int = 64 * 1024**2
     processes: int = 64
 
@@ -299,7 +299,7 @@ class Sandbox:
             "--setenv", "LEAN_NUM_THREADS", "1",
             "--setenv", "LANG", "C.UTF-8", "--",
             "/bin/sh", "-c",
-            "set -eu\n/toolchain/bin/lean --root=/input "
+            "set -eu\nprintf 'LEAN_NUM_THREADS=%s\\n' \"$LEAN_NUM_THREADS\" >&2\nulimit -a >&2\n/toolchain/bin/lean --version >&2\n/toolchain/bin/lean --root=/input "
             "--load-dynlib=/project/.lake/build/lib/libMacaulean_MRDI.so "
             "--load-dynlib=/project/.lake/build/lib/libMacaulean_Macaulean.so "
             "-DmaxRecDepth=32768 -DmaxHeartbeats=20000000 /input/Run.lean >&2\n"
