@@ -63,16 +63,16 @@ run_cmd do
   logInfo "POLYNOMIAL_MONOMIAL_GRIDS_COMPLETE: 36 pairs, divisibility, lcm, grevlex, and exact quotients"
 
 run_cmd do
-  for source in #[
+  -- These are source-evaluation errors. A successful value lacking an encoder
+  -- must fail this assertion rather than being confused with an expected error.
+  let sources := #[
     "R=QQ[x];x/0", "R=QQ[x];leadMonomial(x-x)",
-    "R=QQ[x];(x-x)^(-1)", "R=QQ[x];leadTerm(x,x)",
-    "R=QQ[x];promote(x)", "QQ=7", "QQ[true]"
-  ] do
-    match ← NativePolynomialOracle.query ("(" ++ source ++ ")") with
-    | .ok .error => pure ()
-    | .ok (.ok value) => logError m!"native M2 accepted {source}: {repr value}"
-    | .error message => logError m!"native error transport failed: {message}"
-  logInfo "POLYNOMIAL_NATIVE_ERRORS_COMPLETE: 7"
+    "R=QQ[x];leadTerm(x,x)", "R=QQ[x];promote(x)", "QQ=7", "QQ[true]"
+  ]
+  for source in sources do
+    unless ← NativePolynomialOracle.raisesError ("(" ++ source ++ ")") do
+      logError m!"native M2 unexpectedly accepted error case: {source}"
+  logInfo m!"POLYNOMIAL_NATIVE_ERRORS_COMPLETE: {sources.size}"
 
 -- Native classes requiring other extensions must not be silently coerced.
 run_cmd do

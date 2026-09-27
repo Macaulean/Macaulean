@@ -23,10 +23,13 @@ run_cmd do
   | .error message =>
     unless (message.splitOn "wire:").length > 1 do
       throwError "unsupported value diagnostic lost its raw reply: {message}"
-  | reply => throwError "unsupported successful value misclassified: {repr reply}"
+  | .ok .error => throwError "unsupported successful ring was reported as an evaluation error"
+  | .ok (.ok value) => throwError "unsupported successful ring was decoded as {repr value}"
   match ← NativePolynomialOracle.query "(null,())" with
   | .ok (.ok (.sequence [.null, .sequence []])) => pure ()
-  | reply => throwError "outcome wrapper changed a nested value: {repr reply}"
+  | .ok (.ok value) => throwError "outcome wrapper changed a nested value: {repr value}"
+  | .ok .error => throwError "nested value was reported as an evaluation error"
+  | .error message => throwError "nested value protocol failed: {message}"
 
   -- This source evaluates successfully but sabotages its result encoder. The old
   -- broad try handler incorrectly returned the same reply as division by zero.

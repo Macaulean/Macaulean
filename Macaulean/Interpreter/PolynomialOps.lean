@@ -68,6 +68,9 @@ def evalBinary (op : BinOp) (a b : Value) : Except Error Value := do
     let (r, p) ← asPolynomial a
     let .zz k := b | .error (.algebra "polynomial exponent must be an integer")
     if k ≥ 0 then return .algebra (.poly r (← liftError (pow r.names.length p k.toNat)))
+    -- Native M2 totalizes negative powers of the zero polynomial to zero.
+    -- This is a polynomial compatibility convention, not field inversion.
+    if p.isEmpty then return .algebra (.poly r [])
     let some c := constantValue? p
       | .error (.algebra "negative polynomial powers require a nonzero constant")
     if c = 0 then .error .divByZero
