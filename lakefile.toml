@@ -15,7 +15,9 @@ text = true
 
 [[lean_lib]]
 name = "Macaulean"
+roots = ["Macaulean", "Macaulean.Verification"]
 needs = ["buchbergerSource"]
+precompileModules = true
 
 [[lean_lib]]
 name = "MRDI"
