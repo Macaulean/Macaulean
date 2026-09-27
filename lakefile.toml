@@ -3,8 +3,14 @@ version = "0.1.0"
 defaultTargets = ["macaulean"]
 testDriver = "MacauleanTest"
 
+[[input_file]]
+name = "buchbergerSource"
+path = "Macaulean/Interpreter/Buchberger.m2"
+text = true
+
 [[lean_lib]]
 name = "Macaulean"
+needs = ["buchbergerSource"]
 
 [[lean_lib]]
 name = "MRDI"
