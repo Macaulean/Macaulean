@@ -3,8 +3,8 @@ import Macaulean.Verification
 /-!
 # Synthetic intent-approval regression tests
 
-No real project contract is approved here. Every attestation below is a synthetic
-fixture exercising the independent intent state machine and semantic identities.
+No real project contract is approved here. Attestations are synthetic fixtures
+exercising the intent state machine, dependency identities and exact formal targets.
 -/
 namespace Macaulean.M2.Verification.IntentTests
 open Lean Elab Command Intent
@@ -17,16 +17,16 @@ run_cmd do
   let kind := Contracts.Kind.polynomialIdentity
   let token := Fingerprint.sha256 payload
   let initial : Ledger := {}
-  unless (initial.approve id kind payload token "TEST ONLY").isError do
+  if (initial.approve id kind payload token "TEST ONLY").isOk then
     throwError "approval without a proposal succeeded"
   let proposed := initial.propose id "synthetic" kind payload
   let some p := proposed.find id kind | throwError "proposal missing"
   unless p.status (some payload) == .proposed && p.proofStatus == .unattempted do
     throwError "a proposal acquired approval or evidence"
   for (key,body,digest) in [(id,payload,"wrong"),(id,"changed",token),("other",payload,token)] do
-    unless (proposed.approve key kind body digest "TEST ONLY").isError do
+    if (proposed.approve key kind body digest "TEST ONLY").isOk then
       throwError "mismatched approval accepted"
-  unless (proposed.approve id .orderedRemainder payload token "TEST ONLY").isError do
+  if (proposed.approve id .orderedRemainder payload token "TEST ONLY").isOk then
     throwError "approval changed the schema"
   let .ok approved := proposed.approve id kind payload token "TEST ONLY"
     | throwError "exact synthetic approval failed"
@@ -44,7 +44,7 @@ run_cmd do
   let .ok revoked := approved.revoke id kind "TEST REVOKE" | throwError "revocation failed"
   unless (revoked.find id kind).map (fun p => p.status (some payload)) == some .revoked do
     throwError "revocation not reflected"
-  unless (revoked.propose id "synthetic" kind payload).find id kind |>.map (·.review) == some .revoked do
+  unless ((revoked.propose id "synthetic" kind payload).find id kind).map (·.review) == some .revoked do
     throwError "reproposal silently undid revocation"
   unless approved.events.length == 1 && revoked.events.length == 2 do
     throwError "approval audit events missing"
@@ -82,8 +82,8 @@ run_cmd do
   let .ok recursive := execute {} "rec=n->if n==0 then 0 else rec(n-1)"
     | throwError "recursion fixture failed"
   unless (key recursive "rec").isOk do throwError "recursive dependency graph did not terminate"
-  unless (Snapshot.reachable (.closure 999) {}).isError do throwError "invalid handle accepted"
-  unless (Snapshot.reachable (.symbol "bad" 999) {}).isError do throwError "invalid captured cell accepted"
+  if (Snapshot.reachable (.closure 999) {}).isOk then throwError "invalid handle accepted"
+  if (Snapshot.reachable (.symbol "bad" 999) {}).isOk then throwError "invalid captured cell accepted"
   unless Snapshot.bindingId `ModuleA "f" != Snapshot.bindingId `ModuleB "f" do
     throwError "module-qualified binding collision"
   let .ok a := parse "f=x->x+1" | throwError "parser fixture failed"
@@ -93,8 +93,7 @@ run_cmd do
     throwError "comments or formatting changed resolved-code identity"
   logInfo "INTENT_DEPENDENCIES_COMPLETE: globals, captured aliases, recursion, invalid handles and exact state"
 
--- Fork immutable Lean environments to change a dependency's body under the same
--- name. A name-only or theorem-text-only fingerprint would fail this test.
+-- Change a dependency's body under the same name in separate immutable forks.
 run_cmd do
   let original ← getEnv
   let name := `Macaulean.M2.Verification.IntentTests.syntheticDefinition
@@ -102,15 +101,17 @@ run_cmd do
     addDecl (.defnDecl { name, levelParams := [], type := mkConst ``Nat,
       value := toExpr n, hints := .opaque, safety := .safe })
   add 1
-  let .ok first := Snapshot.seal (← getEnv) [name] | throwError "first theory seal failed"
+  let .ok first := Snapshot.sealTheory (← getEnv) [name] | throwError "first theory seal failed"
   setEnv original
   add 2
-  let .ok second := Snapshot.seal (← getEnv) [name] | throwError "second theory seal failed"
+  let .ok second := Snapshot.sealTheory (← getEnv) [name] | throwError "second theory seal failed"
   unless first.digest != second.digest && first.payload != second.payload do
     throwError "changed declaration body retained approval identity"
-  unless (Snapshot.seal (← getEnv) [`MissingSemanticDefinition]).isError do
+  if (Snapshot.sealTheory (← getEnv) [`MissingSemanticDefinition]).isOk then
     throwError "missing semantic dependency silently ignored"
+  if (Snapshot.sealTheory (← getEnv) [name] 0).isOk then
+    throwError "exhausted semantic traversal silently accepted"
   setEnv original
-  logInfo "INTENT_THEORY_SEALS_COMPLETE: changed definition bodies and missing dependencies"
+  logInfo "INTENT_THEORY_SEALS_COMPLETE: changed definition bodies, missing dependencies and exhaustion"
 
 end Macaulean.M2.Verification.IntentTests

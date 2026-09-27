@@ -28,13 +28,13 @@ run_cmd do
   let .ok p := readPolynomial r v | throwError "valid polynomial view rejected"
   unless p.coeff [1,0] == 0 && p.coeff [0,1] == 2 do throwError "view did not sum repeated exponents"
   unless p.raw == raw do throwError "view changed the represented coefficient data"
-  unless (readPolynomial s v).isError do throwError "same-named foreign ring accepted"
-  unless (readPolynomial r (.algebra (.poly r [(1,[1])]))).isError do
+  if (readPolynomial s v).isOk then throwError "same-named foreign ring accepted"
+  if (readPolynomial r (.algebra (.poly r [(1,[1])]))).isOk then
     throwError "malformed exponent dimension accepted"
-  unless (readPolynomial r (.zz 3)).isError do throwError "scalar silently specialized as polynomial"
+  if (readPolynomial r (.zz 3)).isOk then throwError "scalar silently specialized as polynomial"
   unless (readRow r 2 (.list [v,v])).isOk do throwError "valid row rejected"
-  unless (readRow r 1 (.list [v,v])).isError do throwError "row truncated"
-  unless (readRow r 2 (.list [v,.algebra (.poly s raw)])).isError do throwError "foreign row entry accepted"
+  if (readRow r 1 (.list [v,v])).isOk then throwError "row truncated"
+  if (readRow r 2 (.list [v,.algebra (.poly s raw)])).isOk then throwError "foreign row entry accepted"
   unless (readRow r 0 (.list [])).isOk do throwError "empty row rejected"
   for kind in Contracts.all do
     unless (Contracts.Kind.parse kind.name) == some kind do throwError "schema name did not round trip"
