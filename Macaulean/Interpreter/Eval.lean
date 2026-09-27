@@ -45,6 +45,8 @@ def rangeValues (first : Int) (count : Nat) : List Value :=
 
 def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   match op, a, b with
+  | .strictEq, _, _ => .ok (.bool (a == b))
+  | .strictNe, _, _ => .ok (.bool (a != b))
   | .add, zz m, zz n => .ok (zz (m + n))
   | .sub, zz m, zz n => .ok (zz (m - n))
   | .mul, zz m, zz n => .ok (zz (m * n))

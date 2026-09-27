@@ -4,7 +4,7 @@ import Macaulean.Interpreter.Runtime
 # Checked polynomial-interface laws
 
 The round-trip and bridge theorems connect runtime coefficient/exponent lists to
-Macaulean's existing dependent sparse polynomials. These are representation and
+Macaulean's dependent sparse polynomials and the structural kernel evaluator. These are representation and
 execution contracts, not Gröbner-basis or termination theorems.
 -/
 namespace Macaulean.M2.Polynomials
@@ -34,30 +34,30 @@ theorem encode_dimension (p : Macaulean.Polynomial Rat n) (t : Rat × List Nat)
   exact a.monomial.powers_length
 
 theorem normalize_bridge (p : Macaulean.Polynomial Rat n) :
-    normalized n (encode p) = .ok (encode (Macaulean.Polynomial.normalize p)) := by
+    normalized n (encode p) = .ok (encode (KernelPolynomial.normalize p)) := by
   simp [normalized, decode_encode, bind, Except.bind, pure, Except.pure]
 
 theorem unary_bridge (p : Macaulean.Polynomial Rat n)
     (f : Macaulean.Polynomial Rat n → Macaulean.Polynomial Rat n) :
-    unary n f (encode p) = .ok (encode (Macaulean.Polynomial.normalize (f p))) := by
+    unary n f (encode p) = .ok (encode (KernelPolynomial.normalize (f p))) := by
   simp [unary, decode_encode, bind, Except.bind, pure, Except.pure]
 
 theorem binary_bridge (p q : Macaulean.Polynomial Rat n)
     (f : Macaulean.Polynomial Rat n → Macaulean.Polynomial Rat n → Macaulean.Polynomial Rat n) :
     binary n f (encode p) (encode q) = .ok (encode
-      (Macaulean.Polynomial.normalize (f (Macaulean.Polynomial.normalize p)
-        (Macaulean.Polynomial.normalize q)))) := by
+      (KernelPolynomial.normalize (f (KernelPolynomial.normalize p)
+        (KernelPolynomial.normalize q)))) := by
   simp [binary, decode_encode, bind, Except.bind, pure, Except.pure]
 
 theorem add_bridge (p q : Macaulean.Polynomial Rat n) :
-    add n (encode p) (encode q) = .ok (encode (Macaulean.Polynomial.normalize
-      (Macaulean.Polynomial.add (Macaulean.Polynomial.normalize p) (Macaulean.Polynomial.normalize q)))) :=
-  binary_bridge p q Macaulean.Polynomial.add
+    add n (encode p) (encode q) = .ok (encode (KernelPolynomial.normalize
+      (KernelPolynomial.add (KernelPolynomial.normalize p) (KernelPolynomial.normalize q)))) :=
+  binary_bridge p q KernelPolynomial.add
 
 theorem mul_bridge (p q : Macaulean.Polynomial Rat n) :
-    mul n (encode p) (encode q) = .ok (encode (Macaulean.Polynomial.normalize
-      (Macaulean.Polynomial.mul (Macaulean.Polynomial.normalize p) (Macaulean.Polynomial.normalize q)))) :=
-  binary_bridge p q Macaulean.Polynomial.mul
+    mul n (encode p) (encode q) = .ok (encode (KernelPolynomial.normalize
+      (KernelPolynomial.mul (KernelPolynomial.normalize p) (KernelPolynomial.normalize q)))) :=
+  binary_bridge p q KernelPolynomial.mul
 
 theorem constant_zero (n : Nat) : constant n 0 = [] := by simp [constant]
 

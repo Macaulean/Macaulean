@@ -1,9 +1,10 @@
-import Macaulean.Polynomial.Basic
+import Macaulean.Interpreter.KernelPolynomial
 
 /-!
 # Sparse QQ polynomial data for the interpreter
 
-Arithmetic uses the existing `Macaulean.Polynomial` implementation. The checked
+Arithmetic uses `Macaulean.Polynomial` with the structural kernel-evaluable
+normalizer and arithmetic in `KernelPolynomial`. The checked
 first-order boundary validates exponent dimensions before constructing dependent
 polynomials. Fresh session-relative ring identities distinguish isomorphic rings.
 -/
@@ -26,28 +27,28 @@ def decode (n : Nat) (ts : Raw) : Except String (Macaulean.Polynomial Rat n) :=
 def encode (p : Macaulean.Polynomial Rat n) : Raw :=
   p.terms.map fun t => (t.coefficient, t.monomial.powers)
 def normalized (n : Nat) (ts : Raw) : Except String Raw := do
-  return encode (Macaulean.Polynomial.normalize (← decode n ts))
+  return encode (KernelPolynomial.normalize (← decode n ts))
 def constant (n : Nat) (c : Rat) : Raw :=
   if c = 0 then [] else [(c, List.replicate n 0)]
 def generator (n index : Nat) : Raw :=
   [(1, (List.range n).map fun i => if i = index then 1 else 0)]
 def unary (n : Nat) (f : Macaulean.Polynomial Rat n → Macaulean.Polynomial Rat n)
     (p : Raw) : Except String Raw := do
-  return encode (Macaulean.Polynomial.normalize (f (← decode n p)))
+  return encode (KernelPolynomial.normalize (f (← decode n p)))
 def binary (n : Nat)
     (f : Macaulean.Polynomial Rat n → Macaulean.Polynomial Rat n → Macaulean.Polynomial Rat n)
     (p q : Raw) : Except String Raw := do
-  let p := Macaulean.Polynomial.normalize (← decode n p)
-  let q := Macaulean.Polynomial.normalize (← decode n q)
-  return encode (Macaulean.Polynomial.normalize (f p q))
-def add (n : Nat) := binary n Macaulean.Polynomial.add
-def sub (n : Nat) := binary n Macaulean.Polynomial.sub
-def mul (n : Nat) := binary n Macaulean.Polynomial.mul
+  let p := KernelPolynomial.normalize (← decode n p)
+  let q := KernelPolynomial.normalize (← decode n q)
+  return encode (KernelPolynomial.normalize (f p q))
+def add (n : Nat) := binary n KernelPolynomial.add
+def sub (n : Nat) := binary n KernelPolynomial.sub
+def mul (n : Nat) := binary n KernelPolynomial.mul
 def neg (n : Nat) := unary n Macaulean.Polynomial.neg
 def smul (n : Nat) (c : Rat) := unary n (Macaulean.Polynomial.smul c)
 def pow (n : Nat) (p : Raw) (k : Nat) : Except String Raw := do
-  let p := Macaulean.Polynomial.normalize (← decode n p)
-  return encode (Macaulean.Polynomial.normalize (Macaulean.Polynomial.pow p k))
+  let p := KernelPolynomial.normalize (← decode n p)
+  return encode (KernelPolynomial.normalize (KernelPolynomial.pow p k))
 
 /-- Componentwise divisibility, never silently truncating mismatched dimensions. -/
 def divides (a b : List Nat) : Bool :=

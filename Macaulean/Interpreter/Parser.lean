@@ -4,7 +4,7 @@ import Macaulean.Interpreter.Lexer
 /-! # Shared concrete-tree Pratt grammar
 
 Application is right-associative (46), below powers/indexing (50). Polynomial-ring
-brackets are postfix constructors (55) with quoted identifier lists. All frontends
+brackets are postfix constructors (55) with identifier lists evaluated by the runtime. All frontends
 use this grammar, including the string runtime and structured Lean syntax category.
 -/
 namespace Macaulean.M2
@@ -31,6 +31,7 @@ def infixInfo : Sym → Option (Infix × Nat × Nat)
   | .bar => some (.bin .concat, 23, 24) | .colon => some (.bin .repeat, 22, 22)
   | .lt => some (.bin .lt, 20, 20) | .le => some (.bin .le, 20, 20)
   | .gt => some (.bin .gt, 20, 20) | .ge => some (.bin .ge, 20, 20)
+  | .strictEq => some (.bin .strictEq, 20, 20) | .strictNe => some (.bin .strictNe, 20, 20)
   | .eqeq => some (.bin .eq, 20, 20) | .ne => some (.bin .ne, 20, 20)
   | .kwAnd => some (.logic .andOp, 18, 18) | .kwOr => some (.logic .orOp, 16, 16)
   | .assign => some (.assign, 10, 10) | .localAssign => some (.localAssign, 10, 10)

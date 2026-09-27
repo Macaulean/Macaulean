@@ -2,7 +2,7 @@
 namespace Macaulean.M2
 inductive BinOp where
   | add | sub | mul | div | quot | rem | pow
-  | eq | ne | lt | le | gt | ge
+  | eq | ne | strictEq | strictNe | lt | le | gt | ge
   | range | rangeExclusive | index | hasIndex | concat | repeat | compose
   deriving Repr, DecidableEq, Inhabited
 inductive UnOp where
@@ -39,7 +39,7 @@ inductive Term where
   | assignMany (declareLocal : Bool) (names : List String) (rhs : Term)
   | localSymbol (name : String)
   | returnTerm (value : Term)
-  /-- Names inside brackets are quoted; their current values are not evaluated. -/
+  /-- Bracket identifiers are resolved in the current lexical environment. -/
   | polyRing (base : Term) (names : List String)
   deriving Repr, Inhabited
 mutual
@@ -127,7 +127,7 @@ instance : DecidableEq Term := Term.decEq
 namespace BinOp
 def symbol : BinOp → String
   | add => "+" | sub => "-" | mul => "*" | div => "/" | quot => "//"
-  | rem => "%" | pow => "^" | eq => "==" | ne => "!=" | lt => "<"
+  | rem => "%" | pow => "^" | eq => "==" | ne => "!=" | strictEq => "===" | strictNe => "=!=" | lt => "<"
   | le => "<=" | gt => ">" | ge => ">=" | range => ".."
   | rangeExclusive => "..<" | index => "#" | hasIndex => "#?"
   | concat => "|" | .repeat => ":" | compose => "@@"

@@ -2,7 +2,7 @@
 namespace Macaulean.M2
 inductive Sym where
   | plus | minus | star | slash | slashslash | percent | caret
-  | eqeq | ne | lt | le | gt | ge | assign
+  | eqeq | ne | strictEq | strictNe | lt | le | gt | ge | assign
   | lparen | rparen | lbrace | rbrace | semi | comma | lbracket | rbracket
   | dotdot | dotdotless | sharp | sharpQuestion | bar | colon
   | kwIf | kwThen | kwElse | kwAnd | kwOr | kwNot
@@ -57,6 +57,8 @@ def symbol : List Char → Option (Sym × List Char)
   | '.' :: '.' :: cs => some (.dotdot, cs)
   | '#' :: '?' :: cs => some (.sharpQuestion, cs)
   | '/' :: '/' :: cs => some (.slashslash, cs)
+  | '=' :: '=' :: '=' :: cs => some (.strictEq, cs)
+  | '=' :: '!' :: '=' :: cs => some (.strictNe, cs)
   | '=' :: '=' :: cs => some (.eqeq, cs) | '!' :: '=' :: cs => some (.ne, cs)
   | '<' :: '=' :: cs => some (.le, cs) | '>' :: '=' :: cs => some (.ge, cs)
   | '+' :: cs => some (.plus, cs) | '-' :: cs => some (.minus, cs)

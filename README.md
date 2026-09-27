@@ -40,3 +40,10 @@ From command line:
 ```
 lake build MacauleanTest
 ```
+
+## Pure M2 worksheet: QQ polynomials
+
+`import Macaulean.Interpreter.DSL` followed by `open M2` enables bare inputs such
+as `R = QQ[x,y];` and `(x+y)^2`. Polynomial execution uses pure Lean, not the
+external M2 server. See [the polynomial interface and verification boundary](docs/m2-polynomials.md)
+and [the checked worksheet](MacauleanTest/InterpreterPolynomialsDSL.lean).
