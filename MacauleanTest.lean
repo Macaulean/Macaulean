@@ -31,3 +31,6 @@ import MacauleanTest.InterpreterPolynomialsImport
 import MacauleanTest.PolynomialCIReference
 import MacauleanTest.GroebnerSmoke
 import MacauleanTest.InterpreterGroebnerM2
+import MacauleanTest.InterpreterGroebner
+import MacauleanTest.InterpreterGroebnerDSL
+import MacauleanTest.InterpreterGroebnerImport
