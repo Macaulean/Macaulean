@@ -109,7 +109,7 @@ def helpers : List (String × Value) := ([
   ("m2MonomialCompare(2*x,3*x)", .zz 0),
   ("m2MonomialCompare(y^2,x*z)", .zz 1),
   ("listForm(m2Monomial(R,{2,0,3}))", listFormValue [(1,[2,0,3])]),
-  ("listForm(m2Monomial(R,{0,0,0}))", listFormValue [(1,[0,0,0])])
+  ("listForm(m2Monomial(R,{0,0,0}))", listFormValue [(1,[0,0,0])])]
   .map fun (s,v) => (inXYZ s,v))
 
 def errors : List (String × Error) := [

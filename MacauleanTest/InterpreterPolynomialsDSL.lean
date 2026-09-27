@@ -261,15 +261,15 @@ open Lean Elab Command
 run_cmd do
   for source in #["QQ[x,y]", "QQ[]", "(QQ)[x]", "gens QQ[x,y]", "f=()->QQ[x]",
       "R=QQ[\n x, -- λ 中文\n y];", "(R=QQ[x];x+1)", "(QQ)[a,b][c]"] do
-    let .ok syntax := Parser.runParserCategory (← getEnv) `m2 source
+    let .ok stx := Parser.runParserCategory (← getEnv) `m2 source
       | throwError "category rejected polynomial source {source}"
-    let .ok (actual, silent) := Macaulean.M2.DSL.lowerInput ⟨syntax⟩
+    let .ok (actual, silent) := Macaulean.M2.DSL.lowerInput ⟨stx⟩
       | throwError "lowering failed for {source}"
     let .ok expected := Macaulean.M2.parse source
       | throwError "string parser rejected {source}"
     unless actual == expected do throwError "parser AST disagreement for {source}"
     unless silent == source.endsWith ";" do throwError "terminator lost for {source}"
-    let rendered ← liftCoreM <| PrettyPrinter.ppCategory `m2 syntax
+    let rendered ← liftCoreM <| PrettyPrinter.ppCategory `m2 stx
     let .ok reparsed := Parser.runParserCategory (← getEnv) `m2 rendered.pretty
       | throwError "formatter output no longer parses"
     let .ok (again, sameSilent) := Macaulean.M2.DSL.lowerInput ⟨reparsed⟩
@@ -280,9 +280,9 @@ run_cmd do
 
 run_cmd do
   let source := "QQ[ -- λ 中文\n x,y]"
-  let .ok syntax := Parser.runParserCategory (← getEnv) `m2 source
+  let .ok stx := Parser.runParserCategory (← getEnv) `m2 source
     | throwError "source-location example did not parse"
-  let body := syntax[0][0]
+  let body := stx[0][0]
   unless body.getKind == `Macaulean.M2.DSL.polyRing do throwError "polynomial syntax is opaque"
   for (atom, expected) in #[(body[1], "["), (body[3], "]"), (body[2][0][0], "x"), (body[2][2][0], "y")] do
     let some begin := atom.getPos? | throwError "missing source position"
