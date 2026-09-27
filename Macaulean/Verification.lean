@@ -4,6 +4,7 @@ import Macaulean.Verification.Snapshot
 import Macaulean.Verification.Intent
 import Macaulean.Verification.Index
 import Macaulean.Verification.Frontend
+import Macaulean.Verification.Server
 
 /-!
 # M2-first intent review
