@@ -29,3 +29,4 @@ import MacauleanTest.InterpreterGroebner
 import MacauleanTest.InterpreterGroebnerDSL
 import MacauleanTest.InterpreterGroebnerImport
 import MacauleanTest.InterpreterGroebnerM2
+import MacauleanTest.PolynomialAliasReference
