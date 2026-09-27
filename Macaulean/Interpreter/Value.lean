@@ -1,4 +1,6 @@
-/-! # Immutable runtime values; function handles refer to a pure session store. -/
+import Macaulean.Interpreter.PolynomialData
+
+/-! # Immutable runtime values; handles and ring identities are session-relative. -/
 namespace Macaulean.M2
 inductive Value where
   | zz (n : Int)
@@ -9,6 +11,7 @@ inductive Value where
   | sequence (elements : List Value)
   | closure (id : Nat)
   | symbol (name : String) (cell : Nat)
+  | algebra (object : Polynomials.Object)
   deriving Repr, Inhabited
 mutual
 def Value.decEq (a b : Value) : Decidable (a = b) := by
@@ -26,6 +29,7 @@ def Value.decEq (a b : Value) : Decidable (a = b) := by
   case closure.closure i j => exact decidable_of_iff (i = j) (by simp only [Value.closure.injEq])
   case symbol.symbol x i y j =>
     exact decidable_of_iff (x = y ∧ i = j) (by simp only [Value.symbol.injEq])
+  case algebra.algebra a b => exact decidable_of_iff (a = b) (by simp only [Value.algebra.injEq])
   all_goals exact isFalse (by intro h; cases h)
 termination_by structural a
 
@@ -57,12 +61,13 @@ inductive Error where
   | invalidReference
   | fuelExhausted
   | needsRuntime
+  | algebra (message : String)
   deriving DecidableEq, Repr, Inhabited
 namespace Value
 def className : Value → String
   | zz _ => "ZZ" | qq _ => "QQ" | bool _ => "Boolean" | null => "Nothing"
   | list _ => "List" | sequence _ => "Sequence"
-  | closure _ => "FunctionClosure" | symbol .. => "Symbol"
+  | closure _ => "FunctionClosure" | symbol .. => "Symbol" | algebra a => a.className
 mutual
 def toM2String : Value → String
   | zz n => toString n | qq q => s!"{q.num}/{q.den}" | bool b => toString b | null => "null"
@@ -72,6 +77,7 @@ def toM2String : Value → String
   | sequence xs => "(" ++ ", ".intercalate (strings xs) ++ ")"
   | closure i => s!"<function {i}>"
   | symbol name _ => name
+  | algebra a => a.toM2String
 def strings : List Value → List String
   | [] => [] | v :: vs => toM2String v :: strings vs
 end
@@ -92,7 +98,8 @@ def toM2String : Error → String
   | assignmentArity n m => s!"expected {n} assignment values, got {m}"
   | invalidReference => "invalid lexical cell or function handle"
   | fuelExhausted => "M2 evaluation depth exhausted"
-  | needsRuntime => "function syntax requires the lexical runtime"
+  | needsRuntime => "syntax requires the lexical runtime"
+  | algebra message => message
 instance : ToString Error := ⟨toM2String⟩
 end Error
 deriving instance DecidableEq for Except
