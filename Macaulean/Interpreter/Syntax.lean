@@ -1,6 +1,5 @@
 /-! # Abstract syntax for the pure Macaulay2 language -/
 namespace Macaulean.M2
-
 inductive BinOp where
   | add | sub | mul | div | quot | rem | pow
   | eq | ne | lt | le | gt | ge
@@ -12,19 +11,14 @@ inductive UnOp where
 inductive LogicOp where
   | andOp | orOp
   deriving Repr, DecidableEq, Inhabited
-
-/-- Parentheses around parameters change calling convention in M2. -/
 inductive Parameters where
   | variadic (name : String)
   | fixed (names : List String)
   deriving Repr, DecidableEq, Inhabited
-
 def Parameters.names : Parameters → List String
   | .variadic x => [x] | .fixed xs => xs
-
 def Parameters.toM2String : Parameters → String
   | .variadic x => x | .fixed xs => "(" ++ ", ".intercalate xs ++ ")"
-
 inductive Term where
   | int (n : Int)
   | var (x : String)
@@ -45,10 +39,10 @@ inductive Term where
   | assignMany (declareLocal : Bool) (names : List String) (rhs : Term)
   | localSymbol (name : String)
   | returnTerm (value : Term)
+  /-- Names inside brackets are quoted; their current values are not evaluated. -/
+  | polyRing (base : Term) (names : List String)
   deriving Repr, Inhabited
-
 mutual
-
 def Term.decEq (a b : Term) : Decidable (a = b) := by
   cases a <;> cases b
   case int.int n m => exact decidable_of_iff (n = m) (by simp only [Term.int.injEq])
@@ -110,6 +104,9 @@ def Term.decEq (a b : Term) : Decidable (a = b) := by
   case returnTerm.returnTerm a b =>
     haveI := Term.decEq a b
     exact decidable_of_iff (a = b) (by simp only [Term.returnTerm.injEq])
+  case polyRing.polyRing a xs b ys =>
+    haveI := Term.decEq a b
+    exact decidable_of_iff (a = b ∧ xs = ys) (by simp only [Term.polyRing.injEq])
   all_goals exact isFalse (by intro h; cases h)
 termination_by structural a
 
@@ -127,7 +124,6 @@ def Term.listDecEq (xs ys : List Term) : Decidable (xs = ys) := by
 termination_by structural xs
 end
 instance : DecidableEq Term := Term.decEq
-
 namespace BinOp
 def symbol : BinOp → String
   | add => "+" | sub => "-" | mul => "*" | div => "/" | quot => "//"
@@ -153,13 +149,10 @@ def Term.comma (extend : Bool) (a b : Term) : Term :=
 def Term.inBraces (commaBody : Bool) (a : Term) : Term :=
   match commaBody, a with
   | true, .sequence xs => .listLit xs | _, _ => .listLit [a]
-
-/-- Bare variable sequences are the supported multiple-assignment targets. -/
 def Term.variableNames : List Term → Option (List String)
   | [] => some []
   | .var x :: ts => (x :: ·) <$> Term.variableNames ts
   | _ => none
-
 mutual
 def Term.toM2String : Term → String
   | .int n => if n < 0 then s!"({n})" else toString n
@@ -189,6 +182,7 @@ def Term.toM2String : Term → String
   | .localSymbol x => s!"(local {x})"
   | .returnTerm .empty => "(return)"
   | .returnTerm a => s!"(return {a.toM2String})"
+  | .polyRing a xs => "(" ++ a.toM2String ++ ")[" ++ ", ".intercalate xs ++ "]"
 def Term.strings : List Term → List String
   | [] => [] | a :: xs => a.toM2String :: Term.strings xs
 end
