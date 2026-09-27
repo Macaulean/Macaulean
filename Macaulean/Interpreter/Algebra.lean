@@ -41,10 +41,10 @@ def matrixMultiply (a b : Matrix) : Except Error Matrix := do
       .error (.algebra "incompatible matrix dimensions")
     else do
       let rows ← a.rows.mapM fun row => (List.range b.columns).mapM fun j => do
-        let products ← (row.zip b.rows).mapM fun (p, other) => do
+        let q ← (row.zip b.rows).mapM fun (p, other) => do
           let q ← checked "invalid matrix entry" other[j]?
           checked "incompatible matrix rings" (p.mul q)
-        products.foldlM (fun sum p => checked "incompatible matrix rings" (sum.add p))
+        q.foldlM (fun sum p => checked "incompatible matrix rings" (sum.add p))
           (Poly.constant a.ring 0)
       return ⟨a.ring, b.columns, rows⟩
 
@@ -121,7 +121,7 @@ def polynomialRing? : Value → Option Ring
 def polynomialValues (ps : List Poly) : Value := .list (ps.map Value.polynomial)
 
 def listFormValue (p : Poly) : Value := .list (p.data.terms.map fun t =>
-  .sequence [.list (t.monomial.powers.map fun n => .zz n), .qq t.coefficient])
+  .sequence [.list (t.monomial.powers.map fun (n : Nat) => .zz (Int.ofNat n)), .qq t.coefficient])
 
 def asIdeal (arg : Value) : Except Error Ideal := do
   match arg with
@@ -138,7 +138,6 @@ def asIdeal (arg : Value) : Except Error Ideal := do
     let ps ← xs.mapM (promotePolynomial r)
     return ⟨r,ps⟩
 
-/-- Preserve the supplied order; the DSL algorithm decides all reduction order. -/
 def generatorList (arg : Value) : Except Error (List Poly) := do
   match arg with
   | .basis g => return g.generators
@@ -147,14 +146,14 @@ def generatorList (arg : Value) : Except Error (List Poly) := do
 
 def linearCombination (r : Ring) : List Poly → List Poly → Except Error Poly
   | [], [] => .ok (Poly.constant r 0)
-  | a :: as, b :: bs => do
+  | a :: restA, b :: restB => do
     let p ← checked "incompatible representation rings" (a.mul b)
-    let tail ← linearCombination r as bs
+    let tail ← linearCombination r restA restB
     checked "incompatible representation rings" (p.add tail)
   | _,_ => .error (.algebra "invalid representation length")
 
-/-- Check the change-of-basis identities before publishing the result object.
-This checks provenance only. It does not perform Buchberger or assert its criterion. -/
+/-- Check change-of-basis identities before publishing a result object.
+This checks provenance only, not Buchberger's criterion. -/
 def makeBasis (input : Ideal) (pairs : List Value) : Except Error Basis := do
   let pairs ← pairs.mapM fun pair => do
     let some [.polynomial p, .list row] := pair.elements?
@@ -190,7 +189,7 @@ def primitive (op : Primitive) (arg : Value) : Except Error Value := do
     else return .polynomial p.leadingMonomial
   | .leadTerm,.polynomial p => return .polynomial p.leadingTerm
   | .exponents,.polynomial p =>
-    return .list (p.data.terms.map fun t => .list (t.monomial.powers.map fun n => .zz n))
+    return .list (p.data.terms.map fun t => .list (t.monomial.powers.map fun (n : Nat) => .zz (Int.ofNat n)))
   | .listForm,.polynomial p => return listFormValue p
   | .terms,.polynomial p =>
     return polynomialValues (p.data.terms.map fun t => Poly.ofData p.ring ⟨[t]⟩)
@@ -225,8 +224,8 @@ def primitive (op : Primitive) (arg : Value) : Except Error Value := do
   | _,_ => .error (.algebra s!"unsupported argument for {repr op}: {arg.className}")
 
 mutual
-/-- Ring-variable specs are values. Names already bound to an indeterminate
-reuse its underlying symbol, not the alias spelling used by the caller. -/
+/-- Ring specs are values. Existing indeterminates carry the underlying symbol,
+not the alias spelling used by the caller. -/
 def variableSpecifications : Value → Except Error (List (String × Option Nat))
   | .null => .ok []
   | .globalSymbol name => .ok [(name,none)]

@@ -1,6 +1,10 @@
 import Macaulean.Interpreter.Value
 
-/-! # Typed data transport. Foreign closures and lexical cells are deliberately not decoded. -/
+/-! # Typed scalar/collection transport
+Foreign closures, lexical cells, rings and polynomial objects are deliberately
+not decoded as session-relative handles. Polynomial tests use native `listForm`
+observations with exact exponent lists and rational coefficients instead.
+-/
 namespace Macaulean.M2
 namespace Value
 mutual
@@ -11,8 +15,7 @@ def toWire : Value → List String
   | .null => ["Nothing"]
   | .list xs => ["List", toString xs.length] ++ elementsWire xs
   | .sequence xs => ["Sequence", toString xs.length] ++ elementsWire xs
-  | .closure _ => ["Unsupported", "FunctionClosure"]
-  | .symbol .. => ["Unsupported", "Symbol"]
+  | v => ["Unsupported", v.className]
 def elementsWire : List Value → List String
   | [] => [] | x :: xs => toWire x ++ elementsWire xs
 end

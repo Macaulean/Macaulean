@@ -8,7 +8,11 @@ identity checks that the generated literal equals the pure compilation result. -
 namespace Macaulean.M2.LibraryCompiler
 open Lean Elab Term Meta Lexical
 
-deriving instance ToExpr for BinOp, UnOp, LogicOp, Parameters, Ref
+deriving instance Lean.ToExpr for Macaulean.M2.BinOp
+deriving instance Lean.ToExpr for Macaulean.M2.UnOp
+deriving instance Lean.ToExpr for Macaulean.M2.LogicOp
+deriving instance Lean.ToExpr for Macaulean.M2.Parameters
+deriving instance Lean.ToExpr for Macaulean.M2.Lexical.Ref
 
 mutual
 def codeExpr : Code → Expr

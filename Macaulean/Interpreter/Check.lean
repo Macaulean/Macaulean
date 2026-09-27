@@ -12,7 +12,10 @@ Foreign ring identities and session handles are not accepted as portable values.
 namespace Macaulean.M2
 open Lean Elab Command Meta
 
-deriving instance ToExpr for Error, Algebra.CoefficientRing, Algebra.Ring, Algebra.Primitive
+deriving instance ToExpr for Error
+deriving instance ToExpr for Algebra.CoefficientRing
+deriving instance ToExpr for Algebra.Ring
+deriving instance ToExpr for Algebra.Primitive
 
 private def rationalExpr (q : Rat) : Expr :=
   mkApp2 (mkConst ``mkRat) (toExpr q.num) (toExpr q.den)
@@ -23,7 +26,9 @@ instance : ToExpr Algebra.Poly where
     letI : ToExpr Rat := { toTypeExpr := mkConst ``Rat, toExpr := rationalExpr }
     mkApp2 (mkConst ``Algebra.Poly.mk) (toExpr p.ring) (toExpr p.data)
 
-deriving instance ToExpr for Algebra.Ideal, Algebra.Matrix, Algebra.Basis
+deriving instance ToExpr for Algebra.Ideal
+deriving instance ToExpr for Algebra.Matrix
+deriving instance ToExpr for Algebra.Basis
 
 mutual
 
