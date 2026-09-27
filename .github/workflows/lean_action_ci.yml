@@ -36,12 +36,36 @@ jobs:
           toolchain=$(lean --print-prefix)
           tar --exclude='*.a' --exclude='*.o' --exclude='*.c' --exclude='*.cpp' --exclude='*.ilean' --exclude='*.trace' -czf /tmp/polynomial-environment/lean.tar.gz -C "$toolchain" .
           cd /tmp/polynomial-environment
-          sha256sum *.tar.gz > SHA256SUMS
+          sha256sum *.tar.gz > SHA256SUMS.txt
+          split -b 256M lean.tar.gz lean.part-
       - uses: actions/upload-artifact@v4
-        if: always()
         with:
-          name: polynomial-lean-environment
-          path: /tmp/polynomial-environment/
+          name: polynomial-source-environment
+          path: |
+            /tmp/polynomial-environment/*.txt
+            /tmp/polynomial-environment/source.tar.gz
+            /tmp/polynomial-environment/build.tar.gz
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polynomial-lean-part-aa
+          path: /tmp/polynomial-environment/lean.part-aa
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polynomial-lean-part-ab
+          path: /tmp/polynomial-environment/lean.part-ab
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polynomial-lean-part-ac
+          path: /tmp/polynomial-environment/lean.part-ac
           retention-days: 1
           compression-level: 0
           if-no-files-found: error
