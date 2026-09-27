@@ -89,6 +89,7 @@ inductive Primitive where
   | leadCoefficient | leadMonomial | leadTerm | exponents | terms | listForm | size
   | ring | coefficientRing | generators | entries | numgens | ideal | promote | coefficient
   | monomialDivides | monomialQuotient | monomialLCM | monomialCompare | fromExponents
+  | asIdeal | generatorList | makeBasis | normalFormData | changeMatrix | numRows | numColumns
   deriving Repr, DecidableEq, Inhabited
 
 def Primitive.name : Primitive → String
@@ -101,26 +102,37 @@ def Primitive.name : Primitive → String
   | .monomialDivides => "m2MonomialDivides" | .monomialQuotient => "m2MonomialQuotient"
   | .monomialLCM => "m2MonomialLCM" | .monomialCompare => "m2MonomialCompare"
   | .fromExponents => "m2Monomial"
+  | .asIdeal => "m2AsIdeal" | .generatorList => "m2GeneratorList"
+  | .makeBasis => "m2MakeBasis" | .normalFormData => "m2NormalFormData"
+  | .changeMatrix => "getChangeMatrix" | .numRows => "numRows" | .numColumns => "numColumns"
 def primitives : List Primitive := [
   .leadCoefficient,.leadMonomial,.leadTerm,.exponents,.terms,.listForm,.size,
   .ring,.coefficientRing,.generators,.entries,.numgens,.ideal,.promote,.coefficient,
-  .monomialDivides,.monomialQuotient,.monomialLCM,.monomialCompare,.fromExponents]
+  .monomialDivides,.monomialQuotient,.monomialLCM,.monomialCompare,.fromExponents,
+  .asIdeal,.generatorList,.makeBasis,.normalFormData,.changeMatrix,.numRows,.numColumns]
 
-/-- `row` is a generator matrix, not a general matrix engine. -/
+/-- First-order immutable result containers. `basis` stores one representation row
+per output generator. `matrix` retains its column count even with zero rows.
+Constructors alone are data, not a theorem that a value is a Groebner basis. -/
 inductive Object where
   | rationals
   | ring (info : RingInfo)
   | poly (info : RingInfo) (terms : Raw)
   | ideal (info : RingInfo) (generators : List Raw)
   | row (info : RingInfo) (entries : List Raw)
+  | matrix (info : RingInfo) (columns : Nat) (entries : List (List Raw))
+  | basis (info : RingInfo) (input generators : List Raw) (representations : List (List Raw))
   | builtin (primitive : Primitive)
+  | library (name : String)
   deriving Repr, DecidableEq, Inhabited
 
 def Object.ring? : Object → Option RingInfo
-  | .ring r | .poly r _ | .ideal r _ | .row r _ => some r | _ => none
+  | .ring r | .poly r _ | .ideal r _ | .row r _ | .matrix r .. | .basis r .. => some r
+  | _ => none
 def Object.className : Object → String
   | .rationals => "Type" | .ring _ => "PolynomialRing" | .poly r _ => r.display
-  | .ideal .. => "Ideal" | .row .. => "Matrix" | .builtin _ => "FunctionClosure"
+  | .ideal .. => "Ideal" | .row .. | .matrix .. => "Matrix" | .basis .. => "GroebnerBasis"
+  | .builtin _ | .library _ => "FunctionClosure"
 def monomialText (names : List String) (powers : List Nat) : String :=
   "*".intercalate ((names.zip powers).filterMap fun (x,n) =>
     if n = 0 then none else some (if n = 1 then x else s!"{x}^{n}"))
@@ -139,5 +151,10 @@ def Object.toM2String : Object → String
   | .rationals => "QQ" | .ring r => r.display | .poly r ts => polynomialText r ts
   | .ideal r ps => "ideal(" ++ ", ".intercalate (ps.map (polynomialText r)) ++ ")"
   | .row r ps => "matrix{{" ++ ", ".intercalate (ps.map (polynomialText r)) ++ "}}"
-  | .builtin p => p.name
+  | .matrix r cols rows =>
+    if rows.isEmpty then s!"matrix(0,{cols})"
+    else "matrix{" ++ ", ".intercalate (rows.map fun ps =>
+      "{" ++ ", ".intercalate (ps.map (polynomialText r)) ++ "}") ++ "}"
+  | .basis _ _ ps _ => s!"GroebnerBasis[{ps.length} generators]"
+  | .builtin p => p.name | .library name => name
 end Macaulean.M2.Polynomials
