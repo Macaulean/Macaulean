@@ -153,7 +153,7 @@ def write_once(path: Path, data: bytes) -> None:
 @dataclass(frozen=True)
 class Limits:
     seconds: int = 120
-    memory_bytes: int = 8 * 1024**3
+    memory_bytes: int = 4 * 1024**3
     disk_bytes: int = 64 * 1024**2
     processes: int = 64
 
@@ -296,7 +296,7 @@ class Sandbox:
             "--chdir", "/work", "--setenv", "HOME", "/work",
             "--setenv", "PATH", "/toolchain/bin:/usr/bin:/bin",
             "--setenv", "LEAN_PATH", "/project/.lake/build/lib/lean",
-            "--setenv", "LEAN_NUM_THREADS", "1",
+            "--setenv", "LEAN_NUM_THREADS", "0",
             "--setenv", "LANG", "C.UTF-8", "--",
             "/bin/sh", "-c",
             "set -eu\nprintf 'LEAN_NUM_THREADS=%s\\n' \"$LEAN_NUM_THREADS\" >&2\nulimit -a >&2\n/toolchain/bin/lean --version >&2\n/toolchain/bin/lean --root=/input "
