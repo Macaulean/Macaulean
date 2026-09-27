@@ -15,7 +15,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y curl nodejs
+          apt-get install -y curl nodejs python3
       - uses: leanprover/lean-action@v1
         with:
           test: 'false'
@@ -34,6 +34,17 @@ jobs:
           set -e
           printf '%s\n' "$status" > ci-evidence/intent-focused.exit
           cat ci-evidence/intent-focused.log
+          exit "$status"
+      - name: Exercise real Lean editor RPC and approval replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python3 scripts/intent-lsp-test.py > ci-evidence/intent-lsp.log 2>&1
+          status=$?
+          set -e
+          printf '%s\n' "$status" > ci-evidence/intent-lsp.exit
+          cat ci-evidence/intent-lsp.log
           exit "$status"
       - name: Run complete test suite and retain diagnostics
         shell: bash
