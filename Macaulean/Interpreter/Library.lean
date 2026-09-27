@@ -1,4 +1,5 @@
 import Macaulean.Interpreter.LibraryCompiler
+import Macaulean.Interpreter.SourceFile
 
 /-! # M2 algorithms supplied as source, not engine primitives
 
@@ -13,14 +14,16 @@ open Lexical LibraryCompiler
 set_option maxRecDepth 20000
 set_option maxHeartbeats 5000000
 
-def source : String := include_str "Buchberger.m2"
+def source : String := m2_source% "Buchberger.m2"
 def definitions : List (String × Code) := m2_library% source
 
 open Lean Elab Command in
 run_cmd do
-  let .ok expected := LibraryCompiler.compile source
-    | throwError "M2 library no longer parses/compiles"
-  let quoteEntry := fun (name,code) => (name,LibraryCompiler.codeExpr code)
+  let expected ← match LibraryCompiler.compile source with
+    | .ok ds => pure ds
+    | .error error => throwError "M2 library no longer parses/compiles: {error}"
+  let quoteEntry : String × Code → String × Lean.Expr :=
+    fun (name,code) => (name,LibraryCompiler.codeExpr code)
   unless expected.map quoteEntry == definitions.map quoteEntry do
     throwError "compiled M2 library differs from its checked-in source"
 
