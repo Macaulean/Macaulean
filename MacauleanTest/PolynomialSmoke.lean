@@ -5,9 +5,8 @@ namespace Macaulean.M2.PolynomialSmoke
 open Lean Elab Command
 set_option maxRecDepth 20000
 set_option maxHeartbeats 5000000
+set_option pp.proofs false
 
--- Regression: native execution used to hide a stuck dependent cast. These
--- force the normalized terms and equality decision inside Lean's kernel.
 private def r : Algebra.Ring := ⟨0,["x"],[none]⟩
 private def x := Algebra.Poly.indeterminate r 0
 private def one := Algebra.Poly.constant r 1
@@ -22,6 +21,21 @@ example : decide (x = x) = true := by decide +kernel
 example : decide (x = one) = false := by decide +kernel
 example : (x.mul x).map (fun p => p.data.terms.map (fun t => t.monomial.powers)) =
     some [[2]] := by decide +kernel
+
+-- Temporary, small backend diagnostics (no whole-runtime expansion).
+#reduce (Macaulean.Polynomial.sortTerms (x.data.terms ++ one.data.terms)).length
+#reduce (Macaulean.Polynomial.coalesceTerms (x.data.terms ++ one.data.terms)).length
+#reduce (Macaulean.Polynomial.mergeTerms x.data.terms one.data.terms).length
+#reduce (Macaulean.Polynomial.mergeTerms_old x.data.terms one.data.terms).length
+#reduce (x.data.terms[0]!.monomial.mul x.data.terms[0]!.monomial).powers
+#print axioms Macaulean.Polynomial.mergeTerms
+#print axioms Macaulean.Polynomial.mulTerms
+
+run_cmd do
+  for source in #["0_R", "1_R", "(0_R)", "2*x", "QQ[]"] do
+    match Lean.Parser.runParserCategory (← getEnv) `m2 source with
+    | .ok _ => logInfo m!"M2_CATEGORY_ACCEPTED {source}"
+    | .error err => logInfo m!"M2_CATEGORY_ERROR {source}: {err}"
 
 run_cmd do
   for source in #[
