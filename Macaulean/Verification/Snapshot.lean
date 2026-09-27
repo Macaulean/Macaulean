@@ -8,9 +8,9 @@ import Macaulean.Interpreter.LibraryCompiler
 
 Keys retain constructor structure, resolved code, reachable global bindings,
 captured cells, library bodies and ring identities. Comments and source offsets
-are deliberately absent. A separate theory seal traverses actual Lean declaration
-bodies, including the formal contract. Missing dependencies or exhausted traversal
-budgets fail closed. Session-relative handles are deliberately not portable.
+are deliberately absent. Theory fingerprints traverse actual declaration bodies,
+including the formal contract. Missing dependencies or exhausted budgets fail
+closed. Session-relative handles are deliberately not portable.
 -/
 namespace Macaulean.M2.Verification.Snapshot
 open Lean Fingerprint Lexical
@@ -98,8 +98,8 @@ private def theoryWalk : Nat → Environment → List Name → List Name → Lis
         (if c.isAxiom then n.toString::axioms else axioms)
 
 /-- Exact declaration payload is retained; digest is the portable attestation key. -/
-def seal (env : Environment) (roots : List Name) : Except String Theory := do
-  let (seen,entries,axioms) ← theoryWalk 500000 env roots [] [] []
+def sealTheory (env : Environment) (roots : List Name) (fuel : Nat := 500000) : Except String Theory := do
+  let (seen,entries,axioms) ← theoryWalk fuel env roots [] [] []
   let payload := frame ["lean-declarations-v1",Lean.versionString,frame entries]
   return ⟨payload,sha256 payload,seen.map Name.toString,axioms⟩
 
@@ -114,14 +114,14 @@ initialize theoryExt : EnvExtension (Option Theory) ← registerEnvExtension (pu
 
 def theory : Lean.Elab.Command.CommandElabM Theory := do
   if let some result := theoryExt.getState (← getEnv) then return result
-  let result ← match seal (← getEnv) roots with
+  let result ← match sealTheory (← getEnv) roots with
     | .ok result => pure result | .error e => throwError e
   modifyEnv fun env => theoryExt.setState env (some result)
   return result
 
-/-- Globals read or written by a body, including code inside nested lambdas.
-Captured lexical frames are handled separately, without pretending closures are pure. -/
 mutual
+/-- Globals read or written by a body, including code inside nested lambdas.
+Captured lexical frames are handled separately; closures are not assumed pure. -/
 def references : Code → List Ref
   | .int _ | .empty => []
   | .read r => [r]
@@ -207,7 +207,7 @@ def reachable (fn : Value) (state : Runtime.State) : Except String String := do
   return frame ["m2-reachable-v1",toString state.heap.nextRing,frame entries]
 
 /-- Display identity is stable under comments/formatting. Rebinding and changing
-captured/global dependencies affect the revision, independently of the source span. -/
+captured/global dependencies affect the revision, independently of source spans. -/
 def bindingId (moduleName : Name) (name : String) : String :=
   sha256 (frame ["m2-binding-v1",nameKey moduleName,name])
 
