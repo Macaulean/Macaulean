@@ -26,9 +26,9 @@ def elabFixtureApproval : CommandElab := fun stx => do
     | .ok parsed => pure parsed | .error err => throwError "approval source did not parse: {err}"
   elabCommand parsed
 
-open M2
+-- Qualify the root language namespace because this test is inside Macaulean.M2.
+open _root_.M2
 
--- The ordinary M2 command executes once; the opt-in index is a separate layer.
 #guard_msgs in
 keepPoly = p -> p;
 
@@ -67,7 +67,6 @@ run_cmd do
 #guard_msgs in
 #m2_status "keepPoly" polynomialIdentity
 
--- No M2 execution occurs in the approval commands, so input numbering is unchanged.
 run_cmd do
   unless (← DSL.getSession).nextInput == 2 do throwError "approval executed an M2 input"
 
@@ -103,7 +102,6 @@ unrelated = 17;
 #guard_msgs in
 #m2_status "keepPoly" polynomialIdentity
 
--- Re-proposing exactly the same target cannot silently clear a revocation.
 #guard_msgs in
 #m2_contract "keepPoly" polynomialIdentity
 
@@ -111,7 +109,6 @@ unrelated = 17;
 #guard_msgs in
 #m2_status "keepPoly" polynomialIdentity
 
--- Rebinding produces a distinct generation while retaining the binding's identity.
 #guard_msgs in
 keepPoly = p -> p + 1;
 
@@ -126,7 +123,6 @@ run_cmd do
   unless entry.id == Snapshot.bindingId (← getEnv).mainModule "keepPoly" do
     throwError "source offset or rebinding changed stable identity"
 
--- Nested UTF-8 syntax is preserved for future source-linked proof obligations.
 #guard_msgs in
 choosePoly = (p,q) -> (
   -- λ, 中文: original bytes rather than character offsets
@@ -145,7 +141,6 @@ run_cmd do
       throwError "invalid source byte range"
   if (Index.sourceNodes 0 Syntax.missing).isOk then throwError "partial source map accepted"
 
--- Checked polynomial/row views are available for actual M2 values.
 #guard_msgs in
 R = QQ[x,y];
 #guard_msgs in
@@ -161,7 +156,6 @@ run_cmd do
   unless (Index.viewLabels row).head? == some "Checked dimension-indexed coefficient/generator row" do
     throwError "row view not displayed"
 
--- Indexing can be disabled without changing execution or introducing a second run.
 set_option m2.intent.enabled false in
 #guard_msgs in
 disabled = 21;
