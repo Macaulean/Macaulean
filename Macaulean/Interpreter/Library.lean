@@ -2,29 +2,35 @@ import Macaulean.Interpreter.LibraryCompiler
 import Macaulean.Interpreter.SourceFile
 
 /-! # M2 algorithms supplied as source, not engine primitives
-
-Lake tracks Buchberger.m2 as an input dependency. Its lexical code is compiled
-once into literal Lean data; recursive calls neither reparse source nor install
-fresh helper closures. This has the same parser/elaborator boundary as the bare
-DSL. Compilation fidelity is checked at elaboration, not asserted as an axiom
-or advertised as a proved parser-correctness theorem.
--/
+The source is a tracked Lake input. Compilation is an elaboration boundary,
+not an axiom or a claimed parser-correctness theorem. -/
 namespace Macaulean.M2.Library
-open Lexical LibraryCompiler
+open Lexical LibraryCompiler Lean Elab Command
 set_option maxRecDepth 20000
 set_option maxHeartbeats 5000000
 
 def source : String := m2_source% "Buchberger.m2"
+
+-- Report the failing definition rather than a context-free token error.
+run_cmd do
+  logInfo m!"LIBRARY_READER_CONTROL: {repr (Macaulean.M2.parse "f=x->\n x+1;")}"
+  logInfo m!"LIBRARY_NEWLINE_CONTROL: {repr (Macaulean.M2.Parser.skipNewlines [.newline,.newline,.num 7])}"
+  for block in source.splitOn "\n\n" do
+    match Macaulean.M2.parse block with
+    | .ok _ => pure ()
+    | .error error => logError m!"LIBRARY_FRAGMENT {repr block}: {error}"
+
 def definitions : List (String × Code) := m2_library% source
 
-open Lean Elab Command in
 run_cmd do
   let expected ← match LibraryCompiler.compile source with
     | .ok ds => pure ds
     | .error error => throwError "M2 library no longer parses/compiles: {error}"
   let quoteEntry : String × Code → String × Lean.Expr :=
     fun (name,code) => (name,LibraryCompiler.codeExpr code)
-  unless expected.map quoteEntry == definitions.map quoteEntry do
+  let actualEntries := definitions.map quoteEntry
+  let expectedEntries := expected.map quoteEntry
+  if actualEntries != expectedEntries then
     throwError "compiled M2 library differs from its checked-in source"
 
 def aliases : List (String × String) := [
