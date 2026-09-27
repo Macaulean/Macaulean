@@ -21,27 +21,30 @@ theorem readPolynomials_roundtrip (ps : List (Polynomial r)) :
   induction ps with
   | nil => rfl
   | cons p ps ih =>
-    simp [readPolynomials, polynomial_roundtrip, ih]
+    simp only [List.map_cons, readPolynomials, polynomial_roundtrip, ih]
+    rfl
 
 theorem row_roundtrip (row : Row r n) :
     readRow r n row.value = .ok row := by
   cases row with
   | mk values h =>
-    simp [Row.value, readRow, readPolynomials_roundtrip, h]
+    simp only [Row.value, readRow, readPolynomials_roundtrip, bind, Except.bind, dif_pos h] <;> rfl
 
 theorem row_sequence_roundtrip (row : Row r n) :
     readRow r n row.sequenceValue = .ok row := by
   cases row with
   | mk values h =>
-    simp [Row.sequenceValue, readRow, readPolynomials_roundtrip, h]
+    simp only [Row.sequenceValue, readRow, readPolynomials_roundtrip, bind, Except.bind, dif_pos h] <;> rfl
 
 theorem row_wrong_length (row : Row r n) (m : Nat) (h : n ≠ m) :
     readRow r m row.value = .error "coefficient-row view: wrong length" := by
-  simp [Row.value, readRow, readPolynomials_roundtrip, row.size_eq, h]
+  have wrong : row.values.length ≠ m := by simpa only [row.size_eq] using h
+  simp only [Row.value, readRow, readPolynomials_roundtrip, bind, Except.bind, dif_neg wrong]
 
 theorem row_sequence_wrong_length (row : Row r n) (m : Nat) (h : n ≠ m) :
     readRow r m row.sequenceValue = .error "coefficient-row view: wrong length" := by
-  simp [Row.sequenceValue, readRow, readPolynomials_roundtrip, row.size_eq, h]
+  have wrong : row.values.length ≠ m := by simpa only [row.size_eq] using h
+  simp only [Row.sequenceValue, readRow, readPolynomials_roundtrip, bind, Except.bind, dif_neg wrong]
 
 theorem polynomial_value_injective (p q : Polynomial r) (h : p.value = q.value) : p = q := by
   have same := congrArg (readPolynomial r) h
