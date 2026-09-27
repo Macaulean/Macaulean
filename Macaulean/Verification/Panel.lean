@@ -4,10 +4,9 @@ import Macaulean.Interpreter.DSL
 /-!
 # Intent review in the ordinary Lean InfoView
 
-The panel is a view of an elaboration snapshot. Buttons insert explicit source
-commands at the end of that command, not at an arbitrary cursor inside a function.
-The client never marks a contract approved optimistically: re-elaboration must
-validate the frozen key. No RPC endpoint grants approval or starts proof search.
+Panels describe the elaboration snapshot at their source position. Buttons insert
+source commands at the end of that command, never directly grant approval. The
+server must recheck frozen fingerprints after every edit. RPC is read-only.
 -/
 namespace Macaulean.M2.Verification.Panel
 open Lean Elab Command
@@ -17,10 +16,12 @@ private def strings (xs : List String) : Json := toJson xs
 def proposalJson (p : Intent.Proposal) (current : Option String) : Json :=
   let status := p.status current
   let d := Contracts.describe p.kind
+  let target := (Targets.name p.digest).toString
   Json.mkObj [
     ("schema",Json.str p.kind.name), ("title",Json.str d.title),
     ("inputs",strings d.inputs), ("guarantees",strings d.guarantees),
     ("limitations",strings d.limitations), ("formal",Json.str d.formal),
+    ("target",Json.str target), ("inspectCommand",Json.str s!"#print {target}\n"),
     ("version",Json.str Contracts.version), ("digest",Json.str p.digest),
     ("status",Json.str status.label), ("proofStatus",Json.str "Unattempted - no proof is supplied by intent approval"),
     ("canApprove",toJson (status != .stale && status != .unavailable)),
@@ -41,14 +42,15 @@ def entryJson (index : Index.State) (session : Session) (theory : Option Snapsho
   Json.mkObj [
     ("id",Json.str entry.id), ("name",Json.str entry.name),
     ("generation",toJson entry.generation), ("file",Json.str entry.sourceFile),
+    ("sourceText",Json.str entry.sourceText), ("resolvedCode",Json.str entry.declarationKey),
     ("className",Json.str ((value.map Value.className).getD "Unavailable")),
     ("callable",toJson ((value.map Runtime.callable).getD false)),
     ("views",strings ((value.map Index.viewLabels).getD ["Binding no longer visible"])),
     ("sourceNodes",toJson entry.nodes), ("contracts",toJson cards),
     ("choices",toJson choices)]
 
-/-- Exported, deterministic, read-only inventory for tools. It contains no proof
-success flags and no executable callback. -/
+/-- Deterministic read-only inventory. It contains no proof-success flags and no
+executable callbacks. Exact target definitions are ordinary Lean declarations. -/
 def inventory (env : Environment) : Json :=
   let index := Index.indexExt.getState env
   let session := DSL.sessionExt.getState env
@@ -80,13 +82,17 @@ function ContractCard({p, insert}) {
     e('strong',null,'Guarantees'), ...paragraphs(p.guarantees),
     e('strong',null,'Not claimed'), ...paragraphs(p.limitations),
     e('details',null,e('summary',null,'Formal target and revision'),
-      e('pre',null,p.formal),e('p',null,p.version),e('code',null,p.digest),
+      e('pre',null,p.formal),e('code',null,p.target),
+      e('button',{onClick:()=>insert(p.inspectCommand)},'Inspect exact Lean proposition'),
+      e('p',null,p.version),e('code',null,p.digest),
       e('p',null,'Attestation source: '+(p.approvalSource || 'none'))),
     e('label',null,e('input',{type:'checkbox',checked:reviewed,
       disabled:!p.canApprove,onChange:ev=>setReviewed(ev.target.checked)}),
       ' This contract, including its exclusions, matches my intent.'),
     e('div',null,
-      e('button',{disabled:!reviewed || !p.canApprove,onClick:()=>insert(p.approveCommand)},'Record approval in source'),
+      e('button',{disabled:!reviewed || !p.canApprove,onClick:()=>{
+        if (reviewed && p.canApprove) return insert(p.approveCommand);
+      }},'Record approval in source'),
       e('button',{onClick:()=>insert(p.revokeCommand)},'Revoke in source')));
 }
 export default function IntentPanel(props) {
@@ -108,6 +114,7 @@ export default function IntentPanel(props) {
     e('h3',null,'M2 intent: '+p.name),
     e('p',null,p.className+'; binding generation '+p.generation),
     e('p',null,'Snapshot at this source position. Approval is separate from proof.'),
+    e('p',null,'This target freezes the full runtime state. Runtime edits conservatively invalidate approval.'),
     ...paragraphs(p.views),
     ...p.contracts.map(c=>e(ContractCard,{key:c.schema,p:c,insert})),
     p.callable && e('section',null,
@@ -115,9 +122,12 @@ export default function IntentPanel(props) {
         e('option',{value:''},'Choose a contract to review'),
         ...p.choices.map(c=>e('option',{key:c.name,value:c.name},c.name))),
       selected && e('pre',{style:{whiteSpace:'pre-wrap'}},selected.description),
-      e('button',{disabled:!selected,onClick:()=>insert(selected.command)},'Propose contract in source')),
+      e('button',{disabled:!selected,onClick:()=>{
+        if (selected) return insert(selected.command);
+      }},'Propose contract in source')),
     e('details',null,e('summary',null,'Binding and nested source map'),
       e('p',null,p.file),e('code',null,p.id),
+      e('pre',null,p.sourceText),
       e('pre',null,JSON.stringify(p.sourceNodes,null,2))),
     notice && e('pre',{role:'status',style:{whiteSpace:'pre-wrap'}},notice));
 }
