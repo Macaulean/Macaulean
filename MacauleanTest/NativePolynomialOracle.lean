@@ -27,14 +27,18 @@ def raw (source : String) (surface : Bool := false) : IO (List String) := do
   let output ← IO.Process.output {
     cmd := "M2", args := #["-q","--silent","--no-readline","--stop","-e",script] }
   unless output.exitCode == 0 do
-    throw <| IO.userError s!"native M2 process failed ({output.exitCode}): {output.stderr}"
+    throw <| IO.userError s!"native M2 process failed for {source} ({output.exitCode}): {output.stderr}"
   let json ← match Json.parse output.stdout with
     | .ok j => pure j
-    | .error e => throw <| IO.userError s!"invalid native JSON: {e}\n{output.stdout}\n{output.stderr}"
+    | .error e => throw <| IO.userError s!"invalid native JSON for {source}: {e}\nstdout: {output.stdout}\nstderr: {output.stderr}"
   match fromJson? json with
   | .ok values => pure values
-  | .error e => throw <| IO.userError s!"invalid native wire data: {e}"
+  | .error e => throw <| IO.userError s!"invalid native wire data for {source}: {e}\nJSON: {json.compress}"
 
 def query (source : String) : IO (Except String M2Reply) := do
-  return M2Reply.ofWire (← raw source)
+  let wire ← raw source
+  match M2Reply.ofWire wire with
+  | .ok reply => return .ok reply
+  | .error message =>
+    return .error s!"{message}\nsource: {source}\nwire: {repr wire}"
 end Macaulean.M2.NativePolynomialOracle
