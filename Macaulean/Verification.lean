@@ -1,4 +1,5 @@
 import Macaulean.Verification.Views
+import Macaulean.Verification.ViewLaws
 import Macaulean.Verification.Contracts
 import Macaulean.Verification.Snapshot
 import Macaulean.Verification.Intent
