@@ -28,16 +28,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/polynomial-environment
-          git rev-parse HEAD > /tmp/polynomial-environment/commit.txt
+          git -c safe.directory="$PWD" rev-parse HEAD > /tmp/polynomial-environment/commit.txt
           lean --version > /tmp/polynomial-environment/lean-version.txt
           M2 --version > /tmp/polynomial-environment/m2-version.txt
-          git archive --format=tar.gz -o /tmp/polynomial-environment/source.tar.gz HEAD
+          git -c safe.directory="$PWD" archive --format=tar.gz -o /tmp/polynomial-environment/source.tar.gz HEAD
           tar -czf /tmp/polynomial-environment/build.tar.gz .lake/build/lib/lean
           toolchain=$(lean --print-prefix)
-          tar --exclude='*.a' --exclude='*.o' --exclude='*.c' --exclude='*.cpp' --exclude='*.ilean' --exclude='*.trace' -czf /tmp/polynomial-environment/lean.tar.gz -C "$toolchain" bin lib include share src
+          tar --exclude='*.a' --exclude='*.o' --exclude='*.c' --exclude='*.cpp' --exclude='*.ilean' --exclude='*.trace' -czf /tmp/polynomial-environment/lean.tar.gz -C "$toolchain" .
           cd /tmp/polynomial-environment
           sha256sum *.tar.gz > SHA256SUMS
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: polynomial-lean-environment
           path: /tmp/polynomial-environment/
