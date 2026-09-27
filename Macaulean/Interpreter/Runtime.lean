@@ -78,8 +78,9 @@ def State.polynomialRing (s : State) (base : Value) (names : List String) : Exce
     let vars := (names.zip (List.range names.length)).map fun (x,i) =>
       (x, Value.algebra (.poly r (Polynomials.generator names.length i)))
     let env := vars.foldl (fun env (x,v) => (x,v) :: env) s.env
-    return (.algebra (.ring r), { s with env,
-      heap := { s.heap with nextRing := s.heap.nextRing + 1 } })
+    let heap := { s.heap with nextRing := s.heap.nextRing + 1 }
+    let next : State := { env := env, heap := heap }
+    return (.algebra (.ring r), next)
 
 def arguments (params : Parameters) (arg : Value) : Except Error (List Value) :=
   match params with
