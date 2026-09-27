@@ -3,11 +3,14 @@ import Macaulean.Polynomial.Basic
 /-!
 # Rational polynomials for the M2 runtime
 
-The representation and arithmetic are `Macaulean.Polynomial Rat n`.
-The wrapper supplies generative ring identity and variable bindings. Distinct
-ring constructions are not conflated, even when their printed names agree.
-Public arithmetic normalizes before observing leading terms. There is no
-polynomial reduction or Groebner algorithm in this backend.
+The representation is `Macaulean.Polynomial Rat n`. The wrapper supplies
+generative ring identity and variable bindings. Distinct ring constructions
+are not conflated, even when their printed names agree.
+
+Arithmetic uses normalization and structurally recursive list operations.
+The existing backend's newer `mergeTerms`/`mulTerms` execute after compilation
+but their definitions depend on Classical.choice; they must not sit on the
+kernel-evaluation path. There is no reduction or Groebner algorithm here.
 -/
 namespace Macaulean.M2.Algebra
 
@@ -78,6 +81,24 @@ private theorem Poly.eq_iff_data (p q : Poly) :
 instance : DecidableEq Poly := fun p q =>
   decidable_of_iff (p.ring = q.ring ∧ p.termData = q.termData) (Poly.eq_iff_data p q)
 
+/-- First-order, total arithmetic in the existing polynomial representation.
+Normalization does not assume its input is sorted or free of zero terms. -/
+namespace KernelPolynomial
+
+def add (p q : Macaulean.Polynomial Rat n) : Macaulean.Polynomial Rat n :=
+  (⟨p.terms ++ q.terms⟩ : Macaulean.Polynomial Rat n).normalize
+
+def mul (p q : Macaulean.Polynomial Rat n) : Macaulean.Polynomial Rat n :=
+  (⟨p.terms.flatMap fun t =>
+    Macaulean.Polynomial.mulMonTerms t.coefficient t.monomial q.terms⟩ :
+    Macaulean.Polynomial Rat n).normalize
+
+def pow (p : Macaulean.Polynomial Rat n) : Nat → Macaulean.Polynomial Rat n
+  | 0 => ⟨[⟨1, Macaulean.Mon.unit⟩]⟩
+  | k + 1 => mul p (pow p k)
+
+end KernelPolynomial
+
 namespace Poly
 
 def ofData (r : Ring) (p : Macaulean.Polynomial Rat r.names.length) : Poly :=
@@ -97,10 +118,7 @@ def ofTerms (r : Ring) (ts : List (List Nat × Rat)) : Option Poly := do
     else none
   return ofData r ⟨terms⟩
 
-/-- Transport only the erased length proof, never the computational polynomial.
-A cast of the entire dependent value can obstruct kernel reduction even when
-native compilation erases it. This reconstruction preserves every coefficient
-and exponent and performs exactly the same ring-identity check. -/
+/-- Transport only the erased length proof, never the computational polynomial. -/
 def dataIn (p : Poly) (r : Ring) : Option (Macaulean.Polynomial Rat r.names.length) :=
   if h : p.ring = r then
     some ⟨p.data.terms.map fun t => ⟨t.coefficient,
@@ -110,7 +128,7 @@ def dataIn (p : Poly) (r : Ring) : Option (Macaulean.Polynomial Rat r.names.leng
 
 def add (p q : Poly) : Option Poly := do
   let b ← q.dataIn p.ring
-  return ofData p.ring (p.data.add b)
+  return ⟨p.ring, KernelPolynomial.add p.data b⟩
 
 def neg (p : Poly) : Poly := ofData p.ring p.data.neg
 
@@ -118,11 +136,11 @@ def sub (p q : Poly) : Option Poly := p.add q.neg
 
 def mul (p q : Poly) : Option Poly := do
   let b ← q.dataIn p.ring
-  return ofData p.ring (p.data.mul b)
+  return ⟨p.ring, KernelPolynomial.mul p.data b⟩
 
 def smul (c : Rat) (p : Poly) : Poly := ofData p.ring (p.data.smul c)
 
-def pow (p : Poly) (n : Nat) : Poly := ofData p.ring (p.data.pow n)
+def pow (p : Poly) (n : Nat) : Poly := ⟨p.ring, KernelPolynomial.pow p.data n⟩
 
 def isZero (p : Poly) : Bool := p.data.terms.isEmpty
 
@@ -154,7 +172,6 @@ def indeterminate? (p : Poly) : Option (String × Option Nat) := do
     let name ← p.ring.names[i]?
     return (name, (p.ring.cells[i]?).getD none)
 
-/-- Divisibility here is only for nonzero single-term polynomials over QQ. -/
 def monomialDivides (a b : Poly) : Option Bool := do
   if a.ring != b.ring then none else do
     let a ← a.monomial?
