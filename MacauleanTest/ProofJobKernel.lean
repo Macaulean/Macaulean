@@ -61,7 +61,7 @@ run_cmd do
     let candidateStx ← `(by
       apply Macaulean.M2.Verification.ProofJobs.Identity.contract
         (name := "p") (captured := [[]])
-      decide +kernel)
+      rfl)
     let proof ← Term.elabTermEnsuringType candidateStx target
     Term.synthesizeSyntheticMVarsNoPostponing
     instantiateMVars proof
