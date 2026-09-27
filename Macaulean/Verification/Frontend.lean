@@ -4,8 +4,8 @@ import Macaulean.Verification.Panel
 # Opt-in M2 verification frontend
 
 Import `Macaulean.Verification`, then use ordinary `open M2` and ordinary M2.
-The wrapper delegates execution exactly once. Intent commands mutate only the
-verification index and unproved proposition definitions, never M2 bindings or axioms.
+Execution is delegated exactly once. Intent commands mutate only the verification
+index and unproved proposition definitions, never M2 bindings or axioms.
 -/
 register_option m2.intent.enabled : Bool := {
   defValue := true
@@ -25,7 +25,11 @@ def elabIndexedInput : CommandElab := fun stx => do
     DSL.elabInput stx
     let after ← DSL.getSession
     let changed ← Index.record stx term before after
-    for entry in changed do Panel.show entry stx
+    let index ← Index.get
+    let watched := index.entries.filter fun entry =>
+      index.ledger.proposals.any (fun p => p.bindingId == entry.id) &&
+      !(changed.any (fun e => e.id == entry.id))
+    for entry in changed ++ watched do Panel.showPanel entry stx
 
 private def stringArg (stx : Syntax) : String := (⟨stx⟩ : TSyntax `str).getString
 
@@ -67,7 +71,7 @@ def elabPropose : CommandElab := fun stx => do
   installTarget name kind payload
   let index ← Index.get
   Index.put { index with ledger := index.ledger.propose entry.id name kind payload }
-  Panel.show entry stx
+  Panel.showPanel entry stx
 
 @[command_elab approveCommand]
 def elabApprove : CommandElab := fun stx => do
@@ -79,7 +83,7 @@ def elabApprove : CommandElab := fun stx => do
     | .ok ledger => pure ledger | .error e => throwErrorAt stx e
   installTarget name kind payload
   Index.put { index with ledger }
-  Panel.show entry stx
+  Panel.showPanel entry stx
   logInfoAt stx s!"{name}: intent approved by source attestation; proof unattempted"
 
 @[command_elab revokeCommand]
@@ -91,13 +95,13 @@ def elabRevoke : CommandElab := fun stx => do
   let ledger ← match index.ledger.revoke entry.id kind (← sourceLocation stx) with
     | .ok ledger => pure ledger | .error e => throwErrorAt stx e
   Index.put { index with ledger }
-  Panel.show entry stx
+  Panel.showPanel entry stx
   logInfoAt stx s!"{name}: intent approval revoked; proof unattempted"
 
 @[command_elab inspectCommand]
 def elabInspect : CommandElab := fun stx => do
   let entry ← Index.ensure (stringArg stx[1]) (← DSL.getSession)
-  Panel.show entry stx
+  Panel.showPanel entry stx
   logInfoAt stx s!"{entry.name}: binding generation {entry.generation}; {entry.nodes.length} source nodes; proof unattempted"
 
 @[command_elab statusCommand]
