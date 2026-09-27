@@ -7,36 +7,53 @@ import Macaulean.Macaulay2
 # Differential checking and kernel certificates
 
 The native oracle sends typed data, not source for the M2 parser to reinterpret.
-Function programs returning scalar/collection data use the same certificate path.
-Foreign function handles and lexical cells are never accepted by the wire decoder.
+Foreign ring identities and session handles are not accepted as portable values.
 -/
 namespace Macaulean.M2
 open Lean Elab Command Meta
 
-deriving instance ToExpr for Error
+deriving instance ToExpr for Error, Algebra.CoefficientRing, Algebra.Ring, Algebra.Primitive
+
+private def rationalExpr (q : Rat) : Expr :=
+  mkApp2 (mkConst ``mkRat) (toExpr q.num) (toExpr q.den)
+
+instance : ToExpr Algebra.Poly where
+  toTypeExpr := mkConst ``Algebra.Poly
+  toExpr p :=
+    letI : ToExpr Rat := { toTypeExpr := mkConst ``Rat, toExpr := rationalExpr }
+    mkApp2 (mkConst ``Algebra.Poly.mk) (toExpr p.ring) (toExpr p.data)
+
+deriving instance ToExpr for Algebra.Ideal, Algebra.Matrix, Algebra.Basis
 
 mutual
 
 def valueExpr : Value → Expr
   | .zz n => mkApp (mkConst ``Value.zz) (toExpr n)
-  | .qq q => mkApp (mkConst ``Value.qq) (mkApp2 (mkConst ``mkRat) (toExpr q.num) (toExpr q.den))
+  | .qq q => mkApp (mkConst ``Value.qq) (rationalExpr q)
   | .bool b => mkApp (mkConst ``Value.bool) (toExpr b)
   | .null => mkConst ``Value.null
   | .list xs => mkApp (mkConst ``Value.list) (valuesExpr xs)
   | .sequence xs => mkApp (mkConst ``Value.sequence) (valuesExpr xs)
   | .closure id => mkApp (mkConst ``Value.closure) (toExpr id)
   | .symbol name cell => mkApp2 (mkConst ``Value.symbol) (toExpr name) (toExpr cell)
+  | .globalSymbol name => mkApp (mkConst ``Value.globalSymbol) (toExpr name)
+  | .coefficientRing r => mkApp (mkConst ``Value.coefficientRing) (toExpr r)
+  | .ring r => mkApp (mkConst ``Value.ring) (toExpr r)
+  | .polynomial p => mkApp (mkConst ``Value.polynomial) (toExpr p)
+  | .ideal i => mkApp (mkConst ``Value.ideal) (toExpr i)
+  | .matrix m => mkApp (mkConst ``Value.matrix) (toExpr m)
+  | .basis g => mkApp (mkConst ``Value.basis) (toExpr g)
+  | .primitive p => mkApp (mkConst ``Value.primitive) (toExpr p)
+  | .library name => mkApp (mkConst ``Value.library) (toExpr name)
 
 def valuesExpr : List Value → Expr
   | [] => mkApp (mkConst ``List.nil [0]) (mkConst ``Value)
   | v :: vs => mkApp3 (mkConst ``List.cons [0]) (mkConst ``Value) (valueExpr v) (valuesExpr vs)
-
 end
 
 instance : ToExpr Value where
   toTypeExpr := mkConst ``Value
   toExpr := valueExpr
-
 instance : ToExpr Outcome where
   toTypeExpr := mkConst ``Outcome
   toExpr
@@ -54,7 +71,6 @@ inductive M2Reply where
   | ok (v : Value)
   deriving DecidableEq
 
-/-- Legacy scalar transport, retained for callers of `evalValue`. -/
 def M2Reply.ofStrings : List String → Except String M2Reply
   | ["error", _, _] => .ok .error
   | ["ok", "ZZ", s] =>
@@ -74,7 +90,6 @@ def M2Reply.ofStrings : List String → Except String M2Reply
   | ["ok", cls, s] => .error s!"Macaulay2 returned {s} of class {cls}, which is not supported"
   | r => .error s!"unexpected reply from Macaulay2: {r}"
 
-/-- Decode typed values without invoking `run`, `parse`, or the DSL reader. -/
 def M2Reply.ofWire : List String → Except String M2Reply
   | ["error"] => .ok .error
   | "ok" :: tokens => M2Reply.ok <$> Value.ofWire tokens
@@ -88,7 +103,7 @@ def queryM2 (src : String) : IO (Except String M2Reply) := do
   let reply : List String ← m2.sendRequest "evalValueTree" [src]
   return M2Reply.ofWire reply
 
-/-- Error/error remains a weaker legacy check; positive test suites require two successes. -/
+/-- Error/error is a weaker legacy check; positive suites require two successes. -/
 def agrees : Outcome → M2Reply → Bool
   | .ok v, .ok w => v == w
   | .error _, .error => true | .parseError _, .error => true
@@ -133,5 +148,4 @@ syntax (name := m2Check) "#m2_check " (ident " : ")? str : command
     addRunTheorem name src o s!"Macaulay2 evaluates `{src}` to `{reply.toM2String}`."
     logInfo m!"{MessageData.ofConstName name} : run {repr src} = {o.toM2String}"
   | _ => throwUnsupportedSyntax
-
 end Macaulean.M2

@@ -7,6 +7,7 @@ inductive Sym where
   | dotdot | dotdotless | sharp | sharpQuestion | bar | colon
   | kwIf | kwThen | kwElse | kwAnd | kwOr | kwNot
   | arrow | localAssign | kwLocal | kwReturn | atat
+  | lbracket | rbracket | underscore
   deriving Repr, DecidableEq, Inhabited
 inductive Token where
   | num (n : Nat) | ident (x : String) | sym (s : Sym) | newline
@@ -71,6 +72,8 @@ def symbol : List Char → Option (Sym × List Char)
   | '=' :: cs => some (.assign, cs)
   | '(' :: cs => some (.lparen, cs) | ')' :: cs => some (.rparen, cs)
   | '{' :: cs => some (.lbrace, cs) | '}' :: cs => some (.rbrace, cs)
+  | '[' :: cs => some (.lbracket, cs) | ']' :: cs => some (.rbracket, cs)
+  | '_' :: cs => some (.underscore, cs)
   | ';' :: cs => some (.semi, cs) | ',' :: cs => some (.comma, cs)
   | '#' :: cs => some (.sharp, cs) | '|' :: cs => some (.bar, cs)
   | ':' :: cs => some (.colon, cs) | _ => none

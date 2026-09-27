@@ -16,7 +16,6 @@ inductive Ref where
   | slot (depth index : Nat)
   deriving Repr, DecidableEq, Inhabited
 
-/-- Resolved code is distinct from surface syntax; local references have addresses. -/
 inductive Code where
   | int (n : Int)
   | read (ref : Ref)
@@ -36,7 +35,22 @@ inductive Code where
   | apply (fn arg : Code)
   | symbol (name : String) (ref : Ref)
   | returnTerm (arg : Code)
+  | ringNew (base specifications : Code)
+  | ringName (name : String)
   deriving Repr, Inhabited
+
+/-- Only bare unbound globals in a ring specification denote fresh symbols.
+Bound values, local nulls, explicit local quotes, and expression evaluation are
+not replaced with the spelling of their source. -/
+mutual
+def ringSpecifications : Code → Code
+  | .read (.global name) => .ringName name
+  | .listLit xs => .listLit (ringSpecificationsMany xs)
+  | .sequence xs => .sequence (ringSpecificationsMany xs)
+  | other => other
+def ringSpecificationsMany : List Code → List Code
+  | [] => [] | x :: xs => ringSpecifications x :: ringSpecificationsMany xs
+end
 
 structure Scope where
   names : List (String × Nat) := []
@@ -58,14 +72,12 @@ def Resolver.lookup (r : Resolver) (name : String) : Ref :=
   match r.current.names.lookup name with
   | some i => .slot 0 i | none => findOuter name r.outers 1
 
-/-- := redeclaration creates a fresh binding, not an update of the previous slot. -/
 def Resolver.declare (r : Resolver) (name : String) : Ref × Resolver :=
   let i := r.current.count
   let warnings := if (r.current.names.lookup name).isSome then
       r.warnings ++ [s!"redeclaration of local variable '{name}'"] else r.warnings
   (.slot 0 i, { r with current := ⟨(name, i) :: r.current.names, i + 1⟩, warnings })
 
-/-- `local` quotes an existing current-scope binding without resetting its value. -/
 def Resolver.localRef (r : Resolver) (name : String) : Ref × Resolver :=
   match r.current.names.lookup name with
   | some i => (.slot 0 i, r)
@@ -146,6 +158,10 @@ def resolve : Term → Resolver → Code × Resolver
   | .returnTerm a, r =>
     let (a, r) := resolve a r
     (.returnTerm a, r)
+  | .ringNew base specs, r =>
+    let (base, r) := resolve base r
+    let (specs, r) := resolve specs r
+    (.ringNew base (ringSpecifications specs), r)
 
 def resolveMany : List Term → Resolver → List Code × Resolver
   | [], r => ([], r)
@@ -155,7 +171,6 @@ def resolveMany : List Term → Resolver → List Code × Resolver
     (a :: xs, r)
 end
 
-/-- The current file scope is extended; nested function scopes are never exported. -/
 def prepare (t : Term) (scope : Scope := {}) : Code × Scope × List String :=
   let (code, r) := resolve t { current := scope }
   (code, r.current, r.warnings)

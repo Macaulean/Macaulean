@@ -3,11 +3,11 @@ import Macaulean.Polynomial.Basic
 /-!
 # Rational polynomials for the M2 runtime
 
-The representation and arithmetic are the existing `Macaulean.Polynomial Rat n`.
-The runtime wrapper supplies a generative ring identity and variable names. It
-never conflates separately constructed rings merely because their names agree.
-Every public arithmetic result is normalized before leading terms are observed.
-There is deliberately no polynomial reduction or Groebner algorithm here.
+The representation and arithmetic are `Macaulean.Polynomial Rat n`.
+The wrapper supplies generative ring identity and variable bindings. Distinct
+ring constructions are not conflated, even when their printed names agree.
+Public arithmetic normalizes before observing leading terms. There is no
+polynomial reduction or Groebner algorithm in this backend.
 -/
 namespace Macaulean.M2.Algebra
 
@@ -18,6 +18,8 @@ inductive CoefficientRing where
 structure Ring where
   id : Nat
   names : List String
+  /-- None denotes the global symbol; Some denotes an explicitly quoted local cell. -/
+  cells : List (Option Nat) := []
   deriving Repr, DecidableEq, Inhabited
 
 def Ring.toM2String (r : Ring) : String :=
@@ -35,7 +37,7 @@ instance : DecidableEq Poly := fun p q => by
     | mk s b =>
       by_cases h : r = s
       · subst s
-        exact decidable_of_iff (a = b) (by simp only [Poly.mk.injEq])
+        exact decidable_of_iff (a = b) (by simp)
       · exact isFalse (by intro e; cases e; exact h rfl)
 
 namespace Poly
@@ -46,7 +48,7 @@ def ofData (r : Ring) (p : Macaulean.Polynomial Rat r.names.length) : Poly :=
 def constant (r : Ring) (c : Rat) : Poly :=
   ofData r ⟨[⟨c, Macaulean.Mon.unit⟩]⟩
 
-def variable (r : Ring) (i : Nat) : Poly :=
+def indeterminate (r : Ring) (i : Nat) : Poly :=
   ofData r ⟨[⟨1, ⟨(List.range r.names.length).map (fun j => if i = j then 1 else 0), by simp⟩⟩]⟩
 
 /-- A checked data boundary, also used by independent native test decoders. -/
@@ -100,6 +102,14 @@ def leadingMonomial (p : Poly) : Poly :=
 def monomial? (p : Poly) : Option (Macaulean.PolyTerm Rat p.ring.names.length) :=
   match p.data.terms with | [t] => some t | _ => none
 
+/-- Recover the symbol of an existing indeterminate, including its local binding. -/
+def indeterminate? (p : Poly) : Option (String × Option Nat) := do
+  let t ← p.monomial?
+  if t.coefficient != 1 || t.monomial.degree != 1 then none else do
+    let i := t.monomial.powers.idxOf 1
+    let name ← p.ring.names[i]?
+    return (name, (p.ring.cells[i]?).flatten)
+
 /-- Divisibility here is only for nonzero single-term polynomials over QQ. -/
 def monomialDivides (a b : Poly) : Option Bool := do
   if a.ring != b.ring then none else do
@@ -109,11 +119,11 @@ def monomialDivides (a b : Poly) : Option Bool := do
 
 /-- Exact monomial quotient; no general reduction is hidden in the backend. -/
 def monomialQuotient (a b : Poly) : Option Poly := do
-  let true ← monomialDivides b a | none
-  let x ← a.monomial?
-  let y ← b.monomial?
-  ofTerms a.ring [(List.zipWith (· - ·) x.monomial.powers y.monomial.powers,
-    x.coefficient / y.coefficient)]
+  if !(← monomialDivides b a) then none else do
+    let x ← a.monomial?
+    let y ← b.monomial?
+    ofTerms a.ring [(List.zipWith (· - ·) x.monomial.powers y.monomial.powers,
+      x.coefficient / y.coefficient)]
 
 def monomialLCM (a b : Poly) : Option Poly := do
   if a.ring != b.ring then none else do
@@ -141,7 +151,7 @@ private def unsignedTerm (names : List String) (c : Rat) (powers : List Nat) : S
 
 def toM2String (p : Poly) : String :=
   let parts := p.data.terms.map fun t =>
-    let negative := t.coefficient < 0
+    let negative : Bool := decide (t.coefficient < 0)
     let c := if negative then -t.coefficient else t.coefficient
     (negative, unsignedTerm p.ring.names c t.monomial.powers)
   match parts with
@@ -156,15 +166,14 @@ structure Ideal where
   generators : List Poly
   deriving Repr, DecidableEq, Inhabited
 
-/-- Rectangular polynomial data; only checked constructors are exposed to M2. -/
 structure Matrix where
   ring : Ring
   columns : Nat
   rows : List (List Poly)
   deriving Repr, DecidableEq, Inhabited
 
-/-- `representations[j][i]` expresses generator j in original input generator i.
-The container records data, not a proposition asserting the Groebner criterion. -/
+/-- Row j expresses generator j in the original input generators.
+This is data, not a proposition asserting the Groebner criterion. -/
 structure Basis where
   input : Ideal
   generators : List Poly
@@ -176,7 +185,7 @@ inductive Primitive where
   | leadCoefficient | leadMonomial | leadTerm | exponents | listForm | terms
   | promote | numerator | denominator | size
   | monomialDivides | monomialQuotient | monomialLCM | monomialCompare
-  | makeBasis | changeMatrix | basisInput
+  | makeBasis | changeMatrix | basisInput | generatorList | asIdeal
   deriving Repr, DecidableEq, Inhabited
 
 def Primitive.bindings : List (String × Primitive) := [
@@ -187,6 +196,7 @@ def Primitive.bindings : List (String × Primitive) := [
   ("promote", .promote), ("numerator", .numerator), ("denominator", .denominator), ("size", .size),
   ("m2MonomialDivides", .monomialDivides), ("m2MonomialQuotient", .monomialQuotient),
   ("m2MonomialLCM", .monomialLCM), ("m2MonomialCompare", .monomialCompare),
-  ("m2MakeBasis", .makeBasis), ("getChangeMatrix", .changeMatrix), ("m2BasisInput", .basisInput)
+  ("m2MakeBasis", .makeBasis), ("getChangeMatrix", .changeMatrix), ("m2BasisInput", .basisInput),
+  ("m2GeneratorList", .generatorList), ("m2AsIdeal", .asIdeal)
 ]
 end Macaulean.M2.Algebra

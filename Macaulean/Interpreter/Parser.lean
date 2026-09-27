@@ -22,6 +22,7 @@ def infixInfo : Sym → Option (Infix × Nat × Nat)
   | .caret => some (.bin .pow, 50, 51)
   | .sharp => some (.bin .index, 50, 51)
   | .sharpQuestion => some (.bin .hasIndex, 50, 51)
+  | .underscore => some (.bin .subscript, 50, 51)
   | .atat => some (.bin .compose, 48, 49)
   | .star => some (.bin .mul, 40, 41) | .slash => some (.bin .div, 40, 41)
   | .slashslash => some (.bin .quot, 40, 41) | .percent => some (.bin .rem, 40, 41)
@@ -60,6 +61,7 @@ inductive Tree where
   | assignMany (pos : Nat) (declareLocal : Bool) (names : List String) (lhs rhs : Tree)
   | localSymbol (pos : Nat) (name : String) (identifier : Tree)
   | returnTerm (pos : Nat) (body : Tree)
+  | ringNew (left right : Nat) (base specifications : Tree)
   deriving Repr, DecidableEq, Inhabited
 
 def Tree.isComma : Tree → Bool | .comma .. => true | _ => false
@@ -85,6 +87,8 @@ def Tree.toTerm : Tree → Term
   | .assignMany _ loc xs _ a => .assignMany loc xs a.toTerm
   | .localSymbol _ x _ => .localSymbol x
   | .returnTerm _ a => .returnTerm a.toTerm
+  | .ringNew _ _ base (.missing _) => .ringNew base.toTerm (.sequence [])
+  | .ringNew _ _ base specs => .ringNew base.toTerm specs.toTerm
 
 def Tree.bounds : Tree → Nat × Nat
   | .num i _ | .var i _ | .missing i => (i, i)
@@ -95,14 +99,13 @@ def Tree.bounds : Tree → Nat × Nat
   | .lambda _ _ a b | .localAssign _ _ a b | .assignMany _ _ _ a b => (a.bounds.1, b.bounds.2)
   | .ifThen i _ _ y => (i, y.bounds.2) | .ifElse i _ _ _ _ n => (i, n.bounds.2)
   | .discard i a => (a.bounds.1, i)
+  | .ringNew _ j base _ => (base.bounds.1, j)
 
 def Tree.parameterNames : Tree → Option (List String)
   | .var _ x => some [x]
   | .comma _ a (.var _ x) => (· ++ [x]) <$> a.parameterNames
   | _ => none
 
-/-- M2's binder accepts braces as well as parentheses for fixed parameters.
-The delimiter changes neither arity nor argument unpacking. -/
 def Tree.parameters (t : Tree) : Except String Parameters := do
   let p : Parameters ← match t with
     | .var _ x => .ok (.variadic x)
@@ -113,7 +116,6 @@ def Tree.parameters (t : Tree) : Except String Parameters := do
   if p.names.eraseDups.length != p.names.length then .error "duplicate function parameter"
   else return p
 
-/-- Assignment forms are checked on concrete syntax, before brace/comma lowering. -/
 inductive Target where
   | variable (name : String)
   | multiple (names : List String)
@@ -133,7 +135,6 @@ def Tree.target : Tree → Except String Target
   | .binop _ .index _ _ => .ok .indexed
   | _ => .error "invalid assignment target"
 
-/-- No value printing or coercion can turn a numeral or a List into a binding name. -/
 def assignmentTree (isLocal : Bool) (pos : Nat) (lhs rhs : Tree) : Except String Tree := do
   match ← lhs.target with
   | .variable name =>
@@ -155,7 +156,7 @@ abbrev TreeResult := Except String (Tree × Cursor)
 abbrev Result := Except String (Term × List Token)
 private def missingOperand : List Token → Bool
   | [] | .newline :: _ | .sym .comma :: _ | .sym .semi :: _
-  | .sym .rparen :: _ | .sym .rbrace :: _ | .sym .kwElse :: _ => true | _ => false
+  | .sym .rparen :: _ | .sym .rbrace :: _ | .sym .rbracket :: _ | .sym .kwElse :: _ => true | _ => false
 private def startsArgument : List Token → Bool
   | .num _ :: _ | .ident _ :: _ | .sym .lparen :: _ | .sym .lbrace :: _
   | .sym .kwIf :: _ | .sym .kwLocal :: _ | .sym .kwReturn :: _ | .sym .kwNot :: _ => true
@@ -215,6 +216,21 @@ def parseDelimited : Nat → Nat → Bool → Bool → Nat → Cursor → TreeRe
       else .error "mismatched collection or block delimiter"
     | rest => .error ((if braces then "expected '}' but found " else "expected ')' but found ") ++ describe rest)
 
+def parseRing : Nat → Nat → Bool → Nat → Tree → Cursor → TreeResult
+  | 0, _, _, _, _, _ => .error "parser ran out of fuel"
+  | fuel + 1, minBP, obey, left, base, c => do
+    let c := c.skipNewlines
+    match c.tokens with
+    | .sym .rbracket :: rest =>
+      return ← parseTreeLoop fuel minBP obey (.ringNew left c.index base (.missing left)) ⟨rest, c.index + 1⟩
+    | _ => pure ()
+    let (body, tail) ← parseTreeExpr fuel 0 false c
+    let tail := tail.skipNewlines
+    match tail.tokens with
+    | .sym .rbracket :: rest =>
+      parseTreeLoop fuel minBP obey (.ringNew left tail.index base body) ⟨rest, tail.index + 1⟩
+    | rest => .error s!"expected ']' but found {describe rest}"
+
 def parseTreePrefix : Nat → Nat → Bool → Nat → UnOp → Cursor → TreeResult
   | 0, _, _, _, _, _ => .error "parser ran out of fuel"
   | fuel + 1, minBP, obey, pos, op, c => do
@@ -269,6 +285,9 @@ def parseTreeLoop : Nat → Nat → Bool → Tree → Cursor → TreeResult
       parseTreeLoop fuel minBP obey (.apply lhs rhs) tail
     else
       match c.tokens with
+      | .sym .lbracket :: rest =>
+        if minBP ≤ 50 then parseRing fuel minBP obey c.index lhs ⟨rest, c.index + 1⟩
+        else .ok (lhs, c)
       | .sym s :: rest =>
         match infixInfo s with
         | some (kind, lbp, rbp) =>

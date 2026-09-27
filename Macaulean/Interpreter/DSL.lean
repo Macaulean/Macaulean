@@ -75,8 +75,10 @@ def treeSyntax (c : Lean.Parser.InputContext) (base : Nat)
       #[tokenSyntax c base tokens i, treeSyntax c base tokens a]
   | .returnTerm i a => .node .none `Macaulean.M2.DSL.returnTerm
       #[tokenSyntax c base tokens i, treeSyntax c base tokens a]
+  | .ringNew i j r args => .node .none `Macaulean.M2.DSL.ringNew
+      #[treeSyntax c base tokens r, tokenSyntax c base tokens i,
+        treeSyntax c base tokens args, tokenSyntax c base tokens j]
 
-/-- Grammar decisions belong to the shared Pratt parser, not this editor adapter. -/
 def reader : Lean.Parser.Parser where
   info := { firstTokens := .unknown }
   fn := fun c s =>
@@ -114,7 +116,7 @@ private def binOp? : String → Option BinOp
   | "==" => some .eq | "!=" => some .ne | "<" => some .lt | "<=" => some .le
   | ">" => some .gt | ">=" => some .ge | ".." => some .range | "..<" => some .rangeExclusive
   | "#" => some .index | "#?" => some .hasIndex | "|" => some .concat
-  | ":" => some .repeat | "@@" => some .compose | _ => none
+  | ":" => some .repeat | "@@" => some .compose | "_" => some .subscript | _ => none
 
 private def identifier? (stx : Syntax) : Option String :=
   if stx.getKind == `Macaulean.M2.DSL.var then
@@ -140,7 +142,6 @@ private def parameters (fuel : Nat) (stx : Syntax) : Except String Parameters :=
   if p.names.eraseDups.length != p.names.length then .error "duplicate function parameter"
   else return p
 
-/-- Lower structured syntax directly, including source-significant parameter delimiters. -/
 def lowerTree : Nat → Syntax → Except String Term
   | 0, _ => .error "M2 syntax lowering ran out of fuel"
   | fuel + 1, stx => do
@@ -199,6 +200,11 @@ def lowerTree : Nat → Syntax → Except String Term
       let some x := identifier? stx[1] | .error "expected a local symbol name"
       return .localSymbol x
     | `Macaulean.M2.DSL.returnTerm => return .returnTerm (← lowerTree fuel stx[1])
+    | `Macaulean.M2.DSL.ringNew =>
+      let base ← lowerTree fuel stx[0]
+      let specs ← if stx[2].getKind == `Macaulean.M2.DSL.missing then .ok (.sequence [])
+        else lowerTree fuel stx[2]
+      return .ringNew base specs
     | _ => .error s!"unsupported M2 syntax node {stx.getKind}"
 
 def lowerInput (stx : TSyntax `m2) : Except String (Term × Bool) := do
