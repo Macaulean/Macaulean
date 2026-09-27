@@ -163,11 +163,12 @@ class Limits:
         if self.processes < 1:
             raise ValueError("invalid process limit")
 
-    def install(self) -> None:
+    def install(self, nproc_limit: int | None = None) -> None:
         resource.setrlimit(resource.RLIMIT_CPU, (self.seconds, self.seconds))
         resource.setrlimit(resource.RLIMIT_AS, (self.memory_bytes, self.memory_bytes))
         resource.setrlimit(resource.RLIMIT_FSIZE, (self.disk_bytes, self.disk_bytes))
-        resource.setrlimit(resource.RLIMIT_NPROC, (self.processes, self.processes))
+        limit = self.processes if nproc_limit is None else nproc_limit
+        resource.setrlimit(resource.RLIMIT_NPROC, (limit, limit))
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
 @dataclass(frozen=True)
@@ -247,6 +248,26 @@ class RunResult:
             raise JobError(f"Lean process did not complete successfully: exit={self.code}, timeout={self.timed_out}")
         return read_regular(self.stdout)
 
+def uid_task_count() -> int:
+    """Count host tasks owned by this real uid for an additive RLIMIT_NPROC cap.
+
+    Linux applies RLIMIT_NPROC against all tasks for the real uid, including the
+    GitHub runner and action processes outside our sandbox. A fixed small absolute
+    cap can therefore prevent Lean from creating even its first runtime thread.
+    """
+    uid = os.getuid()
+    count = 0
+    for process in Path("/proc").iterdir():
+        if not process.name.isdigit():
+            continue
+        try:
+            if process.stat().st_uid != uid:
+                continue
+            count += sum(1 for task in (process / "task").iterdir() if task.name.isdigit())
+        except (FileNotFoundError, PermissionError, ProcessLookupError):
+            continue
+    return count
+
 class Sandbox:
     def __init__(self, toolchain: Path, limits: Limits = Limits()) -> None:
         self.toolchain = toolchain.resolve(strict=True)
@@ -289,11 +310,14 @@ class Sandbox:
     def run(self, context: Context, inputs: Path, logdir: Path) -> RunResult:
         logdir.mkdir(parents=True, exist_ok=False)
         stdout, stderr = logdir / "stdout", logdir / "stderr"
+        baseline_tasks = uid_task_count()
+        nproc_limit = baseline_tasks + self.limits.processes
         with stdout.open("xb") as out, stderr.open("xb") as err:
             proc = subprocess.Popen(
                 self.command(context, inputs), stdin=subprocess.DEVNULL, stdout=out, stderr=err,
                 env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
-                start_new_session=True, preexec_fn=self.limits.install,
+                start_new_session=True,
+                preexec_fn=lambda: self.limits.install(nproc_limit),
             )
             timeout = False
             try:
