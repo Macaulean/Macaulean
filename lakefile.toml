@@ -21,6 +21,7 @@ precompileModules = true
 
 [[lean_lib]]
 name = "MRDI"
+precompileModules = true
 
 [[lean_lib]]
 name = "MacauleanTest"
