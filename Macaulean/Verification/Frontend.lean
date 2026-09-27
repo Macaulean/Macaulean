@@ -4,8 +4,8 @@ import Macaulean.Verification.Panel
 # Opt-in M2 verification frontend
 
 Import `Macaulean.Verification`, then use ordinary `open M2` and ordinary M2.
-The wrapper delegates execution to the existing elaborator exactly once. Intent
-commands mutate only the verification index, never M2 bindings or Lean axioms.
+The wrapper delegates execution exactly once. Intent commands mutate only the
+verification index and unproved proposition definitions, never M2 bindings or axioms.
 -/
 register_option m2.intent.enabled : Bool := {
   defValue := true
@@ -27,6 +27,8 @@ def elabIndexedInput : CommandElab := fun stx => do
     let changed ← Index.record stx term before after
     for entry in changed do Panel.show entry stx
 
+private def stringArg (stx : Syntax) : String := (⟨stx⟩ : TSyntax `str).getString
+
 private def readKind (stx : Syntax) : CommandElabM Contracts.Kind := do
   let name := stx.getId.toString
   let some kind := Contracts.Kind.parse name
@@ -41,6 +43,11 @@ private def target (name : String) (kind : Contracts.Kind) : CommandElabM (Index
     | .ok payload => pure payload | .error e => throwError e
   return (entry,payload)
 
+private def installTarget (name : String) (kind : Contracts.Kind) (payload : String) : CommandElabM Unit := do
+  let session ← DSL.getSession
+  let some fn := session.lookup name | throwError "binding is no longer visible"
+  discard <| Targets.install kind fn ⟨session.env,session.heap⟩ (Fingerprint.sha256 payload)
+
 private def sourceLocation (stx : Syntax) : CommandElabM String := do
   let file ← getFileName
   let pos := (stx.getPos?.map (·.byteIdx)).getD 0
@@ -54,28 +61,30 @@ syntax (name := statusCommand) "#m2_status " str ident : command
 
 @[command_elab proposeCommand]
 def elabPropose : CommandElab := fun stx => do
-  let name := stx[1].getString
+  let name := stringArg stx[1]
   let kind ← readKind stx[2]
   let (entry,payload) ← target name kind
+  installTarget name kind payload
   let index ← Index.get
   Index.put { index with ledger := index.ledger.propose entry.id name kind payload }
   Panel.show entry stx
 
 @[command_elab approveCommand]
 def elabApprove : CommandElab := fun stx => do
-  let name := stx[1].getString
+  let name := stringArg stx[1]
   let kind ← readKind stx[2]
   let (entry,payload) ← target name kind
   let index ← Index.get
-  let ledger ← match index.ledger.approve entry.id kind payload stx[3].getString (← sourceLocation stx) with
+  let ledger ← match index.ledger.approve entry.id kind payload (stringArg stx[3]) (← sourceLocation stx) with
     | .ok ledger => pure ledger | .error e => throwErrorAt stx e
+  installTarget name kind payload
   Index.put { index with ledger }
   Panel.show entry stx
   logInfoAt stx s!"{name}: intent approved by source attestation; proof unattempted"
 
 @[command_elab revokeCommand]
 def elabRevoke : CommandElab := fun stx => do
-  let name := stx[1].getString
+  let name := stringArg stx[1]
   let kind ← readKind stx[2]
   let entry ← Index.ensure name (← DSL.getSession)
   let index ← Index.get
@@ -87,13 +96,13 @@ def elabRevoke : CommandElab := fun stx => do
 
 @[command_elab inspectCommand]
 def elabInspect : CommandElab := fun stx => do
-  let entry ← Index.ensure stx[1].getString (← DSL.getSession)
+  let entry ← Index.ensure (stringArg stx[1]) (← DSL.getSession)
   Panel.show entry stx
   logInfoAt stx s!"{entry.name}: binding generation {entry.generation}; {entry.nodes.length} source nodes; proof unattempted"
 
 @[command_elab statusCommand]
 def elabStatus : CommandElab := fun stx => do
-  let name := stx[1].getString
+  let name := stringArg stx[1]
   let kind ← readKind stx[2]
   let (entry,payload) ← target name kind
   let index ← Index.get
