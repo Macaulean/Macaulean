@@ -25,3 +25,7 @@ import MacauleanTest.InterpreterFunctionsDSL
 import MacauleanTest.InterpreterFunctionsImport
 import MacauleanTest.PolynomialReference
 import MacauleanTest.PolynomialSmoke
+import MacauleanTest.InterpreterGroebner
+import MacauleanTest.InterpreterGroebnerDSL
+import MacauleanTest.InterpreterGroebnerImport
+import MacauleanTest.InterpreterGroebnerM2
