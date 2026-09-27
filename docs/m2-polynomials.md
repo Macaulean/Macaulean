@@ -22,6 +22,15 @@ quotient would simplify to a polynomial. `leadMonomial(0_R)` is an error in the
 native version tested; `leadTerm(0_R)` and `leadCoefficient(0_R)` are zero.
 Use `promote(0,R)` where subscripted promotion syntax is unavailable.
 
+Native M2's polynomial-power convention is retained: a negative integer power
+of the zero polynomial is zero in the same polynomial ring. For example,
+`listForm((x-x)^(-1))` is `{}`, not a division-by-zero error. This is a
+compatibility convention, not a claim that zero is invertible. The exponent-zero
+case remains the polynomial one, and division by scalar or polynomial zero still
+raises an error. Scalar ZZ/QQ evaluation is not changed by this convention.
+Odd and even negative exponents are checked against fresh native M2 processes and
+by kernel-checked source execution, with a separate ring-identity regression.
+
 ## Identity and bracket binding
 
 `===` and `=!=` are strict equality and inequality. They do not promote ZZ to QQ
@@ -79,8 +88,12 @@ execution theorem. Rejection-boundary theorems check failure without forcing
 pretty-printed parser diagnostics through kernel reduction. One large aggregate
 `decide` exhausted worker memory; separate theorems retain the same input coverage.
 The native differential suite uses a fresh M2 process per query and checks typed
-coefficient/exponent data against independently written expected values. Process
-failure and malformed transport are errors, not successful rejection tests.
+coefficient/exponent data against independently written expected values. Only
+source evaluation is caught as an expected native error: serialization runs after
+that handler. Process failure, malformed transport and unsupported successful
+values cannot satisfy an error test. Diagnostics retain both the source and the
+raw reply. Regressions include an injected encoder failure and nested null/sequence
+values to check this separation.
 There are additional arithmetic and monomial grids, worksheet formatting/source
 location checks, snapshot/rollback tests and import-isolation checks.
 
