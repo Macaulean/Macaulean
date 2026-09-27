@@ -33,9 +33,9 @@ def arithmetic : List (String × Value) := [
   ("promote(1,R)==1/1", .bool true),
   ("x!=y", .bool true),
   ("{x,1+x}=={x,1/1+x}", .bool true),
-  ("listForm(promote(2,R)^(-2))", listFormValue [(mkRat 1 4,[0,0,0])]),
+  ("listForm((promote(2,R))^(-2))", listFormValue [(mkRat 1 4,[0,0,0])]),
   ("listForm((x-x)^0)", listFormValue [(1,[0,0,0])]),
-  ("listForm(promote(-2/3,R)^(-3))", listFormValue [(mkRat (-27) 8,[0,0,0])]),
+  ("listForm((promote(-2/3,R))^(-3))", listFormValue [(mkRat (-27) 8,[0,0,0])]),
   ("listForm((x^2+y)//x)", listFormValue [(1,[1,0,0])]),
   ("listForm((x^2+y)%x)", listFormValue [(1,[0,1,0])]),
   ("listForm((2*x^2+3*x*y+z)//(2*x))", listFormValue [(1,[1,0,0]),(mkRat 3 2,[0,1,0])]),
@@ -48,8 +48,8 @@ def arithmetic : List (String × Value) := [
 def interface : List (String × Value) := [
   ("numgens R", .zz 3),
   ("#gens R", .zz 3),
-  ("ring x==R", .bool true),
-  ("coefficientRing R==QQ", .bool true),
+  ("ring x === R", .bool true),
+  ("coefficientRing R === QQ", .bool true),
   ("listForm((gens R)#1)", listFormValue [(1,[0,1,0])]),
   ("leadCoefficient(3*x^2-y)", .qq 3),
   ("listForm(leadMonomial(3*x^2-y))", listFormValue [(1,[2,0,0])]),
@@ -68,7 +68,7 @@ def interface : List (String × Value) := [
   ("numgens ideal(x,x,y)", .zz 3),
   ("numgens ideal(0*x,0*x)", .zz 2),
   ("numgens ideal{x,y}", .zz 2),
-  ("ring ideal(x,y)==R", .bool true),
+  ("ring ideal(x,y)===R", .bool true),
   ("#entries gens ideal(x,y)", .zz 1),
   ("#((entries gens ideal(x,y))#0)", .zz 2),
   ("listForm(((entries gens ideal(x^2-y,x*y-1))#0)#1)", listFormValue [(1,[1,1,0]),(-1,[0,0,0])]),
@@ -86,15 +86,27 @@ def successes : List (String × Value) :=
     ("R=QQ[];numgens R", .zz 0),
     ("R=QQ[];listForm(promote(3/2,R))", listFormValue [(mkRat 3 2,[])]),
     ("K=QQ;R=K[a,b];exponents(a+b)", expsValue [[1,0],[0,1]]),
-    ("x=91;R=QQ[x];exponents x", expsValue [[1]]),
+    ("x=3;R=QQ[x];numgens R", .zz 3),
     ("local x;R=QQ[x];x", .null),
     ("x:=13;R=QQ[x];x", .zz 13),
     ("f=x->(R=QQ[x];x);f 3", .zz 3),
     ("calls=0;K=()->(calls=calls+1;QQ);R=(K())[x,y];calls", .zz 1),
-    ("R=QQ[x];p=x;S=QQ[x];R==S", .bool false),
-    ("R=QQ[x];S=R;R==S", .bool true),
-    ("R=QQ[x];p=x;S=QQ[x];ring p==R", .bool true),
-    ("R=QQ[x];p=x;S=QQ[x];ring p==S", .bool false)
+    ("R=QQ[x];p=x;S=QQ[x];R === S", .bool false),
+    ("R=QQ[x];S=R;R === S", .bool true),
+    ("R=QQ[x];p=x;S=QQ[x];ring p === R", .bool true),
+    ("R=QQ[x];p=x;S=QQ[x];ring p === S", .bool false),
+    ("local x;R=QQ[x];numgens R", .zz 0),
+    ("local x;R=QQ[x,y];numgens R", .zz 1),
+    ("x=0;R=QQ[x];numgens R", .zz 0),
+    ("x=-1;R=QQ[x];numgens R", .zz 0),
+    ("f=x->(R=QQ[x];numgens R);f 3", .zz 3),
+    ("x=3;R=QQ[x];x", .zz 3),
+    ("x=3;R=QQ[x];exponents((gens R)#1)", expsValue [[0,1,0]]),
+    ("R=QQ[x,y];old=x;S=QQ[old];ring old===R and ring x===S", .bool true),
+    ("R=QQ[x];f=x->x;{f===f,(x->x)===(x->x)}", .list [.bool true,.bool false]),
+    ("{1===1/1,1=!=1/1,{1}==={1},(1,2)===(1,2)}", .list [.bool false,.bool true,.bool true,.bool true]),
+    ("R=QQ[x];{x===x+0,1===promote(1,R),QQ===QQ,R===R,QQ===R}", .list [.bool true,.bool false,.bool true,.bool true,.bool false]),
+    ("R=QQ[x];{ideal(x)===ideal(x),ideal(x)===ideal(2*x)}", .list [.bool true,.bool false])
   ]
 
 /-- Explicitly named helper APIs, not asserted to be native-library overloads. -/
@@ -138,6 +150,8 @@ def unsupported : List String := [
   "QQ[x,x]", "QQ[x_0..x_2]", "QQ[x,MonomialOrder=>Lex]", "ZZ[x]",
   "R=QQ[x];x/x", "R=QQ[x];1/x", "R=QQ[x];x^(-1)",
   "R=QQ[x,y];(x^2+y)//(x+y)", "R=QQ[x];ideal(x)==ideal(2*x)",
+  "R=QQ[x];R==R", "coefficientRing QQ[x]==QQ",
+  "R=QQ[x,y];old=x+y;QQ[old]", "x=2;QQ[x,y]",
   "R=QQ[x];degree(0*x)", "R=QQ[x];ideal()"
 ]
 end Macaulean.M2.PolynomialCases

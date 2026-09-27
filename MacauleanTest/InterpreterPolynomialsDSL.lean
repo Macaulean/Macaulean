@@ -79,7 +79,7 @@ numgens I
 
 /-- info: o18 = true : Boolean -/
 #guard_msgs in
-ring I == R
+ring I === R
 
 /-- info: o19 = true : Boolean -/
 #guard_msgs in
@@ -167,7 +167,7 @@ R = QQ[x]
 
 /-- info: o40 = false : Boolean -/
 #guard_msgs in
-ring saved == R
+ring saved === R
 
 /-- info: o41 = x^2 + 2*x*y + y^2 : QQ[x, y] -/
 #guard_msgs in
@@ -183,7 +183,7 @@ numgens ring saved
 
 /-- info: o44 = true : Boolean -/
 #guard_msgs in
-ring x == R
+ring x === R
 
 #guard_msgs in
 hold = x;
@@ -193,7 +193,7 @@ T = QQ[x];
 -- Even identical displayed rings have separate identities.
 /-- info: o47 = false : Boolean -/
 #guard_msgs in
-ring hold == T
+ring hold === T
 
 /-- info: o48 = x^2 : QQ[x] -/
 #guard_msgs in
@@ -222,7 +222,7 @@ bindTest 17
 
 /-- info: o55 = true : Boolean -/
 #guard_msgs in
-ring hold == R
+ring hold === R
 
 /-- info: o56 = {} : List -/
 #guard_msgs in
@@ -247,7 +247,7 @@ QQ[true]
 
 /-- info: o61 = true : Boolean -/
 #guard_msgs in
-ring x == R
+ring x === R
 
 -- Ordinary Lean still has its own names and syntax.
 def x : Nat := 99

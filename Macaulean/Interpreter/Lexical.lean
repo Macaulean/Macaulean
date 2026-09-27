@@ -4,8 +4,8 @@ import Macaulean.Interpreter.Syntax
 # Static, source-ordered lexical resolution
 
 := creates a slot before resolving its initializer. `local` reuses current-scope
-bindings. Only function bodies create scopes. Polynomial variable names are quoted
-and published globally by the runtime, never resolved as local assignment targets.
+bindings. Only function bodies create scopes. Bracket identifiers are resolved to their current bindings. Ring construction
+can publish global generators without treating those identifiers as assignments.
 -/
 namespace Macaulean.M2.Lexical
 inductive Ref where
@@ -31,7 +31,7 @@ inductive Code where
   | apply (fn arg : Code)
   | symbol (name : String) (ref : Ref)
   | returnTerm (arg : Code)
-  | polyRing (base : Code) (names : List String)
+  | polyRing (base : Code) (names : List (String × Ref))
   deriving Repr, Inhabited
 structure Scope where
   names : List (String × Nat) := []
@@ -133,7 +133,7 @@ def resolve : Term → Resolver → Code × Resolver
     (.returnTerm a, r)
   | .polyRing a names, r =>
     let (a, r) := resolve a r
-    (.polyRing a names, r)
+    (.polyRing a (names.map fun x => (x,r.lookup x)), r)
 def resolveMany : List Term → Resolver → List Code × Resolver
   | [], r => ([], r)
   | a :: xs, r =>

@@ -1,5 +1,5 @@
 import MacauleanTest.PolynomialCases
-import Macaulean.Interpreter.Check
+import MacauleanTest.NativePolynomialOracle
 
 /-! Native M2 supplies typed coefficient/exponent data; its polynomial printer and
 foreign ring identities are not used to decode our polynomials. -/
@@ -7,7 +7,7 @@ namespace Macaulean.M2.PolynomialNativeTests
 open PolynomialCases Lean Elab Command
 
 private def checkValue (source : String) (expected : Value) : CommandElabM Unit := do
-  match ← queryM2 ("(" ++ source ++ ")") with
+  match ← NativePolynomialOracle.query ("(" ++ source ++ ")") with
   | .ok (.ok actual) =>
     unless actual == expected do logError m!"native mismatch: {source}\nexpected {repr expected}\nactual {repr actual}"
   | .ok .error => logError m!"native M2 unexpectedly failed: {source}"
@@ -41,25 +41,25 @@ run_cmd do
     for (c,d) in powers do
       let m := s!"x^{a}*y^{b}"
       let n := s!"x^{c}*y^{d}"
-      let prefix := "R=QQ[x,y];"
+      let setupSource := "R=QQ[x,y];"
       let divides := Value.bool (decide (a ≤ c ∧ b ≤ d))
-      let ours := prefix ++ s!"m2MonomialDivides({m},{n})"
+      let ours := setupSource ++ s!"m2MonomialDivides({m},{n})"
       unless run ours == .ok divides do logError m!"divisibility grid failed: {ours}"
-      checkValue (prefix ++ s!"(({n})//({m}))*({m})==({n})") divides
+      checkValue (setupSource ++ s!"(({n})//({m}))*({m})==({n})") divides
       let expected := listFormValue [(1,[max a c,max b d])]
-      let ours := prefix ++ s!"listForm(m2MonomialLCM({m},{n}))"
+      let ours := setupSource ++ s!"listForm(m2MonomialLCM({m},{n}))"
       unless run ours == .ok expected do logError m!"lcm grid failed: {ours}"
-      checkValue (prefix ++ s!"listForm(lcm({m},{n}))") expected
+      checkValue (setupSource ++ s!"listForm(lcm({m},{n}))") expected
       let expectedOrder : Int := if a+b > c+d then 1 else if a+b < c+d then -1
         else if b < d then 1 else if b > d then -1 else 0
-      let ours := prefix ++ s!"m2MonomialCompare({m},{n})"
+      let ours := setupSource ++ s!"m2MonomialCompare({m},{n})"
       unless run ours == .ok (.zz expectedOrder) do logError m!"order grid failed: {ours}"
-      checkValue (prefix ++ s!"if ({m})==({n}) then 0 else if leadMonomial(({m})+({n}))==({m}) then 1 else -1") (.zz expectedOrder)
+      checkValue (setupSource ++ s!"if ({m})==({n}) then 0 else if leadMonomial(({m})+({n}))==({m}) then 1 else -1") (.zz expectedOrder)
       if a ≤ c ∧ b ≤ d then
         let expected := listFormValue [(mkRat 3 2,[c-a,d-b])]
-        let ours := prefix ++ s!"listForm(m2MonomialQuotient(3*({n}),2*({m})))"
+        let ours := setupSource ++ s!"listForm(m2MonomialQuotient(3*({n}),2*({m})))"
         unless run ours == .ok expected do logError m!"quotient grid failed: {ours}"
-        checkValue (prefix ++ s!"listForm((3*({n}))//(2*({m})))") expected
+        checkValue (setupSource ++ s!"listForm((3*({n}))//(2*({m})))") expected
   logInfo "POLYNOMIAL_MONOMIAL_GRIDS_COMPLETE: 36 pairs, divisibility, lcm, grevlex, and exact quotients"
 
 run_cmd do
@@ -68,7 +68,7 @@ run_cmd do
     "R=QQ[x];(x-x)^(-1)", "R=QQ[x];leadTerm(x,x)",
     "R=QQ[x];promote(x)", "QQ=7", "QQ[true]"
   ] do
-    match ← queryM2 ("(" ++ source ++ ")") with
+    match ← NativePolynomialOracle.query ("(" ++ source ++ ")") with
     | .ok .error => pure ()
     | .ok (.ok value) => logError m!"native M2 accepted {source}: {repr value}"
     | .error message => logError m!"native error transport failed: {message}"
@@ -76,13 +76,12 @@ run_cmd do
 
 -- Native classes requiring other extensions must not be silently coerced.
 run_cmd do
-  let server ← globalM2Server
   for (source, cls) in #[
     ("QQ[x,x]", "PolynomialRing"),
     ("R=QQ[x];(x^2)/x", "frac R"),
     ("R=QQ[x];degree(0*x)", "InfiniteNumber")
   ] do
-    let reply : List String ← server.sendRequest "evalValue" ["(" ++ source ++ ")"]
+    let reply ← NativePolynomialOracle.raw ("(" ++ source ++ ")") true
     match reply with
     | ["ok", actual, _] => unless actual == cls do logError m!"unexpected native class for {source}: {actual}"
     | _ => logError m!"native-valid boundary failed for {source}: {repr reply}"

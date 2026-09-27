@@ -82,6 +82,51 @@ def State.polynomialRing (s : State) (base : Value) (names : List String) : Exce
     let next : State := { env := env, heap := heap }
     return (.algebra (.ring r), next)
 
+/-- The supported bracket values are unbound global symbols, existing generators,
+null (no generators), or a single integer (native anonymous generator count). -/
+def State.ringSpecifications (s : State) (specs : List (String × Ref))
+    (frames : Frames) : Except Error (List String × Bool) := do
+  let values : List (String × Option Value) ← specs.mapM fun (name, ref) => do
+    match ref with
+    | .global _ =>
+      checkWritable ref
+      return (name, s.env.lookup name)
+    | .slot .. => do return (name, some (← readRef ref frames s))
+  match values with
+  | [(_,some (.zz n))] => return ((List.range n.toNat).map (fun i => s!"p_{i}"), n > 0)
+  | _ =>
+    let names ← values.mapM fun (name,v) => do
+      match v with
+      | none => return [name]
+      | some .null => return ([] : List String)
+      | some (.algebra (.poly r p)) =>
+        let p ← Polynomials.liftError (Polynomials.normalized r.names.length p)
+        match p with
+        | [(c,ns)] =>
+          if c == 1 && ns.sum == 1 then
+            let some i := ns.findIdx? (· == 1)
+              | .error (.algebra "expected an indeterminate in polynomial-ring brackets")
+            let some name := r.names[i]?
+              | .error (.algebra "invalid indeterminate dimension")
+            if name.toList.contains '_' then
+              .error (.algebra "indexed generator rebinding requires the indexed-variable extension")
+            else return [name]
+          else .error (.algebra "expected an indeterminate in polynomial-ring brackets")
+        | _ => .error (.algebra "expected an indeterminate in polynomial-ring brackets")
+      | some (.symbol ..) =>
+        .error (.algebra "quoted local generators require the symbol-binding extension")
+      | _ => .error (.algebra "unsupported polynomial-ring variable specification")
+    return (names.flatten, false)
+
+def State.evalPolynomialRing (s : State) (base : Value) (specs : List (String × Ref))
+    (frames : Frames) : Except Error (Value × State) := do
+  let (names, indexed) ← s.ringSpecifications specs frames
+  let (ring, next) ← s.polynomialRing base names
+  if indexed then
+    -- The index base is a symbol, not the integer-valued variable used as a count.
+    return (ring, { next with env := next.env.filter (fun (name,_) => name != "p") })
+  else return (ring,next)
+
 def arguments (params : Parameters) (arg : Value) : Except Error (List Value) :=
   match params with
   | .variadic _ => .ok [arg]
@@ -191,7 +236,7 @@ def eval : Nat → Code → Frames → State → Except Signal (Value × State)
       .error (.returned v s)
     | .polyRing base names =>
       let (base, s) ← eval fuel base frames s
-      liftResult (s.polynomialRing base names)
+      liftResult (s.evalPolynomialRing base names frames)
 
 def evalMany : Nat → List Code → Frames → State → Except Signal (List Value × State)
   | 0, _, _, _ => .error (.error .fuelExhausted)

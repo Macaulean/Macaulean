@@ -113,6 +113,7 @@ syntax (name := inputSyntax) reader : m2
 private def binOp? : String → Option BinOp
   | "+" => some .add | "-" => some .sub | "*" => some .mul | "/" => some .div
   | "//" => some .quot | "%" => some .rem | "^" => some .pow
+  | "===" => some .strictEq | "=!=" => some .strictNe
   | "==" => some .eq | "!=" => some .ne | "<" => some .lt | "<=" => some .le
   | ">" => some .gt | ">=" => some .ge | ".." => some .range | "..<" => some .rangeExclusive
   | "#" => some .index | "#?" => some .hasIndex | "|" => some .concat

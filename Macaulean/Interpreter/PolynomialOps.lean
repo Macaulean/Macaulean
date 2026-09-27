@@ -33,8 +33,9 @@ def common (a b : Value) : Except Error (RingInfo × Raw × Raw) := do
   return (r, ← cast r a, ← cast r b)
 def equal (a b : Value) : Except Error Bool := do
   match a, b with
-  | .algebra (.rationals), .algebra (.rationals) => return true
-  | .algebra (.ring r), .algebra (.ring s) => return r = s
+  | .algebra .rationals, _ | _, .algebra .rationals
+  | .algebra (.ring _), _ | _, .algebra (.ring _) =>
+    .error (.noMethod "==" [a.className,b.className])
   | .algebra (.row r p), .algebra (.row s q) =>
     if r != s then return false
     return p = q

@@ -27,7 +27,7 @@ saved
 
 /-- info: o4 = true : Boolean -/
 #guard_msgs in
-ring u == R
+ring u === R
 
 run_cmd do
   let s ← Macaulean.M2.DSL.getSession
