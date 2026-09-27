@@ -19,22 +19,30 @@ structure Job where
   target : Name
   payload : String
 
-/-- Resolve the current source-attested target; never refresh approval tokens. -/
-def approved (binding : String) (kind : Contracts.Kind) (digest : String) : CommandElabM Job := do
-  let session ← DSL.getSession
-  let index ← Index.get
-  let some entry := index.find binding | throwError "binding is not in the semantic index"
-  let theory ← Snapshot.theory
-  let payload ← match Index.currentPayload entry kind session theory with
-    | .ok p => pure p | .error e => throwError e
-  let some p := index.ledger.find entry.id kind | throwError "no proposed contract for proof job"
+/-- Read the exact source-attested target from an immutable elaboration snapshot. -/
+def jobAt (env : Environment) (binding : String) (kind : Contracts.Kind)
+    (digest : String) : Except String Job := do
+  let session := DSL.sessionExt.getState env
+  let index := Index.indexExt.getState env
+  let some entry := index.find binding | .error "binding is not in the semantic index"
+  let some theory := Snapshot.theoryExt.getState env | .error "semantic seal is unavailable"
+  let payload ← Index.currentPayload entry kind session theory
+  let some p := index.ledger.find entry.id kind | .error "no proposed contract for proof job"
   unless p.status (some payload) == .sourceAttested do
-    throwError "proof jobs require current source-attested intent"
+    .error "proof jobs require current source-attested intent"
   unless p.digest == digest && Fingerprint.sha256 payload == digest do
-    throwError "proof job fingerprint does not match the approved target"
-  let some fn := session.lookup binding | throwError "proof binding is no longer visible"
-  let target ← Targets.install kind fn ⟨session.env,session.heap⟩ digest
+    .error "proof job fingerprint does not match the approved target"
+  let some fn := session.lookup binding | .error "proof binding is no longer visible"
+  let target := Targets.name digest
+  let some info := env.find? target | .error "approved formal target is missing"
+  unless info.type == mkSort .zero && info.value? true ==
+      some (Targets.statementExpr kind fn ⟨session.env,session.heap⟩) do
+    .error "approved formal target was replaced"
   return ⟨entry,p,target,payload⟩
+
+def approved (binding : String) (kind : Contracts.Kind) (digest : String) : CommandElabM Job := do
+  match jobAt (← getEnv) binding kind digest with
+  | .ok job => pure job | .error e => throwError e
 
 def jobJson (job : Job) : Json := Json.mkObj [
   ("format",Json.str "macaulean.proof-job.v1"),
@@ -76,6 +84,9 @@ def decodePacket (job : Job) (data : Json) : Except String Expr := do
 /-- Synchronous kernel checking. This deliberately bypasses asynchronous `addDecl`
 reporting and never uses `debug.skipKernelTC` from the source file's options. -/
 def check (job : Job) (proof : Expr) (source : String) : CommandElabM Evidence.Receipt := do
+  let current ← approved job.entry.name job.proposal.kind job.proposal.digest
+  unless current.payload == job.payload && current.target == job.target &&
+      current.entry.id == job.entry.id do throwError "proof job became stale"
   let env ← getEnv
   let expected := mkConst job.target
   let theory ← match audit env expected proof with
