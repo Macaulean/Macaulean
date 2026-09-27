@@ -1,32 +1,24 @@
 import Macaulean.Interpreter.Syntax
 import Macaulean.Interpreter.Value
 
-/-!
-# Polynomial value operations
+/-! # Pure polynomial operations
 
-These are pure operations on immutable data. General polynomial reduction,
-Buchberger, fraction fields, ideal equality, and general matrices are not hidden
-behind these primitives. The m2Monomial-prefixed helpers have deliberately narrow,
-explicit contracts rather than impersonating all native M2 overloads.
+General reduction, Buchberger, fraction fields, ideal equality, and general matrices
+are not hidden behind these primitives. The m2Monomial-prefixed operations have
+narrow explicit contracts rather than impersonating all native M2 overloads.
 -/
 namespace Macaulean.M2.Polynomials
-
 def liftError (r : Except String α) : Except Error α := r.mapError Error.algebra
-
 def scalar? : Value → Option Rat
   | .zz n => some n | .qq q => some q | _ => none
-
 def ringOf? : Value → Option RingInfo
   | .algebra a => a.ring? | _ => none
-
 def polyRing? : Value → Option RingInfo
   | .algebra (.poly r _) => some r | _ => none
-
 def asPolynomial (v : Value) : Except Error (RingInfo × Raw) :=
   match v with
   | .algebra (.poly r p) => do return (r, ← liftError (normalized r.names.length p))
   | _ => .error (.algebra s!"expected a polynomial, got {v.className}")
-
 def cast (r : RingInfo) (v : Value) : Except Error Raw :=
   match v with
   | .algebra (.poly s p) =>
@@ -35,12 +27,10 @@ def cast (r : RingInfo) (v : Value) : Except Error Raw :=
   | _ => match scalar? v with
     | some c => .ok (constant r.names.length c)
     | none => .error (.algebra s!"cannot promote {v.className} to {r.display}")
-
 def common (a b : Value) : Except Error (RingInfo × Raw × Raw) := do
   let some r := (polyRing? a).or (polyRing? b)
     | .error (.algebra "expected a polynomial operand")
   return (r, ← cast r a, ← cast r b)
-
 def equal (a b : Value) : Except Error Bool := do
   match a, b with
   | .algebra (.rationals), .algebra (.rationals) => return true
@@ -51,12 +41,23 @@ def equal (a b : Value) : Except Error Bool := do
   | _, _ =>
     let (_, p, q) ← common a b
     return p = q
-
 def constantValue? (p : Raw) : Option Rat :=
   match p with
   | [] => some 0
   | [(c, exps)] => if exps.all (· == 0) then some c else none
   | _ => none
+
+def arithmetic (op : BinOp) (n : Nat) (p q : Raw) : Except Error Raw :=
+  match op with
+  | .add => liftError (add n p q)
+  | .sub => liftError (sub n p q)
+  | .mul => liftError (mul n p q)
+  | .quot | .rem => do
+    if q.isEmpty then .error .divByZero
+    else
+      let result ← liftError (divideByTerm n p q)
+      pure (if op = .quot then result.1 else result.2)
+  | _ => .error (.algebra "unsupported polynomial operator")
 
 def evalBinary (op : BinOp) (a b : Value) : Except Error Value := do
   match op with
@@ -78,17 +79,7 @@ def evalBinary (op : BinOp) (a b : Value) : Except Error Value := do
     else return .algebra (.poly r (← liftError (smul r.names.length (1/c) p)))
   | .add | .sub | .mul | .quot | .rem =>
     let (r, p, q) ← common a b
-    let n := r.names.length
-    let result ← match op with
-      | .add => liftError (add n p q)
-      | .sub => liftError (sub n p q)
-      | .mul => liftError (mul n p q)
-      | .quot | .rem => do
-        if q.isEmpty then .error .divByZero
-        else
-          let (quotient, remainder) ← liftError (divideByTerm n p q)
-          return if op = .quot then quotient else remainder
-      | _ => .error (.algebra "unsupported polynomial operator")
+    let result ← arithmetic op r.names.length p q
     return .algebra (.poly r result)
   | _ => .error (.noMethod op.symbol [a.className,b.className])
 
@@ -98,25 +89,18 @@ def evalUnary (op : UnOp) (a : Value) : Except Error Value := do
   | .neg => return .algebra (.poly r (← liftError (neg r.names.length p)))
   | .pos => return .algebra (.poly r p)
   | _ => .error (.noMethod op.symbol [a.className])
-
 def builtinEnv : List (String × Value) :=
   ("QQ", .algebra .rationals) :: ("gens", .algebra (.builtin .generators)) ::
     primitives.map (fun p => (p.name, .algebra (.builtin p)))
-
-def natList (ns : List Nat) : Value := .list (ns.map fun n => .zz n)
-
+def natList (ns : List Nat) : Value := .list (ns.map fun n => .zz (Int.ofNat n))
 def unpack (arg : Value) : List Value :=
   match arg with | .sequence xs => xs | _ => [arg]
-
 def unaryArg (arg : Value) : Except Error Value :=
   match unpack arg with
   | [a] => .ok a | xs => .error (.arity 1 xs.length)
-
 def binaryArgs (arg : Value) : Except Error (Value × Value) :=
   match unpack arg with
   | [a,b] => .ok (a,b) | xs => .error (.arity 2 xs.length)
-
-/-- All columns, including duplicate and zero generators, are retained. -/
 def makeIdeal (arg : Value) : Except Error Value := do
   if let .algebra (.ideal r ps) := arg then return .algebra (.ideal r ps)
   if let .algebra (.row r ps) := arg then return .algebra (.ideal r ps)
@@ -125,7 +109,6 @@ def makeIdeal (arg : Value) : Except Error Value := do
     | .error (.algebra "ideal construction requires a polynomial to determine the ring")
   let ps ← args.mapM (cast r)
   return .algebra (.ideal r ps)
-
 def exponentsArg (arg : Value) : Except Error (List Nat) := do
   let .list values := arg | .error (.algebra "expected a list of nonnegative exponents")
   values.mapM fun v => match v with
@@ -170,8 +153,7 @@ def callPrimitive (primitive : Primitive) (arg : Value) : Except Error Value := 
       return .algebra (.ring r)
     | .coefficientRing, .algebra (.ring _) => return .algebra .rationals
     | .generators, .algebra (.ring r) =>
-      return .list ((List.range r.names.length).map fun i =>
-        .algebra (.poly r (generator r.names.length i)))
+      return .list ((List.range r.names.length).map fun i => .algebra (.poly r (generator r.names.length i)))
     | .generators, .algebra (.ideal r ps) => return .algebra (.row r ps)
     | .entries, .algebra (.row r ps) => return .list [.list (ps.map fun p => .algebra (.poly r p))]
     | .numgens, .algebra (.ring r) => return .zz r.names.length
@@ -191,5 +173,4 @@ def callPrimitive (primitive : Primitive) (arg : Value) : Except Error Value := 
     | .listForm => return .list (ps.map fun (c,ns) => .sequence [natList ns, .qq c])
     | .size => return .zz ps.length
     | _ => .error (.noMethod primitive.name [a.className])
-
 end Macaulean.M2.Polynomials

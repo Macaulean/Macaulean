@@ -1,6 +1,6 @@
 import Macaulean.Interpreter.Value
 
-/-! # Typed data transport. Foreign closures and lexical cells are deliberately not decoded. -/
+/-! # Typed transport. Foreign ring identities, closures and cells are not decoded. -/
 namespace Macaulean.M2
 namespace Value
 mutual
@@ -13,6 +13,7 @@ def toWire : Value → List String
   | .sequence xs => ["Sequence", toString xs.length] ++ elementsWire xs
   | .closure _ => ["Unsupported", "FunctionClosure"]
   | .symbol .. => ["Unsupported", "Symbol"]
+  | .algebra a => ["Unsupported", a.className]
 def elementsWire : List Value → List String
   | [] => [] | x :: xs => toWire x ++ elementsWire xs
 end
@@ -55,7 +56,6 @@ def readElements : Nat → Nat → List String → Except String (List Value × 
     let (xs, rest) ← readElements fuel n rest
     return (x :: xs, rest)
 end
-
 def ofWire (tokens : List String) : Except String Value := do
   let (v, rest) ← readWire (2 * tokens.length + 2) tokens
   if rest.isEmpty then return v else .error "trailing value wire data"

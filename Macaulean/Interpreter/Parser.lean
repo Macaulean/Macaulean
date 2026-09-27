@@ -259,27 +259,25 @@ def parseCommaRhs : Nat → Bool → Nat → Cursor → TreeResult
     if missingOperand c.tokens then .ok (.missing anchor, c)
     else parseTreeExpr fuel (commaBP + 1) obey c
 
-/-- Only bare, distinct names are supported; options and indexed names are explicit extensions. -/
+/-- Names are quoted, not evaluated. Indexed names/options are separate extensions. -/
 def parseRing : Nat → Nat → Bool → Tree → Nat → Cursor → TreeResult
   | 0, _, _, _, _, _ => .error "parser ran out of fuel"
   | fuel + 1, minBP, obey, base, left, c => do
     let c := c.skipNewlines
     match c.tokens with
     | .sym .rbracket :: rest =>
-      return ← parseTreeLoop fuel minBP obey
-        (.polyRing left c.index [] base (.missing left)) ⟨rest,c.index+1⟩
+      return ← parseTreeLoop fuel minBP obey (.polyRing left c.index [] base (.missing left)) ⟨rest,c.index+1⟩
     | _ => pure ()
     let (vars, tail) ← parseTreeExpr fuel 0 false c
     let some names := vars.parameterNames
       | .error "polynomial-ring brackets currently require bare variable names"
     if names.eraseDups.length != names.length then
-      .error "duplicate polynomial names require the indexed-variable extension"
-    else
-      let tail := tail.skipNewlines
-      match tail.tokens with
-      | .sym .rbracket :: rest => parseTreeLoop fuel minBP obey
-          (.polyRing left tail.index names base vars) ⟨rest,tail.index+1⟩
-      | _ => .error "expected ']' after polynomial variable names"
+      throw "duplicate polynomial names require the indexed-variable extension"
+    let tail := tail.skipNewlines
+    match tail.tokens with
+    | .sym .rbracket :: rest =>
+      parseTreeLoop fuel minBP obey (.polyRing left tail.index names base vars) ⟨rest,tail.index+1⟩
+    | _ => .error "expected ']' after polynomial variable names"
 
 def parseTreeLoop : Nat → Nat → Bool → Tree → Cursor → TreeResult
   | 0, _, _, _, _ => .error "parser ran out of fuel"
