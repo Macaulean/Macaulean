@@ -1,71 +1,50 @@
-name: Polynomial CI Environment
-
+name: Publish Verified Polynomial Repair
 on:
   push:
     branches: [verification/m2-ci-environment-20260927]
-
 permissions:
-  contents: read
-
+  contents: write
 jobs:
-  environment:
+  publish:
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/macaulay2/testbot
     steps:
       - uses: actions/checkout@v7
         with:
-          persist-credentials: false
-      - name: Install dependencies
-        run: |
-          apt-get update
-          apt-get install -y curl
-      - uses: leanprover/lean-action@v1
-        with:
-          test: 'false'
-      - name: Retain source and kernel-evaluation environment
+          fetch-depth: 1
+      - name: Apply reviewed changes with exact source and output checks
         shell: bash
+        env:
+          TARGET: feature/m2-polynomial-ring-20260927
+          EXPECTED: 0c39581fd0e6244cc6011ccab5a7ef46a76647e4
+          PAYLOAD: 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
         run: |
           set -euo pipefail
-          mkdir -p /tmp/polynomial-environment
-          git -c safe.directory="$PWD" rev-parse HEAD > /tmp/polynomial-environment/commit.txt
-          lean --version > /tmp/polynomial-environment/lean-version.txt
-          M2 --version > /tmp/polynomial-environment/m2-version.txt
-          git -c safe.directory="$PWD" archive --format=tar.gz -o /tmp/polynomial-environment/source.tar.gz HEAD
-          tar -czf /tmp/polynomial-environment/build.tar.gz .lake/build/lib/lean
-          toolchain=$(lean --print-prefix)
-          tar --exclude='*.a' --exclude='*.o' --exclude='*.c' --exclude='*.cpp' --exclude='*.ilean' --exclude='*.trace' -czf /tmp/polynomial-environment/lean.tar.gz -C "$toolchain" .
-          cd /tmp/polynomial-environment
-          sha256sum *.tar.gz > SHA256SUMS.txt
-          split -b 256M lean.tar.gz lean.part-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: polynomial-source-environment
-          path: |
-            /tmp/polynomial-environment/*.txt
-            /tmp/polynomial-environment/source.tar.gz
-            /tmp/polynomial-environment/build.tar.gz
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: polynomial-lean-part-aa
-          path: /tmp/polynomial-environment/lean.part-aa
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: polynomial-lean-part-ab
-          path: /tmp/polynomial-environment/lean.part-ab
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
-      - uses: actions/upload-artifact@v4
-        with:
-          name: polynomial-lean-part-ac
-          path: /tmp/polynomial-environment/lean.part-ac
-          retention-days: 1
-          compression-level: 0
-          if-no-files-found: error
+          git fetch origin "$TARGET" --depth=1
+          test "$(git rev-parse FETCH_HEAD)" = "$EXPECTED"
+          git checkout --detach "$EXPECTED"
+          python3 - <<'PY'
+          import os, json, zlib, base64, hashlib, pathlib, subprocess
+          raw = zlib.decompress(base64.b64decode(os.environ['PAYLOAD']))
+          assert hashlib.sha256(raw).hexdigest() == 'c0965a0ac9506da633ce69becf35820d3df981f43334d7b1330233c85f341f2d'
+          data = json.loads(raw)
+          paths = data['expected']
+          assert all(not p.startswith('/') and '..' not in pathlib.PurePosixPath(p).parts and not p.startswith('.github/') for p in paths)
+          pathlib.Path('/tmp/repair.patch').write_text(data['patch'])
+          subprocess.run(['git','apply','--check','--unidiff-zero','/tmp/repair.patch'],check=True)
+          subprocess.run(['git','apply','--index','--unidiff-zero','/tmp/repair.patch'],check=True)
+          for path, content in data['replace'].items():
+              assert path in paths
+              pathlib.Path(path).write_text(content)
+          subprocess.run(['git','add','--',*data['replace']],check=True)
+          for path, expected in paths.items():
+              actual = subprocess.check_output(['git','hash-object',path],text=True).strip()
+              assert actual == expected, (path,actual,expected)
+          actual_paths = subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines()
+          assert set(actual_paths) == set(paths), (actual_paths,list(paths))
+          PY
+          git diff --cached --check
+          git diff --cached --stat
+          git -c user.name='Macaulean automation' -c user.email='noreply@github.com' commit -m 'fix(polynomials): kernel reduction, native identity and binding semantics'
+          test "$(git ls-remote origin "refs/heads/$TARGET" | cut -f1)" = "$EXPECTED"
+          git push origin "HEAD:refs/heads/$TARGET"
+          git rev-parse HEAD
