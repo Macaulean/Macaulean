@@ -11,15 +11,6 @@ set_option maxHeartbeats 5000000
 
 def source : String := m2_source% "Buchberger.m2"
 
--- Report the failing definition rather than a context-free token error.
-run_cmd do
-  logInfo m!"LIBRARY_READER_CONTROL: {repr (Macaulean.M2.parse "f=x->\n x+1;")}"
-  logInfo m!"LIBRARY_NEWLINE_CONTROL: {repr (Macaulean.M2.Parser.skipNewlines [.newline,.newline,.num 7])}"
-  for block in source.splitOn "\n\n" do
-    match Macaulean.M2.parse block with
-    | .ok _ => pure ()
-    | .error error => logError m!"LIBRARY_FRAGMENT {repr block}: {error}"
-
 def definitions : List (String × Code) := m2_library% source
 
 run_cmd do
