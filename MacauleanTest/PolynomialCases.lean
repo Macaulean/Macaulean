@@ -36,6 +36,11 @@ def arithmetic : List (String × Value) := [
   ("listForm((promote(2,R))^(-2))", listFormValue [(mkRat 1 4,[0,0,0])]),
   ("listForm((x-x)^0)", listFormValue [(1,[0,0,0])]),
   ("listForm((promote(-2/3,R))^(-3))", listFormValue [(mkRat (-27) 8,[0,0,0])]),
+  -- Native zero-polynomial powers are not the scalar division-by-zero cases.
+  ("listForm((x-x)^(-1))", listFormValue []),
+  ("listForm((x-x)^(-2))", listFormValue []),
+  ("listForm((promote(0,R))^(-3))", listFormValue []),
+  ("ring ((x-x)^(-1)) === R", .bool true),
   ("listForm((x^2+y)//x)", listFormValue [(1,[1,0,0])]),
   ("listForm((x^2+y)%x)", listFormValue [(1,[0,1,0])]),
   ("listForm((2*x^2+3*x*y+z)//(2*x))", listFormValue [(1,[1,0,0]),(mkRat 3 2,[0,1,0])]),
@@ -128,7 +133,6 @@ def helpers : List (String × Value) :=
 def errors : List (String × Error) := [
   (inXYZ "x/0", .divByZero),
   (inXYZ "x//(0*x)", .divByZero),
-  (inXYZ "(x-x)^(-1)", .divByZero),
   (inXYZ "leadMonomial(x-x)", .algebra "zero polynomial has no leading monomial"),
   (inXYZ "m2MonomialQuotient(x,y)", .algebra "monomial does not divide the numerator"),
   (inXYZ "m2MonomialLCM(x+y,x)", .algebra "expected a nonzero single-term polynomial"),
