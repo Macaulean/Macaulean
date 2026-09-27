@@ -30,15 +30,53 @@ structure Poly where
   data : Macaulean.Polynomial Rat ring.names.length
   deriving Repr, Inhabited
 
-instance : DecidableEq Poly := fun p q => by
-  cases p with
-  | mk r a =>
-    cases q with
-    | mk s b =>
-      by_cases h : r = s
-      · subst s
-        exact decidable_of_iff (a = b) (by simp)
-      · exact isFalse (by intro e; cases e; exact h rfl)
+/-- A nondependent view for deciding equality without transporting polynomial data. -/
+def Poly.termData (p : Poly) : List (Rat × List Nat) :=
+  p.data.terms.map fun t => (t.coefficient, t.monomial.powers)
+
+private theorem termData_injective {n : Nat} (a b : Macaulean.PolyTerm Rat n)
+    (h : (a.coefficient, a.monomial.powers) = (b.coefficient, b.monomial.powers)) : a = b := by
+  rcases a with ⟨a, ⟨xs, hx⟩⟩
+  rcases b with ⟨b, ⟨ys, hy⟩⟩
+  rcases Prod.mk.inj h with ⟨rfl, rfl⟩
+  rfl
+
+private theorem termsData_injective {n : Nat} (xs ys : List (Macaulean.PolyTerm Rat n))
+    (h : xs.map (fun t => (t.coefficient, t.monomial.powers)) =
+      ys.map (fun t => (t.coefficient, t.monomial.powers))) : xs = ys := by
+  induction xs generalizing ys with
+  | nil =>
+    cases ys with
+    | nil => rfl
+    | cons y ys => simp at h
+  | cons x xs ih =>
+    cases ys with
+    | nil => simp at h
+    | cons y ys =>
+      simp only [List.map_cons, List.cons.injEq] at h
+      have hxy := termData_injective x y h.1
+      have htail := ih ys h.2
+      cases hxy
+      cases htail
+      rfl
+
+private theorem Poly.eq_iff_data (p q : Poly) :
+    (p.ring = q.ring ∧ p.termData = q.termData) ↔ p = q := by
+  constructor
+  · rintro ⟨hr, ht⟩
+    rcases p with ⟨r, ⟨xs⟩⟩
+    rcases q with ⟨s, ⟨ys⟩⟩
+    change r = s at hr
+    subst s
+    have h := termsData_injective xs ys ht
+    cases h
+    rfl
+  · intro h
+    cases h
+    exact ⟨rfl, rfl⟩
+
+instance : DecidableEq Poly := fun p q =>
+  decidable_of_iff (p.ring = q.ring ∧ p.termData = q.termData) (Poly.eq_iff_data p q)
 
 namespace Poly
 
@@ -59,9 +97,15 @@ def ofTerms (r : Ring) (ts : List (List Nat × Rat)) : Option Poly := do
     else none
   return ofData r ⟨terms⟩
 
+/-- Transport only the erased length proof, never the computational polynomial.
+A cast of the entire dependent value can obstruct kernel reduction even when
+native compilation erases it. This reconstruction preserves every coefficient
+and exponent and performs exactly the same ring-identity check. -/
 def dataIn (p : Poly) (r : Ring) : Option (Macaulean.Polynomial Rat r.names.length) :=
   if h : p.ring = r then
-    some (cast (congrArg (fun r : Ring => Macaulean.Polynomial Rat r.names.length) h) p.data)
+    some ⟨p.data.terms.map fun t => ⟨t.coefficient,
+      ⟨t.monomial.powers, t.monomial.powers_length.trans
+        (congrArg (fun s : Ring => s.names.length) h)⟩⟩⟩
   else none
 
 def add (p q : Poly) : Option Poly := do
