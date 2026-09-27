@@ -148,7 +148,8 @@ def showPanel (entry : Index.Entry) (stx : Syntax) : CommandElabM Unit := do
     ("entry",entryJson index session theory entry), ("insertAt",toJson position),
     ("theoryDigest",Json.str ((theory.map (·.digest)).getD "not-requested")),
     ("theoryAxioms",toJson ((theory.map (·.axioms)).getD []))]
-  Widget.savePanelWidgetInfo widget.javascriptHash (pure props) stx
+  liftTermElabM do
+    Widget.savePanelWidgetInfo widget.javascriptHash (pure props) stx
 
 open Lean.Server Lean.Server.RequestM in
 @[server_rpc_method]
