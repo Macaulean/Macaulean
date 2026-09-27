@@ -1,6 +1,7 @@
 import Macaulean.Interpreter.Syntax
 import Macaulean.Interpreter.Value
 import Macaulean.Interpreter.PolynomialOps
+import Macaulean.Interpreter.Library
 
 /-! # Shared value operations and loop-free reference semantics -/
 namespace Macaulean.M2
@@ -64,7 +65,7 @@ def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   | .index, .list xs, zz i | .index, .sequence xs, zz i => indexValue xs i
   | .hasIndex, .list xs, zz i | .hasIndex, .sequence xs, zz i =>
     .ok (.bool (normalizedIndex xs.length i).isSome)
-  | .hasIndex, .list xs, _ | .hasIndex, .sequence xs, _ => .ok (.bool false)
+  | .hasIndex, .list _, _ | .hasIndex, .sequence _, _ => .ok (.bool false)
   | .hasIndex, .null, _ => .ok (.bool false)
   | .concat, .list xs, .list ys => .ok (.list (xs ++ ys))
   | .concat, .sequence xs, .sequence ys => .ok (.sequence (xs ++ ys))
@@ -105,7 +106,8 @@ def evalLogicOp (op : LogicOp) (a b : Value) : Except Error Value :=
   | .bool x, .bool y => .ok (.bool (match op with | .andOp => x && y | .orOp => x || y))
   | _, _ => .error (.noMethod op.symbol [a.className, b.className])
 def prelude : Env :=
-  [("true", .bool true), ("false", .bool false), ("null", .null)] ++ Polynomials.builtinEnv
+  [("true", .bool true), ("false", .bool false), ("null", .null)] ++ Polynomials.builtinEnv ++
+    Library.names.map (fun name => (name, .algebra (.library name)))
 def protectedNames : List String := prelude.map (·.1)
 
 mutual

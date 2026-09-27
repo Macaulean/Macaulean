@@ -6,8 +6,8 @@ import Macaulean.Interpreter.Lexical
 
 Captured cells, closures, and fresh ring identities live in immutable session data.
 Evaluation is depth-bounded. Polynomial operations invoke pure Lean functions,
-never a foreign engine. Global publication of ring variables deliberately leaves
-lexically shadowing cells untouched, matching native M2.
+never a foreign engine. Library functions execute the same lexical Code as user
+functions. Global ring-variable publication leaves shadowing cells untouched.
 -/
 namespace Macaulean.M2.Runtime
 open Lexical
@@ -123,7 +123,6 @@ def State.evalPolynomialRing (s : State) (base : Value) (specs : List (String ×
   let (names, indexed) ← s.ringSpecifications specs frames
   let (ring, next) ← s.polynomialRing base names
   if indexed then
-    -- The index base is a symbol, not the integer-valued variable used as a count.
     return (ring, { next with env := next.env.filter (fun (name,_) => name != "p") })
   else return (ring,next)
 
@@ -151,7 +150,7 @@ def catchReturn (r : Result Value) : Result Value :=
   | other => other
 
 def callable : Value → Bool
-  | .closure _ | .algebra (.builtin _) => true | _ => false
+  | .closure _ | .algebra (.builtin _) | .algebra (.library _) => true | _ => false
 
 mutual
 def eval : Nat → Code → Frames → State → Except Signal (Value × State)
@@ -164,17 +163,21 @@ def eval : Nat → Code → Frames → State → Except Signal (Value × State)
     | .unop op a =>
       let (v, s) ← eval fuel a frames s
       match op, v with
-      | .notOp, .closure _ | .notOp, .algebra (.builtin _) => return s.function (.negated v)
+      | .notOp, .closure _ | .notOp, .algebra (.builtin _) | .notOp, .algebra (.library _) =>
+        return s.function (.negated v)
       | _, _ => return (← liftResult (evalUnOp op v), s)
     | .binop op a b =>
       let (va, s) ← eval fuel a frames s
       let (vb, s) ← eval fuel b frames s
       match op, va, vb with
       | .compose, .closure _, .closure _ => return s.function (.composition va vb)
-      | .compose, .algebra (.builtin _), _ =>
+      | .compose, .algebra (.builtin _), _ | .compose, .algebra (.library _), _ =>
         if callable vb then return s.function (.composition va vb)
         else return (← liftResult (evalBinOp op va vb), s)
-      | .compose, .closure _, .algebra (.builtin _) => return s.function (.composition va vb)
+      | .compose, .closure _, .algebra (.builtin _)
+      | .compose, .closure _, .algebra (.library _) => return s.function (.composition va vb)
+      | .rem, _, .algebra (.basis ..) =>
+        call fuel (.algebra (.library "normalForm")) (.sequence [va,vb]) s
       | _, _, _ => return (← liftResult (evalBinOp op va vb), s)
     | .logic op a b =>
       let (va, s) ← eval fuel a frames s
@@ -251,25 +254,32 @@ def call : Nat → Value → Value → State → Except Signal (Value × State)
   | fuel + 1, fn, arg, s => do
     if let .algebra (.builtin p) := fn then
       return (← liftResult (Polynomials.callPrimitive p arg), s)
-    let .closure id := fn
-      | .error (.error (.noMethod "SPACE" [fn.className, arg.className]))
-    let some entry := s.heap.functions[id]? | .error (.error .invalidReference)
-    match entry with
-    | .closure params slots body captured =>
+    if let .algebra (.library name) := fn then
+      let some (.lambda params slots body) := Library.lookup name
+        | .error (.error .invalidReference)
       let values ← liftResult (arguments params arg)
-      let (frame, s) := s.allocate (values ++ List.replicate (slots - values.length) .null)
-      catchReturn (eval fuel body (frame :: captured) s)
-    | .composition f g =>
-      let (v, s) ← call fuel g arg s
-      call fuel f v s
-    | .predicate op f g =>
-      let (v, s) ← call fuel f arg s
-      if v = .bool op.shortCircuit then return (v, s)
-      let (w, s) ← call fuel g arg s
-      return (← liftResult (evalLogicOp op v w), s)
-    | .negated f =>
-      let (v, s) ← call fuel f arg s
-      return (← liftResult (evalUnOp .notOp v), s)
+      let (frame,s) := s.allocate (values ++ List.replicate (slots - values.length) .null)
+      catchReturn (eval fuel body [frame] s)
+    else
+      let .closure id := fn
+        | .error (.error (.noMethod "SPACE" [fn.className, arg.className]))
+      let some entry := s.heap.functions[id]? | .error (.error .invalidReference)
+      match entry with
+      | .closure params slots body captured =>
+        let values ← liftResult (arguments params arg)
+        let (frame, s) := s.allocate (values ++ List.replicate (slots - values.length) .null)
+        catchReturn (eval fuel body (frame :: captured) s)
+      | .composition f g =>
+        let (v, s) ← call fuel g arg s
+        call fuel f v s
+      | .predicate op f g =>
+        let (v, s) ← call fuel f arg s
+        if v = .bool op.shortCircuit then return (v, s)
+        let (w, s) ← call fuel g arg s
+        return (← liftResult (evalLogicOp op v w), s)
+      | .negated f =>
+        let (v, s) ← call fuel f arg s
+        return (← liftResult (evalUnOp .notOp v), s)
 end
 
 def defaultFuel : Nat := 4096
