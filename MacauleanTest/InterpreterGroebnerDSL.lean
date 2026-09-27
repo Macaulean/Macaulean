@@ -208,7 +208,7 @@ numgens(gb J)
 #guard_msgs in
 normalForm(x,{true})
 
-/-- error: expected 2 argument(s), got 3 -/
+/-- error: expected 2 arguments, got 3 -/
 #guard_msgs in
 normalForm(x,y,1)
 
