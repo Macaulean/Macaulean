@@ -10,8 +10,8 @@ def form (ts : List (List Int × Rat)) : Value :=
 def overXY (s : String) : String := "(rr:=QQ[pgx,pgy];" ++ s ++ ")"
 
 def successes : List (String × Value) := [
-  ("numgens QQ[]", .zz 0),
-  ("numgens QQ[pgx,pgy]", .zz 2),
+  ("numgens (QQ[])", .zz 0),
+  ("numgens (QQ[pgx,pgy])", .zz 2),
   ("(local pgx;rr:=QQ[pgx];numgens rr)", .zz 0),
   ("(pgx:=null;rr:=QQ[pgx];numgens rr)", .zz 0),
   ("(rr:=QQ[pgx];ss:=QQ[pgx];rr==ss)", .bool false),
@@ -31,6 +31,11 @@ def successes : List (String × Value) := [
   (overXY "listForm promote(2/3,rr)", form [([0,0],mkRat 2 3)]),
   (overXY "listForm (pgx^0)", form [([0,0],1)]),
   (overXY "listForm ((2_rr)^(-2))", form [([0,0],mkRat 1 4)]),
+  -- M2's polynomial inverse uses 0 for the inverse of the zero polynomial;
+  -- this must not be confused with its scalar division-by-zero error.
+  (overXY "listForm ((0_rr)^(-1))", form []),
+  (overXY "listForm ((0_rr)^(-2))", form []),
+  (overXY "listForm ((0_rr)^0)", form [([0,0],1)]),
   (overXY "leadCoefficient ((2/3)*pgx^2*pgy-pgy)", .qq (mkRat 2 3)),
   (overXY "leadCoefficient (0*pgx)", .qq 0),
   (overXY "listForm leadMonomial (2*pgx*pgy+pgy^2+1)", form [([1,1],1)]),
@@ -63,7 +68,8 @@ because the string parser rejected a valid program. -/
 def errors : List String := [
   overXY "pgx/(0_rr)",
   overXY "pgx/0",
-  overXY "(0_rr)^(-1)",
+  -- Brackets bind below application: these apply numgens to QQ first.
+  "numgens QQ[]", "numgens QQ[pgx,pgy]",
   overXY "leadMonomial (0*pgx)",
   "(rr:=QQ[pgx];old:=pgx;ss:=QQ[pgx];old+pgx)",
   "(rr:=QQ[pgx];old:=pgx;ss:=QQ[pgx];old*pgx)",
