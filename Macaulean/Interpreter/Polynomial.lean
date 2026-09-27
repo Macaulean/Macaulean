@@ -108,7 +108,7 @@ def indeterminate? (p : Poly) : Option (String × Option Nat) := do
   if t.coefficient != 1 || t.monomial.degree != 1 then none else do
     let i := t.monomial.powers.idxOf 1
     let name ← p.ring.names[i]?
-    return (name, (p.ring.cells[i]?).flatten)
+    return (name, (p.ring.cells[i]?).getD none)
 
 /-- Divisibility here is only for nonzero single-term polynomials over QQ. -/
 def monomialDivides (a b : Poly) : Option Bool := do

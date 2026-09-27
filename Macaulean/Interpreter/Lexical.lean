@@ -39,10 +39,10 @@ inductive Code where
   | ringName (name : String)
   deriving Repr, Inhabited
 
+mutual
 /-- Only bare unbound globals in a ring specification denote fresh symbols.
 Bound values, local nulls, explicit local quotes, and expression evaluation are
 not replaced with the spelling of their source. -/
-mutual
 def ringSpecifications : Code → Code
   | .read (.global name) => .ringName name
   | .listLit xs => .listLit (ringSpecificationsMany xs)
@@ -72,12 +72,14 @@ def Resolver.lookup (r : Resolver) (name : String) : Ref :=
   match r.current.names.lookup name with
   | some i => .slot 0 i | none => findOuter name r.outers 1
 
+/-- := redeclaration creates a fresh binding, not an update of the previous slot. -/
 def Resolver.declare (r : Resolver) (name : String) : Ref × Resolver :=
   let i := r.current.count
   let warnings := if (r.current.names.lookup name).isSome then
       r.warnings ++ [s!"redeclaration of local variable '{name}'"] else r.warnings
   (.slot 0 i, { r with current := ⟨(name, i) :: r.current.names, i + 1⟩, warnings })
 
+/-- `local` quotes an existing current-scope binding without resetting its value. -/
 def Resolver.localRef (r : Resolver) (name : String) : Ref × Resolver :=
   match r.current.names.lookup name with
   | some i => (.slot 0 i, r)
