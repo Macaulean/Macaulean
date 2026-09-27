@@ -143,7 +143,7 @@ run_cmd do
   for node in entry.nodes do
     unless node.startByte ≤ node.stopByte && node.stopByte ≤ text.utf8ByteSize do
       throwError "invalid source byte range"
-  unless (Index.sourceNodes 0 Syntax.missing).isError do throwError "partial source map accepted"
+  if (Index.sourceNodes 0 Syntax.missing).isOk then throwError "partial source map accepted"
 
 -- Checked polynomial/row views are available for actual M2 values.
 #guard_msgs in
@@ -169,7 +169,6 @@ run_cmd do
   unless (← DSL.getSession).lookup "disabled" == some (.zz 21) do throwError "disabled frontend changed execution"
   unless ((← Index.get).find "disabled").isNone do throwError "disabled input was indexed"
 
--- Lean remains Lean, and no user theorem is needed for normal M2 evaluation.
 example : 2 + 2 = 4 := rfl
 
 run_cmd do
