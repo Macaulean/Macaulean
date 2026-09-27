@@ -4,9 +4,9 @@ import Macaulean.Interpreter.Run
 namespace Macaulean.M2.PolynomialCases
 
 def listFormValue (ts : List (Rat × List Nat)) : Value :=
-  .list (ts.map fun (c,ns) => .sequence [.list (ns.map fun n => .zz n), .qq c])
+  .list (ts.map fun (c,ns) => .sequence [.list (ns.map fun n => .zz (Int.ofNat n)), .qq c])
 def expsValue (ns : List (List Nat)) : Value :=
-  .list (ns.map fun xs => .list (xs.map fun n => .zz n))
+  .list (ns.map fun xs => .list (xs.map fun n => .zz (Int.ofNat n)))
 def inXYZ (src : String) : String := "R=QQ[x,y,z];" ++ src
 
 def arithmetic : List (String × Value) := [
@@ -97,8 +97,8 @@ def successes : List (String × Value) :=
     ("R=QQ[x];p=x;S=QQ[x];ring p==S", .bool false)
   ]
 
-/-- Our explicitly named monomial APIs, not claimed as native-library overloads. -/
-def helpers : List (String × Value) := ( [
+/-- Explicitly named helper APIs, not asserted to be native-library overloads. -/
+def helpers : List (String × Value) := ([
   ("m2MonomialDivides(x,x^2*y)", .bool true),
   ("m2MonomialDivides(x^2,x*y)", .bool false),
   ("m2MonomialDivides(2*x,3*x*y)", .bool true),
@@ -132,7 +132,7 @@ def errors : List (String × Error) := [
   ("R=QQ[x];p=x;S=QQ[x];p+x", .algebra "polynomials belong to different rings")
 ]
 
-/-- Valid native features intentionally not implemented by this polynomial layer. -/
+/-- Rejection boundaries. Native validity is tested separately where claimed. -/
 def unsupported : List String := [
   "QQ[x,x]", "QQ[x_0..x_2]", "QQ[x,MonomialOrder=>Lex]", "ZZ[x]",
   "R=QQ[x];x/x", "R=QQ[x];1/x", "R=QQ[x];x^(-1)",

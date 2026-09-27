@@ -34,7 +34,7 @@ run_cmd do
       checkValue source expected
   logInfo "POLYNOMIAL_QUADRATIC_GRID_COMPLETE: 25"
 
--- Test the explicitly named APIs against independently expressed native operations.
+-- Compare the named APIs against independently expressed native operations.
 run_cmd do
   let powers : List (Nat × Nat) := [(0,0),(1,0),(0,1),(2,0),(1,1),(0,2)]
   for (a,b) in powers do
@@ -62,7 +62,6 @@ run_cmd do
         checkValue (prefix ++ s!"listForm((3*({n}))//(2*({m})))") expected
   logInfo "POLYNOMIAL_MONOMIAL_GRIDS_COMPLETE: 36 pairs, divisibility, lcm, grevlex, and exact quotients"
 
--- Genuine native runtime failures, separate from unsupported valid features.
 run_cmd do
   for source in #[
     "R=QQ[x];x/0", "R=QQ[x];leadMonomial(x-x)",
@@ -71,10 +70,11 @@ run_cmd do
   ] do
     match ← queryM2 ("(" ++ source ++ ")") with
     | .ok .error => pure ()
-    | reply => logError m!"native M2 did not reject {source}: {repr reply}"
+    | .ok (.ok value) => logError m!"native M2 accepted {source}: {repr value}"
+    | .error message => logError m!"native error transport failed: {message}"
   logInfo "POLYNOMIAL_NATIVE_ERRORS_COMPLETE: 7"
 
--- These native results require different value classes, never silently coerce them.
+-- Native classes requiring other extensions must not be silently coerced.
 run_cmd do
   let server ← globalM2Server
   for (source, cls) in #[
@@ -91,7 +91,6 @@ run_cmd do
     | _ => pure ()
   logInfo "POLYNOMIAL_NATIVE_BOUNDARIES_COMPLETE: 3"
 
--- Actual certificate path after native agreement, using portable nested typed data.
 run_cmd do
   let source := "R=QQ[x,y];listForm((x-y)*(x+y))"
   let expected := listFormValue [(1,[2,0]),(-1,[0,2])]
