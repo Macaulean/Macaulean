@@ -1,0 +1,8 @@
+by
+  intro arg admissible fuel result after execution
+  have same := Macaulean.M2.Verification.ProofJobs.Identity.successful_value
+    _ 0 "p" [[]] arg result after fuel (by rfl) execution
+  subst result
+  obtain ⟨ring, polynomial, decoded⟩ := admissible
+  exact ⟨ring, polynomial, polynomial, decoded, decoded,
+    Macaulean.M2.Verification.Views.equivalent_refl polynomial⟩

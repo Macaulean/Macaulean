@@ -1,0 +1,3 @@
+by
+  apply Macaulean.M2.Verification.ProofJobs.Identity.contract (name := "p") (captured := [[]])
+  decide +kernel
