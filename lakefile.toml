@@ -8,6 +8,11 @@ name = "buchbergerSource"
 path = "Macaulean/Interpreter/Buchberger.m2"
 text = true
 
+[[input_file]]
+name = "intentWidgetTest"
+path = "scripts/intent-widget.test.mjs"
+text = true
+
 [[lean_lib]]
 name = "Macaulean"
 needs = ["buchbergerSource"]
@@ -17,6 +22,7 @@ name = "MRDI"
 
 [[lean_lib]]
 name = "MacauleanTest"
+needs = ["intentWidgetTest"]
 
 [[lean_exe]]
 name = "macaulean"
