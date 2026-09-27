@@ -47,14 +47,18 @@ def exprKey : Expr → String
   | .mdata _ e => exprKey e
   | .proj n i e => frame ["proj",nameKey n,toString i,exprKey e]
 
-def exprNames : Expr → List Name
-  | .const n _ => [n]
-  | .app f a => exprNames f ++ exprNames a
-  | .lam _ t b _ | .forallE _ t b _ => exprNames t ++ exprNames b
-  | .letE _ t v b _ => exprNames t ++ exprNames v ++ exprNames b
-  | .mdata _ e => exprNames e
-  | .proj n _ e => n :: exprNames e
-  | _ => []
+/-- Repeated references in generated code are one graph edge, not repeated work.
+The declaration body itself is still serialized in full. -/
+def exprNameSet : Expr → NameSet → NameSet
+  | .const n _, names => names.insert n
+  | .app f a, names => exprNameSet a (exprNameSet f names)
+  | .lam _ t b _, names | .forallE _ t b _, names => exprNameSet b (exprNameSet t names)
+  | .letE _ t v b _, names => exprNameSet b (exprNameSet v (exprNameSet t names))
+  | .mdata _ e, names => exprNameSet e names
+  | .proj n _ e, names => exprNameSet e (names.insert n)
+  | _, names => names
+
+def exprNames (e : Expr) : List Name := (exprNameSet e {}).toArray.toList
 
 def declarationExtra (c : ConstantInfo) : List String × List Name :=
   match c with
@@ -81,25 +85,29 @@ structure Theory where
   axioms : List String
   deriving Inhabited
 
-private def theoryWalk : Nat → Environment → List Name → List Name → List String → List String →
+private def theoryWalk : Nat → Environment → List Name → NameSet → List String → List String →
     Except String (List Name × List String × List String)
   | 0, _, _, _, _, _ => .error "semantic dependency traversal exhausted"
-  | _+1, _, [], seen, entries, axioms => .ok (seen,entries,axioms)
+  | _+1, _, [], seen, entries, axioms => .ok (seen.toArray.toList,entries,axioms)
   | fuel+1, env, n::todo, seen, entries, axioms => do
-    if n ∈ seen then theoryWalk fuel env todo seen entries axioms
+    if seen.contains n then theoryWalk fuel env todo seen entries axioms
     else
       let some c := env.find? n | .error s!"missing semantic declaration {n}"
       let (extra,more) := declarationExtra c
       let value := c.value? true
       let key := frame ([nameKey n,frame (c.levelParams.map nameKey),exprKey c.type,
         toString c.isUnsafe,match value with | none => "no-value" | some e => frame ["value",exprKey e]] ++ extra)
-      let refs := exprNames c.type ++ (value.map exprNames).getD [] ++ more
-      theoryWalk fuel env (refs ++ todo) (n::seen) (key::entries)
+      let refs := exprNameSet c.type {}
+      let refs := match value with | none => refs | some e => exprNameSet e refs
+      let refs := more.foldl (fun names n => names.insert n) refs
+      let seen := seen.insert n
+      let fresh := refs.toArray.toList.filter (fun ref => !seen.contains ref)
+      theoryWalk fuel env (fresh ++ todo) seen (key::entries)
         (if c.isAxiom then n.toString::axioms else axioms)
 
 /-- Exact declaration payload is retained; digest is the portable attestation key. -/
 def sealTheory (env : Environment) (roots : List Name) (fuel : Nat := 500000) : Except String Theory := do
-  let (seen,entries,axioms) ← theoryWalk fuel env roots [] [] []
+  let (seen,entries,axioms) ← theoryWalk fuel env roots {} [] []
   let payload := frame ["lean-declarations-v1",Lean.versionString,frame entries]
   return ⟨payload,sha256 payload,seen.map Name.toString,axioms⟩
 
@@ -108,8 +116,6 @@ def roots : List Name := [
   ``LibraryCompiler.compile, ``Contracts.Statement, ``Contracts.render,
   ``Views.readPolynomial, ``Views.readRow, ``Fingerprint.sha256]
 
-/-- Lean declarations are immutable within an environment. This cache is local to
-the current elaboration environment and does not survive importing a worksheet. -/
 initialize theoryExt : EnvExtension (Option Theory) ← registerEnvExtension (pure none)
 
 def theory : Lean.Elab.Command.CommandElabM Theory := do
@@ -206,8 +212,6 @@ def reachable (fn : Value) (state : Runtime.State) : Except String String := do
   let entries ← walk 100000 state [.value fn] [] []
   return frame ["m2-reachable-v1",toString state.heap.nextRing,frame entries]
 
-/-- Display identity is stable under comments/formatting. Rebinding and changing
-captured/global dependencies affect the revision, independently of source spans. -/
 def bindingId (moduleName : Name) (name : String) : String :=
   sha256 (frame ["m2-binding-v1",nameKey moduleName,name])
 
