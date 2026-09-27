@@ -2,35 +2,25 @@ import MacauleanTest.NativePolynomialOracle
 import Macaulean.Interpreter.KernelPolynomial
 
 open Macaulean.M2
-#print axioms Macaulean.Polynomial.normalize
-#print axioms Macaulean.Polynomial.sortTerms
-#print axioms Macaulean.Polynomial.coalesceTerms
-#print axioms Macaulean.Polynomial.add
-#print axioms Macaulean.M2.KernelPolynomial.add
-#print axioms Macaulean.M2.Polynomials.normalized
 
 #eval do
   for src in [
-    "R=QQ[x,y,z];ring x==R",
-    "R=QQ[x,y,z];ring x===R",
-    "R=QQ[x,y,z];coefficientRing R==QQ",
-    "R=QQ[x,y,z];ring ideal(x,y)==R",
-    "R=QQ[x];S=QQ[x];R==S",
-    "R=QQ[x];S=R;R==S",
-    "R=QQ[x];p=x;S=QQ[x];ring p==R",
-    "x=91;R=QQ[x];exponents x",
-    "x=3;R=QQ[x];numgens R",
-    "local x;R=QQ[x];x",
-    "local x;R=QQ[x];numgens R",
-    "x:=13;R=QQ[x];x",
-    "f=x->(R=QQ[x];numgens R);f 3",
-    "calls=0;K=()->(calls=calls+1;QQ);R=(K())[x,y];calls",
-    "R=QQ[x,y];listForm((promote(2,R))^(-2))",
-    "QQ[x,x]",
-    "R=QQ[x];(x^2)/x",
-    "R=QQ[x];degree(0*x)",
-    "R=QQ[x];leadMonomial(0*x)",
-    "R=QQ[x];old=x;S=QQ[old];{numgens S,ring old===S,ring x===R}"
+    "x=3;R=QQ[x];{numgens R,gens R,x}",
+    "x=0;R=QQ[x];{numgens R,gens R,x}",
+    "x=-1;R=QQ[x];numgens R",
+    "local x;R=QQ[x,y];{numgens R,gens R,x,y}",
+    "f=x->(R=QQ[x];{numgens R,gens R,x});f 3",
+    "x=2;R=QQ[x,y];{numgens R,gens R,x,y}",
+    "x=2;y=2;R=QQ[x,y];{numgens R,gens R,x,y}",
+    "R=QQ[x,y];old=x;S=QQ[old];{numgens S,gens S,ring old===R,ring x===S}",
+    "R=QQ[x,y];old=x+y;S=QQ[old];{numgens S,gens S}",
+    "local x;R=QQ[local x];{numgens R,gens R,ring x===R}",
+    "{1===1/1,1=!=1/1,{1}==={1},(1,2)===(1,2)}",
+    "R=QQ[x];{x===x+0,1===promote(1,R),promote(1,R)===promote(1,R)}",
+    "R=QQ[x];{QQ===QQ,R===R,QQ===R,QQ=!=R}",
+    "R=QQ[x];f=x->x;{f===f,(x->x)===(x->x)}",
+    "R=QQ[x];{(gens ideal(x))===(gens ideal(x))}",
+    "R=QQ[x];{ideal(x)===ideal(x),ideal(x)===ideal(2*x)}"
   ] do
     let result ← NativePolynomialOracle.raw s!"({src})" true
     IO.println s!"POLYNOMIAL_FRESH_REFERENCE {repr src}: {repr result}"
