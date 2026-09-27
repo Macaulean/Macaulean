@@ -6,7 +6,7 @@ import Macaulean.Interpreter.DSL
 
 Panels describe the elaboration snapshot at their source position. Buttons insert
 source commands at the end of that command, never directly grant approval. The
-server must recheck frozen fingerprints after every edit. RPC is read-only.
+server rechecks frozen fingerprints after every edit. RPC is read-only.
 -/
 namespace Macaulean.M2.Verification.Panel
 open Lean Elab Command
@@ -49,8 +49,8 @@ def entryJson (index : Index.State) (session : Session) (theory : Option Snapsho
     ("sourceNodes",toJson entry.nodes), ("contracts",toJson cards),
     ("choices",toJson choices)]
 
-/-- Deterministic read-only inventory. It contains no proof-success flags and no
-executable callbacks. Exact target definitions are ordinary Lean declarations. -/
+/-- Deterministic read-only inventory. Exact target definitions are ordinary Lean
+declarations, not proof-success flags or executable callbacks. -/
 def inventory (env : Environment) : Json :=
   let index := Index.indexExt.getState env
   let session := DSL.sessionExt.getState env
@@ -73,8 +73,9 @@ import { EditorContext } from '@leanprover/infoview';
 const e = React.createElement;
 function paragraphs(xs) { return xs.map((s,i) => e('p', {key:i}, s)); }
 function ContractCard({p, insert}) {
-  const [reviewed,setReviewed] = React.useState(false);
-  React.useEffect(() => setReviewed(false), [p.digest,p.status]);
+  const [reviewedKey,setReviewedKey] = React.useState('');
+  const currentKey = JSON.stringify([p.digest,p.status]);
+  const reviewed = reviewedKey === currentKey;
   return e('section', {className:'mt2'},
     e('h4',null,p.title), e('p',null,'Intent: '+p.status),
     e('p',null,'Proof: '+p.proofStatus),
@@ -87,7 +88,7 @@ function ContractCard({p, insert}) {
       e('p',null,p.version),e('code',null,p.digest),
       e('p',null,'Attestation source: '+(p.approvalSource || 'none'))),
     e('label',null,e('input',{type:'checkbox',checked:reviewed,
-      disabled:!p.canApprove,onChange:ev=>setReviewed(ev.target.checked)}),
+      disabled:!p.canApprove,onChange:ev=>setReviewedKey(ev.target.checked ? currentKey : '')}),
       ' This contract, including its exclusions, matches my intent.'),
     e('div',null,
       e('button',{disabled:!reviewed || !p.canApprove,onClick:()=>{
@@ -126,14 +127,17 @@ export default function IntentPanel(props) {
         if (selected) return insert(selected.command);
       }},'Propose contract in source')),
     e('details',null,e('summary',null,'Binding and nested source map'),
-      e('p',null,p.file),e('code',null,p.id),
-      e('pre',null,p.sourceText),
+      e('p',null,p.file),e('code',null,p.id),e('pre',null,p.sourceText),
       e('pre',null,JSON.stringify(p.sourceNodes,null,2))),
+    e('details',null,e('summary',null,'Semantic dependency assumptions'),
+      e('p',null,'These are dependencies, not newly granted assumptions.'),
+      e('code',null,props.theoryDigest || 'not requested'),
+      e('pre',null,JSON.stringify(props.theoryAxioms || [],null,2))),
     notice && e('pre',{role:'status',style:{whiteSpace:'pre-wrap'}},notice));
 }
 "#
 
-def show (entry : Index.Entry) (stx : Syntax) : CommandElabM Unit := do
+def showPanel (entry : Index.Entry) (stx : Syntax) : CommandElabM Unit := do
   let env ← getEnv
   let index := Index.indexExt.getState env
   let session := DSL.sessionExt.getState env
@@ -141,7 +145,9 @@ def show (entry : Index.Entry) (stx : Syntax) : CommandElabM Unit := do
   let some tail := stx.getTailPos? | throwErrorAt stx "missing source anchor for intent panel"
   let position := (← getFileMap).utf8PosToLspPos tail
   let props := Json.mkObj [
-    ("entry",entryJson index session theory entry), ("insertAt",toJson position)]
+    ("entry",entryJson index session theory entry), ("insertAt",toJson position),
+    ("theoryDigest",Json.str ((theory.map (·.digest)).getD "not-requested")),
+    ("theoryAxioms",toJson ((theory.map (·.axioms)).getD []))]
   Widget.savePanelWidgetInfo widget.javascriptHash (pure props) stx
 
 open Lean.Server Lean.Server.RequestM in
