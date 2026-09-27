@@ -1,0 +1,40 @@
+name: M2 proof-job isolation and kernel replay
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install isolated worker support
+        run: sudo apt-get update && sudo apt-get install -y bubblewrap python3
+      - uses: leanprover/lean-action@v1
+        with:
+          build: 'false'
+          test: 'false'
+      - name: Record exact smoke baseline
+        run: |
+          mkdir -p ci-evidence
+          git rev-parse HEAD > ci-evidence/stage2-commit.txt
+          lean --version > ci-evidence/stage2-lean-version.txt
+          bwrap --version > ci-evidence/stage2-sandbox-version.txt
+      - name: Real kernel proof and two-process replay smoke
+        shell: bash
+        run: bash scripts/m2_proof_smoke.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: m2-stage2-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ci-evidence/
+          retention-days: 7
+          if-no-files-found: error
