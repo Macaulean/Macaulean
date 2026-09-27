@@ -1,20 +1,46 @@
-name: Lean Action CI
+name: Polynomial CI Environment
 
 on:
   push:
-  pull_request:
-  workflow_dispatch:
+    branches: [verification/m2-ci-environment-20260927]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  environment:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/macaulay2/testbot
-
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - name: Install dependencies
         run: |
           apt-get update
           apt-get install -y curl
       - uses: leanprover/lean-action@v1
+        with:
+          test: 'false'
+      - name: Retain source and kernel-evaluation environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/polynomial-environment
+          git rev-parse HEAD > /tmp/polynomial-environment/commit.txt
+          lean --version > /tmp/polynomial-environment/lean-version.txt
+          M2 --version > /tmp/polynomial-environment/m2-version.txt
+          git archive --format=tar.gz -o /tmp/polynomial-environment/source.tar.gz HEAD
+          tar -czf /tmp/polynomial-environment/build.tar.gz .lake/build/lib/lean
+          toolchain=$(lean --print-prefix)
+          tar --exclude='*.a' --exclude='*.o' --exclude='*.c' --exclude='*.cpp' --exclude='*.ilean' --exclude='*.trace' -czf /tmp/polynomial-environment/lean.tar.gz -C "$toolchain" bin lib include share src
+          cd /tmp/polynomial-environment
+          sha256sum *.tar.gz > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polynomial-lean-environment
+          path: /tmp/polynomial-environment/
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
