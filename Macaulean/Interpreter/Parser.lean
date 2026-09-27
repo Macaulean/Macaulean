@@ -3,9 +3,9 @@ import Macaulean.Interpreter.Lexer
 
 /-! # Shared concrete-tree Pratt grammar
 
-Application is right-associative (46), below powers/indexing (50) and composition
-(48), above multiplication (40). Arrow and assignments share precedence 10.
-Parameter delimiters are retained until arity is determined, never erased early.
+Application is right-associative (46), below powers/indexing (50). Polynomial-ring
+brackets are postfix constructors (55) with quoted identifier lists. All frontends
+use this grammar, including the string runtime and structured Lean syntax category.
 -/
 namespace Macaulean.M2
 namespace Parser
@@ -15,6 +15,7 @@ def notBP : Nat := 19
 def branchBP : Nat := 10
 def commaBP : Nat := 5
 def applicationBP : Nat := 46
+def ringBP : Nat := 55
 inductive Infix where
   | bin (op : BinOp) | logic (op : LogicOp) | assign | comma | arrow | localAssign
 
@@ -60,10 +61,10 @@ inductive Tree where
   | assignMany (pos : Nat) (declareLocal : Bool) (names : List String) (lhs rhs : Tree)
   | localSymbol (pos : Nat) (name : String) (identifier : Tree)
   | returnTerm (pos : Nat) (body : Tree)
+  | polyRing (left right : Nat) (names : List String) (base vars : Tree)
   deriving Repr, DecidableEq, Inhabited
 
 def Tree.isComma : Tree → Bool | .comma .. => true | _ => false
-
 def Tree.toTerm : Tree → Term
   | .num _ n => .int n | .var _ x => .var x
   | .paren _ _ t => t.toTerm
@@ -85,6 +86,7 @@ def Tree.toTerm : Tree → Term
   | .assignMany _ loc xs _ a => .assignMany loc xs a.toTerm
   | .localSymbol _ x _ => .localSymbol x
   | .returnTerm _ a => .returnTerm a.toTerm
+  | .polyRing _ _ names a _ => .polyRing a.toTerm names
 
 def Tree.bounds : Tree → Nat × Nat
   | .num i _ | .var i _ | .missing i => (i, i)
@@ -95,14 +97,13 @@ def Tree.bounds : Tree → Nat × Nat
   | .lambda _ _ a b | .localAssign _ _ a b | .assignMany _ _ _ a b => (a.bounds.1, b.bounds.2)
   | .ifThen i _ _ y => (i, y.bounds.2) | .ifElse i _ _ _ _ n => (i, n.bounds.2)
   | .discard i a => (a.bounds.1, i)
+  | .polyRing _ j _ a _ => (a.bounds.1, j)
 
 def Tree.parameterNames : Tree → Option (List String)
   | .var _ x => some [x]
   | .comma _ a (.var _ x) => (· ++ [x]) <$> a.parameterNames
   | _ => none
 
-/-- M2's binder accepts braces as well as parentheses for fixed parameters.
-The delimiter changes neither arity nor argument unpacking. -/
 def Tree.parameters (t : Tree) : Except String Parameters := do
   let p : Parameters ← match t with
     | .var _ x => .ok (.variadic x)
@@ -113,7 +114,6 @@ def Tree.parameters (t : Tree) : Except String Parameters := do
   if p.names.eraseDups.length != p.names.length then .error "duplicate function parameter"
   else return p
 
-/-- Assignment forms are checked on concrete syntax, before brace/comma lowering. -/
 inductive Target where
   | variable (name : String)
   | multiple (names : List String)
@@ -133,7 +133,6 @@ def Tree.target : Tree → Except String Target
   | .binop _ .index _ _ => .ok .indexed
   | _ => .error "invalid assignment target"
 
-/-- No value printing or coercion can turn a numeral or a List into a binding name. -/
 def assignmentTree (isLocal : Bool) (pos : Nat) (lhs rhs : Tree) : Except String Tree := do
   match ← lhs.target with
   | .variable name =>
@@ -155,7 +154,7 @@ abbrev TreeResult := Except String (Tree × Cursor)
 abbrev Result := Except String (Term × List Token)
 private def missingOperand : List Token → Bool
   | [] | .newline :: _ | .sym .comma :: _ | .sym .semi :: _
-  | .sym .rparen :: _ | .sym .rbrace :: _ | .sym .kwElse :: _ => true | _ => false
+  | .sym .rparen :: _ | .sym .rbrace :: _ | .sym .rbracket :: _ | .sym .kwElse :: _ => true | _ => false
 private def startsArgument : List Token → Bool
   | .num _ :: _ | .ident _ :: _ | .sym .lparen :: _ | .sym .lbrace :: _
   | .sym .kwIf :: _ | .sym .kwLocal :: _ | .sym .kwReturn :: _ | .sym .kwNot :: _ => true
@@ -260,11 +259,35 @@ def parseCommaRhs : Nat → Bool → Nat → Cursor → TreeResult
     if missingOperand c.tokens then .ok (.missing anchor, c)
     else parseTreeExpr fuel (commaBP + 1) obey c
 
+/-- Only bare, distinct names are supported; options and indexed names are explicit extensions. -/
+def parseRing : Nat → Nat → Bool → Tree → Nat → Cursor → TreeResult
+  | 0, _, _, _, _, _ => .error "parser ran out of fuel"
+  | fuel + 1, minBP, obey, base, left, c => do
+    let c := c.skipNewlines
+    match c.tokens with
+    | .sym .rbracket :: rest =>
+      return ← parseTreeLoop fuel minBP obey
+        (.polyRing left c.index [] base (.missing left)) ⟨rest,c.index+1⟩
+    | _ => pure ()
+    let (vars, tail) ← parseTreeExpr fuel 0 false c
+    let some names := vars.parameterNames
+      | .error "polynomial-ring brackets currently require bare variable names"
+    if names.eraseDups.length != names.length then
+      .error "duplicate polynomial names require the indexed-variable extension"
+    else
+      let tail := tail.skipNewlines
+      match tail.tokens with
+      | .sym .rbracket :: rest => parseTreeLoop fuel minBP obey
+          (.polyRing left tail.index names base vars) ⟨rest,tail.index+1⟩
+      | _ => .error "expected ']' after polynomial variable names"
+
 def parseTreeLoop : Nat → Nat → Bool → Tree → Cursor → TreeResult
   | 0, _, _, _, _ => .error "parser ran out of fuel"
   | fuel + 1, minBP, obey, lhs, c =>
     let c := if obey then c else c.skipNewlines
-    if startsArgument c.tokens && minBP ≤ applicationBP then do
+    if c.tokens.head? = some (.sym .lbracket) && minBP ≤ ringBP then
+      parseRing fuel minBP obey lhs c.index ⟨c.tokens.tail,c.index+1⟩
+    else if startsArgument c.tokens && minBP ≤ applicationBP then do
       let (rhs, tail) ← parseTreeExpr fuel applicationBP obey c
       parseTreeLoop fuel minBP obey (.apply lhs rhs) tail
     else

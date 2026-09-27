@@ -1,13 +1,8 @@
 import Macaulean.Interpreter.Syntax
 import Macaulean.Interpreter.Value
+import Macaulean.Interpreter.PolynomialOps
 
-/-!
-# Shared value operations and loop-free reference semantics
-
-`evalTerm` is the original structurally recursive reference evaluator. The source
-and worksheet entry points use `Runtime.evaluate`, which adds lexical resolution,
-closures, return, and explicit recursion fuel. Both use the value operations here.
--/
+/-! # Shared value operations and loop-free reference semantics -/
 namespace Macaulean.M2
 abbrev Env := List (String × Value)
 namespace Value
@@ -20,6 +15,8 @@ def equalValue : Value → Value → Except Error Bool
   | .bool a, .bool b => .ok (a == b)
   | .null, .null => .ok true
   | .symbol a i, .symbol b j => .ok (a == b && i == j)
+  | .algebra a, b => Polynomials.equal (.algebra a) b
+  | a, .algebra b => Polynomials.equal a (.algebra b)
   | a, b => match a.toRat?, b.toRat? with
     | some p, some q => .ok (decide (p = q))
     | _, _ => .error (.noMethod "==" [a.className, b.className])
@@ -65,7 +62,8 @@ def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   | .index, .list xs, zz i | .index, .sequence xs, zz i => indexValue xs i
   | .hasIndex, .list xs, zz i | .hasIndex, .sequence xs, zz i =>
     .ok (.bool (normalizedIndex xs.length i).isSome)
-  | .hasIndex, .list _, _ | .hasIndex, .sequence _, _ | .hasIndex, .null, _ => .ok (.bool false)
+  | .hasIndex, .list xs, _ | .hasIndex, .sequence xs, _ => .ok (.bool false)
+  | .hasIndex, .null, _ => .ok (.bool false)
   | .concat, .list xs, .list ys => .ok (.list (xs ++ ys))
   | .concat, .sequence xs, .sequence ys => .ok (.sequence (xs ++ ys))
   | .eq, .list xs, .list ys => .bool <$> Value.equalValue (.list xs) (.list ys)
@@ -78,6 +76,8 @@ def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   | .ne, .bool x, .bool y => .ok (.bool (x != y))
   | .eq, .null, .null => .ok (.bool true)
   | .ne, .null, .null => .ok (.bool false)
+  | op, .algebra a, b => Polynomials.evalBinary op (.algebra a) b
+  | op, a, .algebra b => Polynomials.evalBinary op a (.algebra b)
   | _, _, _ => match op, a.toRat?, b.toRat? with
     | .add, some p, some q => .ok (qq (p + q))
     | .sub, some p, some q => .ok (qq (p - q))
@@ -96,12 +96,14 @@ def evalUnOp : UnOp → Value → Except Error Value
   | .pos, zz n => .ok (zz n) | .pos, qq q => .ok (qq q)
   | .notOp, .bool b => .ok (.bool (!b))
   | .length, .list xs | .length, .sequence xs => .ok (.zz xs.length)
+  | op, .algebra a => Polynomials.evalUnary op (.algebra a)
   | op, v => .error (.noMethod op.symbol [v.className])
 def evalLogicOp (op : LogicOp) (a b : Value) : Except Error Value :=
   match a, b with
   | .bool x, .bool y => .ok (.bool (match op with | .andOp => x && y | .orOp => x || y))
   | _, _ => .error (.noMethod op.symbol [a.className, b.className])
-def prelude : Env := [("true", .bool true), ("false", .bool false), ("null", .null)]
+def prelude : Env :=
+  [("true", .bool true), ("false", .bool false), ("null", .null)] ++ Polynomials.builtinEnv
 def protectedNames : List String := prelude.map (·.1)
 
 mutual
@@ -153,7 +155,7 @@ def evalTerm : Term → Env → Except Error (Value × Env)
     let (values, env) ← evalTerms elements env
     return (.sequence values, env)
   | .lambda .., _ | .apply .., _ | .localAssign .., _ | .assignMany .., _
-  | .localSymbol .., _ | .returnTerm .., _ => .error .needsRuntime
+  | .localSymbol .., _ | .returnTerm .., _ | .polyRing .., _ => .error .needsRuntime
 
 def evalTerms : List Term → Env → Except Error (List Value × Env)
   | [], env => .ok ([], env)
