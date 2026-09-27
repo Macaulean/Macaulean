@@ -5,7 +5,6 @@ namespace Macaulean.M2.PolynomialSmoke
 open Lean Elab Command
 set_option maxRecDepth 20000
 set_option maxHeartbeats 5000000
-set_option pp.proofs false
 
 private def r : Algebra.Ring := ⟨0,["x"],[none]⟩
 private def x := Algebra.Poly.indeterminate r 0
@@ -21,21 +20,27 @@ example : decide (x = x) = true := by decide +kernel
 example : decide (x = one) = false := by decide +kernel
 example : (x.mul x).map (fun p => p.data.terms.map (fun t => t.monomial.powers)) =
     some [[2]] := by decide +kernel
-
--- Temporary, small backend diagnostics (no whole-runtime expansion).
-#reduce (Macaulean.Polynomial.sortTerms (x.data.terms ++ one.data.terms)).length
-#reduce (Macaulean.Polynomial.coalesceTerms (x.data.terms ++ one.data.terms)).length
-#reduce (Macaulean.Polynomial.mergeTerms x.data.terms one.data.terms).length
-#reduce (Macaulean.Polynomial.mergeTerms_old x.data.terms one.data.terms).length
-#reduce (x.data.terms[0]!.monomial.mul x.data.terms[0]!.monomial).powers
-#print axioms Macaulean.Polynomial.mergeTerms
-#print axioms Macaulean.Polynomial.mulTerms
+example : (x.pow 3).termData = [(1,[3])] := by decide +kernel
 
 run_cmd do
-  for source in #["0_R", "1_R", "(0_R)", "2*x", "QQ[]"] do
+  for source in #["0_R", "1_R", "(0_R)", "denominator := 0", "denomGuard = 0"] do
+    match Macaulean.M2.Input.parse source with
+    | .ok p => logInfo m!"INPUT_TREE {source}: {repr p.tree.toTerm}"
+    | .error error => logInfo m!"INPUT_ERROR {source}: {error}"
     match Lean.Parser.runParserCategory (← getEnv) `m2 source with
-    | .ok _ => logInfo m!"M2_CATEGORY_ACCEPTED {source}"
-    | .error err => logInfo m!"M2_CATEGORY_ERROR {source}: {err}"
+    | .ok _ => logInfo m!"CATEGORY_OK {source}"
+    | .error error => logInfo m!"CATEGORY_ERROR {source}: {error}"
+
+run_cmd do
+  for source in #[
+    "(rr:=QQ[pgx];old:=pgx;ss:=QQ[old];{ring old==rr,ring pgx==ss,ring old==ss,ring pgx==rr})",
+    "(rr:=QQ[pgx];old:=pgx;ss:=QQ[old];{numgens ss,exponents old,exponents pgx})",
+    "(rr:=QQ[pgx];listForm leadMonomial (0_rr))"
+  ] do
+    match ← queryM2 source with
+    | .error error => logInfo m!"NATIVE_BOUNDARY {repr source}: transport error {error}"
+    | .ok .error => logInfo m!"NATIVE_BOUNDARY {repr source}: native error"
+    | .ok (.ok v) => logInfo m!"NATIVE_BOUNDARY {repr source}: {v.toM2String} : {v.className}"
 
 run_cmd do
   for source in #[
