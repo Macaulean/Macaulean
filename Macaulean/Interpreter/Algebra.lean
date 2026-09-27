@@ -186,9 +186,7 @@ def primitive (op : Primitive) (arg : Value) : Except Error Value := do
   | .numgens,.ideal i => return .zz i.generators.length
   | .numgens,.basis b => return .zz b.generators.length
   | .leadCoefficient,.polynomial p => return .qq p.leadingCoefficient
-  | .leadMonomial,.polynomial p =>
-    if p.isZero then .error (.algebra "zero polynomial has no leading monomial")
-    else return .polynomial p.leadingMonomial
+  | .leadMonomial,.polynomial p => return .polynomial p.leadingMonomial
   | .leadTerm,.polynomial p => return .polynomial p.leadingTerm
   | .exponents,.polynomial p =>
     return .list (p.data.terms.map fun t => .list (t.monomial.powers.map fun (n : Nat) => .zz (Int.ofNat n)))
