@@ -30,7 +30,7 @@ theorem library_call (fuel : Nat) (name : String) (params : Parameters)
       let (frame,next) := s.allocate (values ++ List.replicate (slots-values.length) .null)
       Runtime.catchReturn (Runtime.eval fuel body [frame] next) := by
   simp [Runtime.call, h, ha, Runtime.liftResult, Except.mapError,
-    bind, Except.bind, pure, Except.pure]
+    bind, Except.bind]
 
 /-- A basis remainder dispatches to the M2 library, not `divideByTerm`. -/
 theorem remainder_dispatch (fuel : Nat) (a b : Code) (frames : Runtime.Frames)
@@ -41,7 +41,7 @@ theorem remainder_dispatch (fuel : Nat) (a b : Code) (frames : Runtime.Frames)
     Runtime.eval (fuel+1) (.binop .rem a b) frames s =
       Runtime.call fuel (.algebra (.library "normalForm"))
         (.sequence [v,.algebra (.basis r input gs rows)]) s2 := by
-  simp [Runtime.eval, ha, hb, bind, Except.bind, pure, Except.pure]
+  simp [Runtime.eval, ha, hb, bind, Except.bind]
 
 theorem linearCombination_empty (n : Nat) :
     Polynomials.linearCombination n [] [] = .ok [] := rfl
