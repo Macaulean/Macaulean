@@ -98,19 +98,20 @@ def successes : List (String × Value) :=
   ]
 
 /-- Explicitly named helper APIs, not asserted to be native-library overloads. -/
-def helpers : List (String × Value) := ([
-  ("m2MonomialDivides(x,x^2*y)", .bool true),
-  ("m2MonomialDivides(x^2,x*y)", .bool false),
-  ("m2MonomialDivides(2*x,3*x*y)", .bool true),
-  ("listForm(m2MonomialQuotient(3*x^2*y,2*x))", listFormValue [(mkRat 3 2,[1,1,0])]),
-  ("listForm(m2MonomialLCM(2*x^2,3*x*y))", listFormValue [(1,[2,1,0])]),
-  ("m2MonomialCompare(x,y)", .zz 1),
-  ("m2MonomialCompare(y,x)", .zz (-1)),
-  ("m2MonomialCompare(2*x,3*x)", .zz 0),
-  ("m2MonomialCompare(y^2,x*z)", .zz 1),
-  ("listForm(m2Monomial(R,{2,0,3}))", listFormValue [(1,[2,0,3])]),
-  ("listForm(m2Monomial(R,{0,0,0}))", listFormValue [(1,[0,0,0])])]
-  .map fun (s,v) => (inXYZ s,v))
+def helpers : List (String × Value) :=
+  List.map (fun (s,v) => (inXYZ s,v)) [
+    ("m2MonomialDivides(x,x^2*y)", .bool true),
+    ("m2MonomialDivides(x^2,x*y)", .bool false),
+    ("m2MonomialDivides(2*x,3*x*y)", .bool true),
+    ("listForm(m2MonomialQuotient(3*x^2*y,2*x))", listFormValue [(mkRat 3 2,[1,1,0])]),
+    ("listForm(m2MonomialLCM(2*x^2,3*x*y))", listFormValue [(1,[2,1,0])]),
+    ("m2MonomialCompare(x,y)", .zz 1),
+    ("m2MonomialCompare(y,x)", .zz (-1)),
+    ("m2MonomialCompare(2*x,3*x)", .zz 0),
+    ("m2MonomialCompare(y^2,x*z)", .zz 1),
+    ("listForm(m2Monomial(R,{2,0,3}))", listFormValue [(1,[2,0,3])]),
+    ("listForm(m2Monomial(R,{0,0,0}))", listFormValue [(1,[0,0,0])])
+  ]
 
 def errors : List (String × Error) := [
   (inXYZ "x/0", .divByZero),
