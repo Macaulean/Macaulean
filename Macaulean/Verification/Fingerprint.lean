@@ -3,10 +3,9 @@ import Lean
 /-!
 # Approval fingerprints
 
-SHA-256 labels a canonical length-framed payload. It is an integrity fingerprint,
-not a signature or human authentication. Live approvals also retain their exact
-payload and compare it on every use. Replayed source attestations rely on SHA-256
-collision resistance; test vectors check the implementation, not that assumption.
+SHA-256 labels canonical length-framed data. It is an integrity fingerprint, not
+a signature or human authentication. Live records retain exact payloads. Source
+attestations and declaration manifests rely on SHA-256 collision resistance.
 -/
 namespace Macaulean.M2.Verification.Fingerprint
 
@@ -31,10 +30,10 @@ private def small1 (x : UInt32) := rotate x 17 ^^^ rotate x 19 ^^^ (x >>> 10)
 private def big0 (x : UInt32) := rotate x 2 ^^^ rotate x 13 ^^^ rotate x 22
 private def big1 (x : UInt32) := rotate x 6 ^^^ rotate x 11 ^^^ rotate x 25
 
-private def compress (state : Array UInt32) (bytes : Array UInt8) : Array UInt32 := Id.run do
+private def compress (state : Array UInt32) (bytes : Array UInt8) (offset : Nat) : Array UInt32 := Id.run do
   let mut words : Array UInt32 := #[]
   for i in [0:16] do
-    let j := 4*i
+    let j := offset+4*i
     let w := bytes[j]!.toUInt32 <<< 24 ||| bytes[j+1]!.toUInt32 <<< 16 |||
       bytes[j+2]!.toUInt32 <<< 8 ||| bytes[j+3]!.toUInt32
     words := words.push w
@@ -64,20 +63,21 @@ private def compress (state : Array UInt32) (bytes : Array UInt8) : Array UInt32
   return #[state[0]!+a,state[1]!+b,state[2]!+c,state[3]!+d,
     state[4]!+e,state[5]!+f,state[6]!+g,state[7]!+h]
 
-private def blocks : Nat → List UInt8 → Array UInt32 → Array UInt32
-  | 0, _, state => state
-  | fuel+1, bytes, state => blocks fuel (bytes.drop 64) (compress state (bytes.take 64).toArray)
 private def hexDigit (n : Nat) : Char :=
   Char.ofNat (if n < 10 then '0'.toNat+n else 'a'.toNat+(n-10))
 private def wordHex (w : UInt32) : String :=
   String.ofList ((List.range 8).map fun i => hexDigit ((w.toNat >>> (4*(7-i))) % 16))
 
-def sha256 (source : String) : String :=
-  let bytes := source.toUTF8.data.toList
-  let bits := bytes.length*8
-  let padding := (64 - ((bytes.length+9)%64))%64
-  let lengthBytes := (List.range 8).map fun i => UInt8.ofNat ((bits >>> (8*(7-i)))%256)
-  let padded := bytes ++ [128] ++ List.replicate padding 0 ++ lengthBytes
-  String.join ((blocks (padded.length/64) padded initial).toList.map wordHex)
+/-- Iterate directly over padded bytes; no recursive copying of the message. -/
+def sha256 (source : String) : String := Id.run do
+  let mut bytes := source.toUTF8.data
+  let bits := bytes.size*8
+  let padding := (64 - ((bytes.size+9)%64))%64
+  bytes := bytes.push 128
+  for _ in [0:padding] do bytes := bytes.push 0
+  for i in [0:8] do bytes := bytes.push (UInt8.ofNat ((bits >>> (8*(7-i)))%256))
+  let mut state := initial
+  for block in [0:bytes.size/64] do state := compress state bytes (64*block)
+  return String.join (state.toList.map wordHex)
 
 end Macaulean.M2.Verification.Fingerprint
