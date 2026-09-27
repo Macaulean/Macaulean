@@ -10,7 +10,6 @@ import MacauleanTest.InterpreterDSL
 import MacauleanTest.InterpreterDSLImport
 import MacauleanTest.InterpreterDSLPrinter
 import MacauleanTest.InterpreterBranching
-import MacauleanTest.InterpreterBranchingDSL
 import MacauleanTest.InterpreterBranchingImport
 import MacauleanTest.InterpreterBranchingM2
 import MacauleanTest.InterpreterCollections
@@ -34,3 +33,4 @@ import MacauleanTest.InterpreterGroebnerM2
 import MacauleanTest.InterpreterGroebner
 import MacauleanTest.InterpreterGroebnerDSL
 import MacauleanTest.InterpreterGroebnerImport
+import MacauleanTest.VerificationViews
