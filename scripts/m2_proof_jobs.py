@@ -155,7 +155,7 @@ class Limits:
     seconds: int = 120
     memory_bytes: int = 4 * 1024**3
     disk_bytes: int = 64 * 1024**2
-    processes: int = 512
+    processes: int = 64
 
     def __post_init__(self) -> None:
         if self.seconds < 1 or self.memory_bytes < 64 * 1024**2 or self.disk_bytes < MAX_PACKET:
@@ -275,6 +275,7 @@ class Sandbox:
             "--chdir", "/work", "--setenv", "HOME", "/work",
             "--setenv", "PATH", "/toolchain/bin:/usr/bin:/bin",
             "--setenv", "LEAN_PATH", "/project/.lake/build/lib/lean",
+            "--setenv", "LEAN_NUM_THREADS", "1",
             "--setenv", "LANG", "C.UTF-8", "--",
             "/bin/sh", "-c",
             "set -eu\n/toolchain/bin/lean --root=/input "
