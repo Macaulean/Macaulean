@@ -39,3 +39,4 @@ import MacauleanTest.VerificationIntent
 import MacauleanTest.VerificationDSL
 import MacauleanTest.VerificationImport
 import MacauleanTest.VerificationWidget
+import MacauleanTest.VerificationGraph
