@@ -55,6 +55,29 @@ missing output must leave the smoke test red. Do not disable AppArmor globally,
 add `--share-net`, run the candidate as root, or remove sandbox requirements to
 obtain a green result.
 
+## Lean thread stacks and virtual memory
+
+The pinned Lean 4.33.1 runtime normally reserves 1 GiB per runtime thread. The
+worker explicitly sets `LEAN_STACK_SIZE_KB=65536`, `LEAN_NUM_THREADS=1`, and the
+shell options `-j1 -s65536`. The shell's own thread setting matters; changing
+only the environment variable did not fix the original startup failure.
+
+The default `RLIMIT_AS` budget is **16 GiB of virtual address space per process**.
+That includes file-backed `.olean` and `.ir` mappings, not just resident heap
+memory. The former 4 GiB cap prevented the complete Lean environment from
+loading; Lean reported a failed `.ir` read after exhausting mapping/allocation
+space. This is not a claim that a proof needs 16 GiB of physical RAM.
+
+The runner accepts `--memory-mib` to set another finite virtual-space budget.
+A too-small budget is a failed attempt, never accepted evidence. CPU, wall-time,
+file-size and process limits remain enabled. These are per-process resource
+limits, not an aggregate cgroup quota for a shared host; use a dedicated worker
+or VM for untrusted candidates.
+
+Worker failures identify the retained stderr path. The smoke script also prints
+bounded tails of all worker diagnostics on failure; complete stdout, stderr,
+exit status and timeout status remain in `ci-evidence/`.
+
 ## macOS and containers
 
 The editor/source review can be used in the normal Lean environment, but this
