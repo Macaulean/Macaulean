@@ -69,8 +69,13 @@ def main() -> int:
         assert (result / 'receipt.json').is_file() and (result / 'proof.json').is_file()
         (EVIDENCE / f'stage2-{label}-result.json').write_text(json.dumps({'directory': str(result)}))
     print('STAGE2_NATIVE_POSITIVE_COMPLETE: two real candidates, separate synthesis and kernel acceptance', flush=True)
+    # The term parser refuses the appended command before elaborating either
+    # the proof or the axiom. Require that precise boundary, not any error.
+    injection = read_regular(ROOT / 'tests/proof-candidates/injection.proof').decode('utf-8')
+    assert injection.splitlines() == ['by', '  trivial', 'axiom injected : False']
     controls = [('hole', 'validation', 'unapproved axiom: sorryAx'),
-                ('injection', 'synthesis', 'axiom'), ('wrong', 'synthesis', 'type mismatch')]
+                ('injection', 'synthesis', '<input>:3:0: expected end of input'),
+                ('wrong', 'synthesis', 'type mismatch')]
     for name, stage, marker in controls:
         out = outputs / name
         try:
@@ -86,6 +91,9 @@ def main() -> int:
             status = json.loads((stderr.parent / 'process.json').read_text())
             assert status['exit'] != 0 and not status['timedOut'], (name, status)
             assert not (out / 'checked').exists(), f'{name}: failed proof was published'
+            if stage == 'synthesis':
+                assert not (attempts[0] / 'validation').exists(), f'{name}: rejected source reached validator'
+                assert not (attempts[0] / 'proof.json').exists(), f'{name}: rejected source emitted a proof'
         else:
             raise AssertionError(f'unacceptable proof passed: {name}')
     print('STAGE2_NATIVE_NEGATIVE_COMPLETE: holes, command injection and wrong proposition', flush=True)
