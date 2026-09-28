@@ -153,7 +153,9 @@ def write_once(path: Path, data: bytes) -> None:
 @dataclass(frozen=True)
 class Limits:
     seconds: int = 120
-    memory_bytes: int = 4 * 1024**3
+    # RLIMIT_AS counts file-backed .olean/.ir mappings, not just resident RAM.
+    # The pinned Lean import graph exceeds the former 4 GiB virtual-space cap.
+    memory_bytes: int = 16 * 1024**3
     disk_bytes: int = 64 * 1024**2
     processes: int = 4096
 
@@ -245,7 +247,8 @@ class RunResult:
 
     def checked_output(self) -> bytes:
         if self.timed_out or self.code != 0:
-            raise JobError(f"Lean process did not complete successfully: exit={self.code}, timeout={self.timed_out}")
+            raise JobError(f"Lean process did not complete successfully: exit={self.code}, "
+                           f"timeout={self.timed_out}; diagnostics: {self.stderr}")
         return read_regular(self.stdout)
 
 def uid_task_count() -> int:
@@ -288,7 +291,7 @@ class Sandbox:
             cmd += ["--ro-bind", "/etc/ld.so.cache", "/etc/ld.so.cache"]
         # Lean's 64-bit runtime defaults to a 1 GiB reservation per thread.
         # Bound both its early stack setup and the shell task manager rather
-        # than weakening the address-space cap or relying on CPU-count defaults.
+        # than relying on CPU-count defaults or removing address-space limits.
         cmd += [
             "--proc", "/proc", "--dev", "/dev",
             "--ro-bind", str(context.root), "/project",
@@ -441,19 +444,21 @@ def main() -> int:
     parser.add_argument("--toolchain", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seconds", type=int, default=120)
+    parser.add_argument("--memory-mib", type=int, default=16384,
+                        help="Per-process virtual address-space cap, including mapped Lean modules")
     args = parser.parse_args()
     failures = []
     for candidate in args.candidate:
         try:
             result = run_job(args.manifest, candidate, args.project, args.toolchain,
-                             args.output, Limits(seconds=args.seconds))
+                             args.output, Limits(seconds=args.seconds, memory_bytes=args.memory_mib * 1024**2))
             print(json.dumps({"status": "checked-for-frozen-job", "directory": str(result),
                               "editorReplayRequired": True}))
             return 0
         except StaleJob as exc:
             print(f"STALE: {exc}", file=sys.stderr)
             return 2
-        except (JobError, OSError, UnicodeError) as exc:
+        except (JobError, OSError, UnicodeError, ValueError) as exc:
             failures.append({"candidate": str(candidate), "error": str(exc)})
             print(json.dumps(failures[-1]), file=sys.stderr)
     print(json.dumps({"status": "no-accepted-proof", "attempts": failures}), file=sys.stderr)
