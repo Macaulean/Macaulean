@@ -33,7 +33,7 @@ class WorkerStartupTests(unittest.TestCase):
 
     def test_memory_and_cpu_limits_are_not_removed(self):
         limits = Limits()
-        self.assertEqual(limits.memory_bytes, 4 * 1024**3)
+        self.assertEqual(limits.memory_bytes, 16 * 1024**3)
         with patch("m2_proof_jobs.resource.setrlimit") as set_limit:
             limits.install()
         import resource
@@ -42,6 +42,15 @@ class WorkerStartupTests(unittest.TestCase):
         self.assertEqual(calls[resource.RLIMIT_CPU], (limits.seconds, limits.seconds))
         self.assertEqual(calls[resource.RLIMIT_FSIZE], (limits.disk_bytes, limits.disk_bytes))
         self.assertEqual(calls[resource.RLIMIT_NPROC], (limits.processes, limits.processes))
+
+    def test_explicit_smaller_budget_is_honored(self):
+        import resource
+        limit = 2 * 1024**3
+        with patch("m2_proof_jobs.resource.setrlimit") as set_limit:
+            Limits(memory_bytes=limit).install()
+        set_limit.assert_any_call(resource.RLIMIT_AS, (limit, limit))
+        with self.assertRaises(ValueError):
+            Limits(memory_bytes=-1)
 
     def test_network_and_environment_isolation_survive_startup_fix(self):
         cmd = self.command()
