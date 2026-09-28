@@ -286,6 +286,9 @@ class Sandbox:
         cmd += ["--dir", "/etc"]
         if Path("/etc/ld.so.cache").is_file():
             cmd += ["--ro-bind", "/etc/ld.so.cache", "/etc/ld.so.cache"]
+        # Lean's 64-bit runtime defaults to a 1 GiB reservation per thread.
+        # Bound both its early stack setup and the shell task manager rather
+        # than weakening the address-space cap or relying on CPU-count defaults.
         cmd += [
             "--proc", "/proc", "--dev", "/dev",
             "--ro-bind", str(context.root), "/project",
@@ -296,10 +299,11 @@ class Sandbox:
             "--chdir", "/work", "--setenv", "HOME", "/work",
             "--setenv", "PATH", "/toolchain/bin:/usr/bin:/bin",
             "--setenv", "LEAN_PATH", "/project/.lake/build/lib/lean",
-            "--setenv", "LEAN_NUM_THREADS", "0",
+            "--setenv", "LEAN_NUM_THREADS", "1",
+            "--setenv", "LEAN_STACK_SIZE_KB", "65536",
             "--setenv", "LANG", "C.UTF-8", "--",
             "/bin/sh", "-c",
-            "set -eu\nprintf 'LEAN_NUM_THREADS=%s\\n' \"$LEAN_NUM_THREADS\" >&2\nulimit -a >&2\n/toolchain/bin/lean --version >&2\n/toolchain/bin/lean --root=/input "
+            "set -eu\n/toolchain/bin/lean -j1 -s65536 --root=/input "
             "--load-dynlib=/project/.lake/build/lib/libMacaulean_MRDI.so "
             "--load-dynlib=/project/.lake/build/lib/libMacaulean_Macaulean.so "
             "-DmaxRecDepth=32768 -DmaxHeartbeats=20000000 /input/Run.lean >&2\n"
