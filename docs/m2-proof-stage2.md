@@ -63,6 +63,9 @@ The [polynomial arithmetic milestone](m2-arithmetic-semantics.md) supplies gener
 denotation laws for the production arithmetic and its lexical-runtime use,
 including the arithmetic balances in the two reduction branches. These are
 building blocks for the remaining correspondence proof, not its completion.
+The [coefficientwise follow-up](m2-coefficient-contracts.md) also proves these
+arithmetic laws in the existing Stage 1 coefficient views and connects them to
+actual operator and runtime execution.
 
 The actual `m2gbReduce` representation and irreducibility statements are explicit
 unproved proposition definitions in `ProofJobs.RuntimeReduction`. Abstract
