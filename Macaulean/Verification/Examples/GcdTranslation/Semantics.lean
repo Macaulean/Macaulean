@@ -238,7 +238,7 @@ structure Proofs : Prop where
   writePreserves : WritePreserves
   absBridge : AbsBridge
   scalarOperations : ScalarOperations
-  initialize : LeafPreserves initializeTerm expectedInitialize
+  initialization : LeafPreserves initializeTerm expectedInitialize
   condition : LeafPreserves conditionTerm expectedCondition
   iteration : LeafPreserves iterationTerm expectedIteration
   result : LeafPreserves resultTerm expectedResult
