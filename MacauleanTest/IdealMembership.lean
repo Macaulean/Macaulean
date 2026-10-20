@@ -51,6 +51,17 @@ info: -Macaulean.Polynomial.ofVar (Fin.ofNat 2 0) + Macaulean.Polynomial.ofVar (
       let poly ← toPolynomialExpr? vars ringType expr
       ppExpr poly
 
+-- unsupported terms containing variables give an error rather than a kernel error
+/-- error: m2idealmem: unsupported term x⁻¹ -/
+#guard_msgs in
+#eval do
+  let ringType := mkConst ``Rat
+  withLocalDecl `x .default ringType fun x => do
+    let expr ← mkAppM ``Inv.inv #[x]
+    let vars : FVarIdMap Nat := (∅ : FVarIdMap Nat).insert x.fvarId! 0
+    let poly ← toPolynomialExpr? vars ringType expr
+    ppExpr poly
+
 --this theorem really should be proven elsewhere
 private theorem RArray_get_ofArray (h : i < arr.size) : (RArray.ofArray arr len_hyp).get i = arr[i] := by
   have irw : i = ↑(Fin.mk i h) := by simp
