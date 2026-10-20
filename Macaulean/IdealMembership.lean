@@ -163,6 +163,8 @@ partial def toPolynomialExpr?
     mkMul (← toPolynomialExpr? variables ring a) (← toPolynomialExpr? variables ring b)
   | HPow.hPow _ _ _ _ a b =>
     mkAppM ``HPow.hPow #[(← toPolynomialExpr? variables ring a), b]
+  | Neg.neg _ _ a =>
+    mkAppM ``Neg.neg #[← toPolynomialExpr? variables ring a]
   | _ =>
     match x with
     | .fvar varId =>
