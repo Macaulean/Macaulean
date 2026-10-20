@@ -29,6 +29,11 @@ def update (store : Store) (name : String) (value : Value) : Store :=
 
 def absInt (n : Int) : Int := if n < 0 then -n else n
 
+/-- Needed for reflection: the production runtime also accepts some rational
+operations which are intentionally outside this exact-integer source relation. -/
+def IntegerInputs (s : Store) : Prop :=
+  ∃ a b : Int, s "a" = .zz a ∧ s "b" = .zz b
+
 @[simp] theorem update_same (s : Store) (x : String) (v : Value) :
     update s x v x = v := by simp [update]
 @[simp] theorem update_other (s : Store) (x y : String) (v : Value) (h : y ≠ x) :
@@ -179,9 +184,9 @@ def ScalarOperations : Prop :=
     evalBinOp .ne (.zz a) (.zz b) = .ok (.bool (decide (a ≠ b))) ∧
     evalBinOp .lt (.zz a) (.zz b) = .ok (.bool (decide (a < b)))
 
-/-- GCD-06a. Generic loop/sequence lifting for any related plan pair.
-A future proof uses induction on Source.Exec, with the recursive while execution
-as its own smaller derivation, and increasing bounds for the target driver. -/
+/-- GCD-06a. Generic loop/sequence lifting for a plan pair whose leaf contracts
+are discharged. The property is defined for any pair, not asserted for every
+pair. Prove the while case by induction on the recursive execution derivation. -/
 def PlanPreserves (plan : Plan) (code : CodePlan) : Prop :=
   ∀ source source' value frames before,
     Related source frames before → AbsInstalled before →
@@ -194,10 +199,12 @@ def PlanPreserves (plan : Plan) (code : CodePlan) : Prop :=
           Related source' frames after ∧ AbsInstalled after ∧
           OutsideUnchanged frames before after
 
-/-- GCD-06b. Successful machine runs must have a source derivation as well.
-This is stronger than testing one run and separate from existence of enough fuel. -/
+/-- GCD-06b. Successful machine runs on integer inputs must have a source
+derivation. The IntegerInputs premise is essential: the production runtime has
+additional rational cases not present in this deliberately restricted semantics. -/
 def PlanReflects (plan : Plan) (code : CodePlan) : Prop :=
   ∀ source frames before controlDepth runtimeDepth value after,
+    Source.IntegerInputs source →
     Related source frames before → AbsInstalled before →
     executePlan controlDepth runtimeDepth code frames before = .ok (value, after) →
     ∃ source', Source.Exec plan source source' value ∧
