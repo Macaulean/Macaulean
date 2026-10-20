@@ -12,8 +12,9 @@ around existing `Lexical.Code`. Remove these adapters when GCD-01 adds while to
 the production pipeline. All leaf compilation and execution use the real
 `Lexical.resolve` and `Runtime.eval`.
 
-The literal source file is not parsed successfully by the baseline: while/do
-are missing. `lowerPlan bodyPlan` is consequently NOT yet a translation of the
+The baseline treats while/do as ordinary identifiers and has no while Term.
+A successful parse of the literal file is therefore NOT evidence that the
+intended loop was parsed. `lowerPlan bodyPlan` is NOT yet a translation of the
 whole source file. GCD-01/GCD-03/GCD-09 record the missing source/DSL connections.
 No claim in this module uses the native D interpreter as its specification.
 -/
@@ -105,7 +106,7 @@ Exhaustion remains the baseline `.fuelExhausted` error. A future resumable budge
 interface is a separate design choice, not silently imposed on this baseline. -/
 def executePlan : Nat → Nat → CodePlan → Runtime.Frames → Runtime.State → Runtime.Result Value
   | 0, _, _, _, _ => .error (.error .fuelExhausted)
-  | fuel + 1, depth, .leaf code, frames, state =>
+  | _ + 1, depth, .leaf code, frames, state =>
     Runtime.eval depth code frames state
   | fuel + 1, depth, .seq first second, frames, state => do
     let (_, state) ← executePlan fuel depth first frames state
