@@ -9,6 +9,11 @@ path = "Macaulean/Interpreter/Buchberger.m2"
 text = true
 
 [[input_file]]
+name = "gcdSource"
+path = "Macaulean/Interpreter/GCD.m2"
+text = true
+
+[[input_file]]
 name = "intentWidgetTest"
 path = "scripts/intent-widget.test.mjs"
 text = true
@@ -16,7 +21,7 @@ text = true
 [[lean_lib]]
 name = "Macaulean"
 roots = ["Macaulean", "Macaulean.Verification"]
-needs = ["buchbergerSource"]
+needs = ["buchbergerSource", "gcdSource"]
 precompileModules = true
 
 [[lean_lib]]

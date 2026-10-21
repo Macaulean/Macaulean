@@ -144,7 +144,7 @@ def finish (r : Result Value) : Except Error (Value × State) :=
   | .ok result => .ok result
   | .error (.returned value state) => .ok (value, state)
   | .error (.error error) => .error error
-def catchReturn (r : Result Value) : Result Value :=
+def catchReturn (r : Result Value) : Except Signal (Value × State) :=
   match r with
   | .error (.returned v s) => .ok (v, s)
   | other => other
@@ -152,23 +152,27 @@ def catchReturn (r : Result Value) : Result Value :=
 def callable : Value → Bool
   | .closure _ | .algebra (.builtin _) | .algebra (.library _) => true | _ => false
 
+abbrev CallHandler := Value → Value → State → Option (Result Value)
+
 mutual
-def eval : Nat → Code → Frames → State → Except Signal (Value × State)
-  | 0, _, _, _ => .error (.error .fuelExhausted)
-  | fuel + 1, code, frames, s => do
+def eval (depth : Nat) (code : Code) (frames : Frames) (s : State)
+    (handler : CallHandler := fun _ _ _ => none) : Except Signal (Value × State) :=
+  match depth with
+  | 0 => .error (.error .fuelExhausted)
+  | fuel + 1 => do
     match code with
     | .int n => return (.zz n, s)
     | .empty => return (.null, s)
     | .read ref => return (← liftResult (readRef ref frames s), s)
     | .unop op a =>
-      let (v, s) ← eval fuel a frames s
+      let (v, s) ← eval fuel a frames s handler
       match op, v with
       | .notOp, .closure _ | .notOp, .algebra (.builtin _) | .notOp, .algebra (.library _) =>
         return s.function (.negated v)
       | _, _ => return (← liftResult (evalUnOp op v), s)
     | .binop op a b =>
-      let (va, s) ← eval fuel a frames s
-      let (vb, s) ← eval fuel b frames s
+      let (va, s) ← eval fuel a frames s handler
+      let (vb, s) ← eval fuel b frames s handler
       match op, va, vb with
       | .compose, .closure _, .closure _ => return s.function (.composition va vb)
       | .compose, .algebra (.builtin _), _ | .compose, .algebra (.library _), _ =>
@@ -177,57 +181,57 @@ def eval : Nat → Code → Frames → State → Except Signal (Value × State)
       | .compose, .closure _, .algebra (.builtin _)
       | .compose, .closure _, .algebra (.library _) => return s.function (.composition va vb)
       | .rem, _, .algebra (.basis ..) =>
-        call fuel (.algebra (.library "normalForm")) (.sequence [va,vb]) s
+        call fuel (.algebra (.library "normalForm")) (.sequence [va,vb]) s handler
       | _, _, _ => return (← liftResult (evalBinOp op va vb), s)
     | .logic op a b =>
-      let (va, s) ← eval fuel a frames s
+      let (va, s) ← eval fuel a frames s handler
       if va = .bool op.shortCircuit then return (va, s)
-      let (vb, s) ← eval fuel b frames s
+      let (vb, s) ← eval fuel b frames s handler
       if callable va && callable vb then return s.function (.predicate op va vb)
       else return (← liftResult (evalLogicOp op va vb), s)
     | .ifThen c yes =>
-      let (v, s) ← eval fuel c frames s
+      let (v, s) ← eval fuel c frames s handler
       match v with
-      | .bool true => eval fuel yes frames s
+      | .bool true => eval fuel yes frames s handler
       | .bool false => return (.null, s)
       | _ => .error (.error (.conditionNotBoolean v.className))
     | .ifElse c yes no =>
-      let (v, s) ← eval fuel c frames s
+      let (v, s) ← eval fuel c frames s handler
       match v with
-      | .bool true => eval fuel yes frames s
-      | .bool false => eval fuel no frames s
+      | .bool true => eval fuel yes frames s handler
+      | .bool false => eval fuel no frames s handler
       | _ => .error (.error (.conditionNotBoolean v.className))
     | .set ref rhs =>
       liftResult (checkWritable ref)
-      let (value, s) ← eval fuel rhs frames s
+      let (value, s) ← eval fuel rhs frames s handler
       return (value, ← liftResult (writeRef ref value frames s))
     | .setMany refs rhs =>
-      let (value, s) ← eval fuel rhs frames s
+      let (value, s) ← eval fuel rhs frames s handler
       let values := value.elements?.getD [value]
       if refs.length != values.length then
         .error (.error (.assignmentArity refs.length values.length))
       else return (value, ← liftResult (writeMany refs values frames s))
     | .indexAssign a i v =>
-      let (a, s) ← eval fuel a frames s
-      let (i, s) ← eval fuel i frames s
-      let (v, _) ← eval fuel v frames s
+      let (a, s) ← eval fuel a frames s handler
+      let (i, s) ← eval fuel i frames s handler
+      let (v, _) ← eval fuel v frames s handler
       match a with
       | .list _ | .sequence _ => .error (.error (.immutableCollection a.className))
       | _ => .error (.error (.noMethod "#=" [a.className, i.className, v.className]))
     | .seq a b =>
-      let (_, s) ← eval fuel a frames s
-      eval fuel b frames s
+      let (_, s) ← eval fuel a frames s handler
+      eval fuel b frames s handler
     | .listLit xs =>
-      let (xs, s) ← evalMany fuel xs frames s
+      let (xs, s) ← evalMany fuel xs frames s handler
       return (.list xs, s)
     | .sequence xs =>
-      let (xs, s) ← evalMany fuel xs frames s
+      let (xs, s) ← evalMany fuel xs frames s handler
       return (.sequence xs, s)
     | .lambda params slots body => return s.function (.closure params slots body frames)
     | .apply f a =>
-      let (f, s) ← eval fuel f frames s
-      let (a, s) ← eval fuel a frames s
-      call fuel f a s
+      let (f, s) ← eval fuel f frames s handler
+      let (a, s) ← eval fuel a frames s handler
+      call fuel f a s handler
     | .symbol name ref =>
       match ref with
       | .slot d i =>
@@ -235,23 +239,28 @@ def eval : Nat → Code → Frames → State → Except Signal (Value × State)
         return (.symbol name cell, s)
       | _ => .error (.error .invalidReference)
     | .returnTerm a =>
-      let (v, s) ← eval fuel a frames s
+      let (v, s) ← eval fuel a frames s handler
       .error (.returned v s)
     | .polyRing base names =>
-      let (base, s) ← eval fuel base frames s
+      let (base, s) ← eval fuel base frames s handler
       liftResult (s.evalPolynomialRing base names frames)
 
-def evalMany : Nat → List Code → Frames → State → Except Signal (List Value × State)
-  | 0, _, _, _ => .error (.error .fuelExhausted)
-  | _ + 1, [], _, s => .ok ([], s)
-  | fuel + 1, x :: xs, frames, s => do
-    let (v, s) ← eval fuel x frames s
-    let (vs, s) ← evalMany fuel xs frames s
+def evalMany (depth : Nat) (codes : List Code) (frames : Frames) (s : State)
+    (handler : CallHandler := fun _ _ _ => none) : Except Signal (List Value × State) :=
+  match depth, codes with
+  | 0, _ => .error (.error .fuelExhausted)
+  | _ + 1, [] => .ok ([], s)
+  | fuel + 1, x :: xs => do
+    let (v, s) ← eval fuel x frames s handler
+    let (vs, s) ← evalMany fuel xs frames s handler
     return (v :: vs, s)
 
-def call : Nat → Value → Value → State → Except Signal (Value × State)
-  | 0, _, _, _ => .error (.error .fuelExhausted)
-  | fuel + 1, fn, arg, s => do
+def call (depth : Nat) (fn arg : Value) (s : State)
+    (handler : CallHandler := fun _ _ _ => none) : Except Signal (Value × State) :=
+  match depth with
+  | 0 => .error (.error .fuelExhausted)
+  | fuel + 1 => do
+    if let some result := handler fn arg s then return ← result
     if let .algebra (.builtin p) := fn then
       return (← liftResult (Polynomials.callPrimitive p arg), s)
     if let .algebra (.library name) := fn then
@@ -259,7 +268,7 @@ def call : Nat → Value → Value → State → Except Signal (Value × State)
         | .error (.error .invalidReference)
       let values ← liftResult (arguments params arg)
       let (frame,s) := s.allocate (values ++ List.replicate (slots - values.length) .null)
-      catchReturn (eval fuel body [frame] s)
+      catchReturn (eval fuel body [frame] s handler)
     else
       let .closure id := fn
         | .error (.error (.noMethod "SPACE" [fn.className, arg.className]))
@@ -268,17 +277,17 @@ def call : Nat → Value → Value → State → Except Signal (Value × State)
       | .closure params slots body captured =>
         let values ← liftResult (arguments params arg)
         let (frame, s) := s.allocate (values ++ List.replicate (slots - values.length) .null)
-        catchReturn (eval fuel body (frame :: captured) s)
+        catchReturn (eval fuel body (frame :: captured) s handler)
       | .composition f g =>
-        let (v, s) ← call fuel g arg s
-        call fuel f v s
+        let (v, s) ← call fuel g arg s handler
+        call fuel f v s handler
       | .predicate op f g =>
-        let (v, s) ← call fuel f arg s
+        let (v, s) ← call fuel f arg s handler
         if v = .bool op.shortCircuit then return (v, s)
-        let (w, s) ← call fuel g arg s
+        let (w, s) ← call fuel g arg s handler
         return (← liftResult (evalLogicOp op v w), s)
       | .negated f =>
-        let (v, s) ← call fuel f arg s
+        let (v, s) ← call fuel f arg s handler
         return (← liftResult (evalUnOp .notOp v), s)
 end
 
@@ -292,10 +301,11 @@ structure InputResult where
   deriving Repr
 
 def evaluate (t : Term) (s : State := {}) (scope : Scope := {})
-    (fileFrame : List Nat := []) (fuel : Nat := defaultFuel) : Except Error InputResult := do
+    (fileFrame : List Nat := []) (fuel : Nat := defaultFuel)
+    (handler : CallHandler := fun _ _ _ => none) : Except Error InputResult := do
   let (code, scope, warnings) := Lexical.prepare t scope
   let (fresh, s) := s.allocate (List.replicate (scope.count - fileFrame.length) .null)
   let frame := fileFrame ++ fresh
-  let (value, s) ← finish (eval fuel code [frame] s)
+  let (value, s) ← finish (eval fuel code [frame] s handler)
   return ⟨value, s, scope, frame, warnings⟩
 end Macaulean.M2.Runtime
