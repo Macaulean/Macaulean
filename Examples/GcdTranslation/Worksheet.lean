@@ -1,44 +1,32 @@
-import Macaulean.Verification
 import Macaulean.Verification.Examples.GcdTranslation.Semantics
 
-/-!
-# Existing DSL surface and the missing whole-loop/export connection
-
-Run with `lake env lean Examples/GcdTranslation/Worksheet.lean`.
-This worksheet deliberately executes only source constructs supported by the
-current fork. The function below exposes ONE iteration for inspection. It is
-not a substitute for the while-containing gcd function in gcd.m2.
-
-TODO(GCD-01): after production while support, interpret the exact gcd.m2 source
-through this same DSL and invoke its gcdEuclid closure.
-TODO(GCD-09): expose versioned source/code/state/run/translation-Prop declarations
-using LibraryCompiler/Verification snapshot machinery; a Prop is not a proof.
+/-! Design-first worksheet. These are honest Lean definitions of the new model's
+artifacts and computations. The legacy `open M2` parser is intentionally not used.
+It still erases operator identity to BinOp and does not implement the proposed
+Word/namespace pipeline. DESIGN-DSL will connect the fork's editor/review adapter
+to the new frontend; DESIGN-PARSE is required first.
 -/
-open M2
+namespace GcdDesignWorksheet
+open Macaulean.Language.Design
 
-gcdExampleAbs = (n) -> if n < 0 then -n else n;
+/-- Immutable source, not a mutable interpreter binding. -/
+def source : String := Gcd.sourceText
+/-- Contains byte-word registry, Symbols, bound syntax and resolved Code. -/
+def artifact := Gcd.build
+/-- A resource-bounded computation on actual designed closures and while nodes. -/
+def run := Gcd.run
+/-- A proposition waiting for a proof, not an automatically admitted theorem. -/
+def translationStatement : Prop := Gcd.TODO.Translation
 
-gcdExampleStep = (a, b) -> (
-    r := a % b;
-    a = b;
-    b = r;
-    (a, b)
-);
+def terminationStatement : Prop := Gcd.TODO.Terminates
 
-gcdExampleAbs(-1071)
-gcdExampleStep(1071, 462)
-gcdExampleStep(462, 147)
-gcdExampleStep(147, 21)
+#eval Gcd.answer 256 1071 462
+#eval Gcd.answer 256 (-1071) 462
+#check translationStatement
+#check terminationStatement
 
--- These are ordinary Lean declarations from the detailed worked example.
--- The complete-source automatic exporter remains GCD-09; no command is invented.
-#check Macaulean.M2.Verification.Examples.GcdTranslation.sourceText
-#check Macaulean.M2.Verification.Examples.GcdTranslation.lowered
-#check Macaulean.M2.Verification.Examples.GcdTranslation.result
-#check Macaulean.M2.Verification.Examples.GcdTranslation.Source.Graph
-#check Macaulean.M2.Verification.Examples.GcdTranslation.TODO.BodyTranslation
-
--- TODO: prove this proposition. Do not use native evaluation of a few arguments,
--- intent approval, or an admitted theorem as the proof of the universal claim.
--- The exact type to inhabit is:
--- Macaulean.M2.Verification.Examples.GcdTranslation.TODO.BodyTranslation
+-- TODO(DESIGN-EXPORT): after source-link and runtime preservation are proved,
+-- generate these versioned definitions from the new frontend's accepted syntax.
+-- Export source/registry/dependencies together; never import raw session IDs as
+-- live symbols in an unrelated session. Do not emit a theorem before its proof.
+end GcdDesignWorksheet

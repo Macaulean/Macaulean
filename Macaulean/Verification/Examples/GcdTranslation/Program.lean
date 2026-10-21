@@ -1,161 +1,139 @@
-import Macaulean.Interpreter.Parser
-import Macaulean.Interpreter.Runtime
-import Macaulean.Interpreter.Semantics
+import Macaulean.Language.Design.Machine
 import Macaulean.Interpreter.SourceFile
 
-/-!
-# Euclid: actual interpreter components and the missing while seam
-
-This is a worked example, NOT a new production interpreter. `Plan` adds only
-structured composition/while around existing `Term`s; `CodePlan` does the same
-around existing `Lexical.Code`. Remove these adapters when GCD-01 adds while to
-the production pipeline. All leaf compilation and execution use the real
-`Lexical.resolve` and `Runtime.eval`.
-
-The baseline treats while/do as ordinary identifiers and has no while Term.
-A successful parse of the literal file is therefore NOT evidence that the
-intended loop was parsed. `lowerPlan bodyPlan` is NOT yet a translation of the
-whole source file. GCD-01/GCD-03/GCD-09 record the missing source/DSL connections.
-No claim in this module uses the native D interpreter as its specification.
+/-! Design-first GCD case study. The only reused interpreter utility is literal
+source-file inclusion. Neither the old parser nor Term/BinOp/Runtime determines
+the new design. Surface below is an explicit fixture, NOT claimed parser output.
+DESIGN-PARSE and DESIGN-DSL remain required before raw-source execution is claimed.
 -/
-namespace Macaulean.M2.Verification.Examples.GcdTranslation
+namespace Macaulean.Language.Design.Gcd
+open Binding
 
-open Lexical
-
-/-- Kept verbatim as an input artifact, including the actual while loop. -/
 def sourceText : String := m2_source% "../../../../Examples/GcdTranslation/gcd.m2"
+def sourceBytes : Bytes := wordKey sourceText
 
-/-- The helper is written in the existing source language, not an external CAS. -/
-def absBody : Term :=
-  .ifElse (.binop .lt (.var "n") (.int 0)) (.unop .neg (.var "n")) (.var "n")
-def absDefinition : Term := .assign "abs" (.lambda (.fixed ["n"]) absBody)
+def registerProfile (key : String) (profile : ParseProfile) : Build WordId := do
+  let c ← get
+  let (id, words) := c.words.addProfile profile
+  put { c with words }
+  intern (wordKey key) id
 
-def initializeTerm : Term :=
-  .seq (.assign "a" (.apply (.var "abs") (.var "a")))
-       (.assign "b" (.apply (.var "abs") (.var "b")))
-def conditionTerm : Term := .binop .ne (.var "b") (.int 0)
-def iterationTerm : Term :=
-  .seq (.localAssign "r" (.binop .rem (.var "a") (.var "b")))
-    (.seq (.assign "a" (.var "b")) (.assign "b" (.var "r")))
-def resultTerm : Term := .var "a"
+def install (key : String) (profile : ParseProfile) (arity : Nat) (p : Primitive) : Build WordId := do
+  let word ← registerProfile key profile
+  let sym ← freshGlobal ⟨0⟩ word true
+  let c ← get
+  put { c with bootstrapActors := ((sym, arity), p) :: c.bootstrapActors }
+  return word
 
-/-- Only the missing control seam; do not duplicate arithmetic/function syntax. -/
-inductive Plan where
-  | leaf (term : Term)
-  | seq (first second : Plan)
-  | whileDo (condition : Term) (body : Plan)
+structure Vocabulary where
+  minus : WordId
+  remainder : WordId
+  notEqual : WordId
+  less : WordId
   deriving Repr
 
-inductive CodePlan where
-  | leaf (code : Code)
-  | seq (first second : CodePlan)
-  | whileDo (condition : Code) (body : CodePlan)
+/-- A deliberately enumerated GCD grammar seed, NOT the complete M2 table.
+Profiles control syntax; Actors are installed separately under protected Symbols. -/
+def bootstrap : Build Vocabulary := do
+  let c ← get
+  put { c with namespaces := [{}, {}] }
+  let minus ← install "-" ⟨50, 50, 50, .prefix, .binary⟩ 1 .neg
+  let remainder ← install "%" ⟨60, 60, 0, .reject, .binary⟩ 2 .rem
+  let notEqual ← install "!=" ⟨30, 30, 0, .reject, .binary⟩ 2 .ne
+  let less ← install "<" ⟨30, 30, 30, .prefix, .binary⟩ 2 .lt
+  let _ ← registerProfile "=" ⟨10, 9, 0, .reject, .binary⟩
+  let _ ← registerProfile ":=" ⟨10, 9, 0, .reject, .binary⟩
+  let _ ← registerProfile "->" ⟨10, 9, 0, .reject, .arrow⟩
+  let _ ← registerProfile "(" ⟨65, 6, 6, .delimiter, .adjacent⟩
+  let _ ← registerProfile ")" ⟨6, 0, 0, .reject, .reject⟩
+  let _ ← registerProfile "," ⟨9, 9, 0, .optionalPrefix, .optionalBinary⟩
+  let _ ← registerProfile ";" ⟨8, 7, 0, .reject, .optionalBinary⟩
+  let _ ← registerProfile "while" ⟨0, 0, 11, .whileForm, .reject⟩
+  let _ ← registerProfile "do" ⟨0, 0, 0, .reject, .reject⟩
+  let _ ← registerProfile "if" ⟨0, 0, 11, .ifForm, .reject⟩
+  let _ ← registerProfile "then" ⟨0, 0, 0, .reject, .reject⟩
+  let _ ← registerProfile "else" ⟨0, 0, 0, .reject, .reject⟩
+  let _ ← registerProfile "symbol" ⟨0, 0, 0, .quote .ordinary, .reject⟩
+  let c ← get
+  let some core := c.namespaces[0]? | fail "missing bootstrap namespace"
+  put { c with namespaces := c.namespaces.set 0 { core with writable := false } }
+  return ⟨minus, remainder, notEqual, less⟩
+
+structure Names where
+  abs : WordId
+  n : WordId
+  gcd : WordId
+  a : WordId
+  b : WordId
+  r : WordId
   deriving Repr
 
-/-- Same sequence/control structure as the source function body. -/
-def bodyPlan : Plan :=
-  .seq (.leaf initializeTerm)
-    (.seq (.whileDo conditionTerm (.leaf iterationTerm)) (.leaf resultTerm))
+def registerNames : Build Names := do
+  return ⟨← intern (wordKey "abs"), ← intern (wordKey "n"),
+    ← intern (wordKey "gcdEuclid"), ← intern (wordKey "a"),
+    ← intern (wordKey "b"), ← intern (wordKey "r")⟩
 
-/-- Source-ordered resolution, using the existing resolver for every Term.
-While does not create a scope. Its body's declarations are resolved once, not
-once per dynamic iteration. This adapter is provisional until GCD-01. -/
-def lowerPlan : Plan → Resolver → CodePlan × Resolver
-  | .leaf t, r =>
-    let (c, r) := Lexical.resolve t r
-    (.leaf c, r)
-  | .seq a b, r =>
-    let (a, r) := lowerPlan a r
-    let (b, r) := lowerPlan b r
-    (.seq a b, r)
-  | .whileDo test body, r =>
-    let (test, r) := Lexical.resolve test r
-    let (body, r) := lowerPlan body r
-    (.whileDo test body, r)
+/-- Retains WordIds. `%` has not become a primitive instruction here. -/
+def surfaceFixture (w : Vocabulary) (n : Names) : Surface :=
+  .seq
+    (.set false n.abs (.lambda [n.n]
+      (.ifElse (.binary w.less (.read n.n) (.int 0))
+        (.unary w.minus (.read n.n)) (.read n.n))))
+    (.set false n.gcd (.lambda [n.a, n.b]
+      (.seq (.set false n.a (.call (.read n.abs) [.read n.a]))
+        (.seq (.set false n.b (.call (.read n.abs) [.read n.b]))
+          (.seq
+            (.whileDo (.binary w.notEqual (.read n.b) (.int 0))
+              (.seq (.set true n.r (.binary w.remainder (.read n.a) (.read n.b)))
+                (.seq (.set false n.a (.read n.b)) (.set false n.b (.read n.r)))))
+            (.read n.a))))))
 
-def parameters : Parameters := .fixed ["a", "b"]
-def parameterResolver : Resolver := (Resolver.declareMany parameters.names {}).2
-def lowered : CodePlan × Resolver := lowerPlan bodyPlan parameterResolver
+structure Artifact where
+  catalog : Catalog
+  vocabulary : Vocabulary
+  names : Names
+  surface : Surface
+  bound : Bound
+  code : Code
+  functionRef : Ref
+  scope : ScopeId
+  parameters : List SymbolId
+  layout : List SymbolId
+  deriving Repr
 
-def aRef : Ref := .slot 0 0
-def bRef : Ref := .slot 0 1
-def rRef : Ref := .slot 0 2
+def build : Result Catalog Artifact := (do
+  let vocabulary ← bootstrap
+  let names ← registerNames
+  let surface := surfaceFixture vocabulary names
+  let (bound, code) ← compile 256 [⟨0⟩] surface
+  let c ← get
+  let id ← global names.gcd false
+  let ref ← lift (address c [⟨0⟩] id)
+  let .seq _ (.set _ (.lambda scope ps layout _)) := bound
+    | fail "GCD fixture did not bind to a function"
+  return { catalog := c, vocabulary, names, surface, bound, code,
+    functionRef := ref, scope, parameters := ps, layout }) {}
 
-def expectedInitialize : Code :=
-  .seq (.set aRef (.apply (.read (.global "abs")) (.read aRef)))
-       (.set bRef (.apply (.read (.global "abs")) (.read bRef)))
-def expectedCondition : Code := .binop .ne (.read bRef) (.int 0)
-def expectedIteration : Code :=
-  .seq (.set rRef (.binop .rem (.read aRef) (.read bRef)))
-    (.seq (.set aRef (.read bRef)) (.set bRef (.read rRef)))
-def expectedResult : Code := .read aRef
+def boundInvocation (artifact : Artifact) (a b : Int) : Bound :=
+  .seq artifact.bound (.call (.read artifact.functionRef.symbol) [.int a, .int b])
+def codeInvocation (artifact : Artifact) (a b : Int) : Code :=
+  .seq artifact.code (.call (.read artifact.functionRef) [.int a, .int b])
 
-def expectedPlan : CodePlan :=
-  .seq (.leaf expectedInitialize)
-    (.seq (.whileDo expectedCondition (.leaf expectedIteration)) (.leaf expectedResult))
+/-- Actual designed closure allocation and call, including actual while execution.
+This accepts the structured fixture; it does not falsely claim to parse sourceText. -/
+def run (fuel : Nat) (a b : Int) : Except String (Result Machine.State Value) :=
+  match build with
+  | .error e _ => .error e
+  | .exhausted _ => .error "binding resource exhausted"
+  | .done artifact _ => .ok (Machine.eval fuel (codeInvocation artifact a b)
+      (some ⟨0⟩) (Machine.initial artifact.catalog))
 
-/-- A finite, concrete lowering check, distinct from general preservation. -/
-def LoweringShape : Prop :=
-  lowered.1 = expectedPlan ∧ lowered.2.current.count = 3 ∧
-  lowered.2.lookup "a" = aRef ∧ lowered.2.lookup "b" = bRef ∧
-  lowered.2.lookup "r" = rRef
+/-- Observation for concrete tests only; keep the full Result in preservation claims. -/
+def answer (fuel : Nat) (a b : Int) : Except String Int := do
+  match ← run fuel a b with
+  | .done (.int z) _ => return z
+  | .done _ _ => .error "non-integer result"
+  | .error e _ => .error e
+  | .exhausted _ => .error "resource exhausted"
 
-/-- A test driver around real leaf execution, not a claimed production while.
-Both bounds are DEPTH bounds. They are not a count of total executed steps.
-Exhaustion remains the baseline `.fuelExhausted` error. A future resumable budget
-interface is a separate design choice, not silently imposed on this baseline. -/
-def executePlan : Nat → Nat → CodePlan → Runtime.Frames → Runtime.State → Runtime.Result Value
-  | 0, _, _, _, _ => .error (.error .fuelExhausted)
-  | _ + 1, depth, .leaf code, frames, state =>
-    Runtime.eval depth code frames state
-  | fuel + 1, depth, .seq first second, frames, state => do
-    let (_, state) ← executePlan fuel depth first frames state
-    executePlan fuel depth second frames state
-  | fuel + 1, depth, .whileDo test body, frames, state => do
-    let (value, state) ← Runtime.eval depth test frames state
-    match value with
-    | .bool false => return (.null, state)
-    | .bool true =>
-      let (_, state) ← executePlan fuel depth body frames state
-      executePlan fuel depth (.whileDo test body) frames state
-    | _ => .error (.error (.conditionNotBoolean value.className))
-
-/-- Install the explicit abs helper and allocate the function's THREE slots once.
-This sets up a body test; it does not claim to run the source's outer declaration
-or `Runtime.call` on a production while-containing closure. See GCD-08. -/
-def setup (depth : Nat) (a b : Int) : Runtime.Result Runtime.Frames := do
-  let (_, state) ← Runtime.eval depth (Lexical.prepare absDefinition).1 [] {}
-  let (cells, state) := state.allocate [.zz a, .zz b, .null]
-  return ([cells], state)
-
-def runBody (controlDepth runtimeDepth : Nat) (a b : Int) : Runtime.Result Value := do
-  let (frames, state) ← setup runtimeDepth a b
-  executePlan controlDepth runtimeDepth lowered.1 frames state
-
-/-- A named bounded computation is already usable in Lean propositions. It is
-not a total Int → Int function and does not assert any preservation theorem. -/
-def result (controlDepth runtimeDepth : Nat) (a b : Int) : Except Error Value :=
-  (Runtime.finish (runBody controlDepth runtimeDepth a b)).map Prod.fst
-
-/-- Inspect one actual iteration in an isolated frame. Useful for detecting
-assignment-order and slot-aliasing mistakes without relying on a gcd oracle. -/
-def iterationResult (depth : Nat) (a b : Int) : Except Error (List Value) := do
-  let (cells, state) := ({} : Runtime.State).allocate [.zz a, .zz b, .null]
-  let (_, state) ← Runtime.finish (Runtime.eval depth expectedIteration [cells] state)
-  return [← Runtime.readRef aRef [cells] state,
-          ← Runtime.readRef bRef [cells] state,
-          ← Runtime.readRef rRef [cells] state]
-
-/-- Existing arithmetic theorem reused verbatim: no new modulo axiom. -/
-theorem remainder_leaf (a b : Int) :
-    evalBinOp .rem (.zz a) (.zz b) = .ok (.zz (a % b)) := rfl
-
-/-- Existing semantics already supplies the Euclidean remainder facts; these
-are needed for termination later, not for source/slot simulation itself. -/
-example (a b : Int) (hb : b ≠ 0) :
-    ∃ q r, evalBinOp .quot (.zz a) (.zz b) = .ok (.zz q) ∧
-      evalBinOp .rem (.zz a) (.zz b) = .ok (.zz r) ∧
-      a = b * q + r ∧ 0 ≤ r ∧ r < b.natAbs :=
-  quot_rem_spec a b hb
-
-end Macaulean.M2.Verification.Examples.GcdTranslation
+end Macaulean.Language.Design.Gcd

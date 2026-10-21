@@ -1,0 +1,11 @@
+{
+  "status": "PASS_STRUCTURAL_ONLY",
+  "files_checked": 9,
+  "lean_guard_commands_supplied": 21,
+  "lean_compiled": false,
+  "lean_guards_executed": false,
+  "universal_proofs_checked": false,
+  "native_m2_executed": false,
+  "limitations": "Text/import-boundary checks only; no typing, execution, semantic or proof validation.",
+  "errors": []
+}
