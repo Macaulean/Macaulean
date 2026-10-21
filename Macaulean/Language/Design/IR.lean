@@ -1,16 +1,11 @@
 import Macaulean.Language.Design.Words
 
-/-!
-# Distinct syntax, binding, and storage identities
-
-Unlike the superseded example, no Interpreter.Term/Code/Ref/Runtime is imported.
-`whileDo` is a first-class node, not a Plan wrapper around the old interpreter.
-The prototype covers the Euclidean source fragment, not all of M2 syntax.
+/-! Syntax, declaration, activation and execution identity are different domains.
+No dependency on legacy Interpreter.Term, BinOp, Lexical.Code or Runtime.
+While is a real language node. This is a closed prototype, not all M2.
 -/
 namespace Macaulean.Language.Design
 
-/-- An actual symbol value denotes declaration plus activation. A local slot need
-not be a separately allocated object. None denotes this session's global binding. -/
 inductive Value where
   | int (n : Int)
   | bool (b : Bool)
@@ -18,18 +13,16 @@ inductive Value where
   | symbol (declaration : SymbolId) (activation : Option ActivationId)
   | closure (id : Nat)
   deriving DecidableEq, BEq, Repr, Inhabited
-
 inductive Home where
   | global (namespaceId : NamespaceId) (slot : Nat)
-  | local (scope : ScopeId) (slot : Nat)
+  | lexical (scope : ScopeId) (slot : Nat)
   deriving DecidableEq, BEq, Repr, Inhabited
 structure SymbolInfo where
   canonicalWord : WordId
   home : Home
-  protected : Bool := false
+  isProtected : Bool := false
   deriving DecidableEq, BEq, Repr, Inhabited
 structure Namespace where
-  /-- Retained entries, newest first. Lookup and enumeration are different views. -/
   entries : List (WordId × SymbolId) := []
   writable : Bool := true
   deriving DecidableEq, BEq, Repr, Inhabited
@@ -38,7 +31,7 @@ structure Scope where
   layout : List SymbolId := []
   deriving DecidableEq, BEq, Repr, Inhabited
 
-/-- Syntax does not know the integer meaning of %, !=, < or unary -. -/
+/-- Operators retain lexical identity; there is no Surface.add/rem/abs. -/
 inductive Surface where
   | int (n : Int)
   | read (word : WordId)
@@ -52,24 +45,21 @@ inductive Surface where
   | lambda (parameters : List WordId) (body : Surface)
   | call (fn : Surface) (arguments : List Surface)
   deriving Repr, Inhabited
-
 structure OperatorRef where
   sourceWord : WordId
   symbol : SymbolId
   deriving DecidableEq, BEq, Repr, Inhabited
-
 inductive Location where
   | global (slot : Nat)
-  | local (depth slot : Nat)
+  | lexical (depth slot : Nat)
   deriving DecidableEq, BEq, Repr, Inhabited
 structure Ref where
   symbol : SymbolId
   location : Location
   deriving DecidableEq, BEq, Repr, Inhabited
 
-/-- Bound syntax is Node SymbolId; executable IR is Node Ref. Sharing the
-control-node vocabulary does not define either evaluator in terms of the other.
-Source reads use declaration lookup; machine reads use direct locations. -/
+/-- Shared grammar of control nodes, but DIFFERENT references and semantics:
+Bound uses SymbolId association lookup; Code uses direct depth/slot addresses. -/
 inductive Node (reference : Type) where
   | int (n : Int)
   | read (ref : reference)
@@ -86,40 +76,34 @@ inductive Node (reference : Type) where
 abbrev Bound := Node SymbolId
 abbrev Code := Node Ref
 
-/-- Implementation of a resolved operator, never its lexical identity. The four
-primitive cases are a chosen closed integer fragment, not a full method system. -/
+/-- An execution choice keyed by resolved Symbol, NOT a parsing category. -/
 inductive Primitive where
   | neg | rem | ne | lt
   deriving DecidableEq, BEq, Repr, Inhabited
 abbrev Actors := List ((SymbolId × Nat) × Primitive)
-
 structure Catalog where
   words : WordRegistry := {}
   namespaces : List Namespace := [{writable := false}, {}]
   searchPath : List NamespaceId := [⟨1⟩, ⟨0⟩]
   symbols : List SymbolInfo := []
   scopes : List Scope := [{}]
-  /-- Initial values for newly allocated globals, not a second runtime store. -/
+  /-- Allocation seeds only; execution does not consult these as a second store. -/
   globalSeeds : List (SymbolId × Value) := []
   bootstrapActors : Actors := []
   deriving Repr, Inhabited
 
-/-- Reached state survives errors; resource exhaustion is not a language error.
-The prototype does not import native D's exceptional-control quirks. -/
-inductive Result (state : Type) (value : Type) where
-  | done (value : value) (after : state)
-  | error (message : String) (after : state)
-  | exhausted (after : state)
+inductive Result (σ α : Type) where
+  | done (value : α) (after : σ)
+  | error (message : String) (after : σ)
+  | exhausted (after : σ)
   deriving Repr
 
-def Result.bind (r : Result s a) (next : a → s → Result s b) : Result s b :=
+def Result.bind (r : Result σ α) (next : α → σ → Result σ β) : Result σ β :=
   match r with
-  | .done v state => next v state
-  | .error e state => .error e state
-  | .exhausted state => .exhausted state
+  | .done v s => next v s
+  | .error e s => .error e s
+  | .exhausted s => .exhausted s
 
-/-- These source operations are our explicit integer semantics. A future object
-method table replaces/extends Actors under a separately stated dispatch contract. -/
 def primitiveValue (p : Primitive) (args : List Value) : Except String Value :=
   match p, args with
   | .neg, [.int a] => .ok (.int (-a))
@@ -127,7 +111,6 @@ def primitiveValue (p : Primitive) (args : List Value) : Except String Value :=
   | .ne, [.int a, .int b] => .ok (.bool (decide (a ≠ b)))
   | .lt, [.int a, .int b] => .ok (.bool (decide (a < b)))
   | _, _ => .error "operator argument shape outside the integer fragment"
-
 def dispatch (actors : Actors) (op : OperatorRef) (args : List Value) : Except String Value := do
   let some p := actors.lookup (op.symbol, args.length) | .error "no installed actor"
   primitiveValue p args
