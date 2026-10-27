@@ -1,9 +1,16 @@
 # Verified M2 functions: contracts and generated verification conditions
 
 This note describes an experiment: verifying functions written in the M2 DSL
-without translating them into Lean by hand. The first instance covers functions on
-natural numbers (`#m2_verify`). The design is meant to grow to more of the DSL;
-the last section explains how.
+without translating them into Lean by hand. There are two interfaces:
+
+- **`#m2_verify`**: a contract command for functions on natural numbers. It is
+  described first.
+- **Functions as Lean terms** (`Macaulean.Verification.Handles`): every worksheet
+  function becomes a Lean constant, and you prove ordinary theorems about it.
+  This one works for any M2 value and supports calls between functions. It is
+  described in its own section below.
+
+The last section explains how to grow either one to more of the DSL.
 
 ## The idea
 
@@ -174,6 +181,122 @@ tokenized by Lean.
 - **Tests:** `MacauleanTest/VerificationNatContracts.lean` contains positive and
   negative examples. `Examples/Gcd.lean` is a worksheet.
 
+## Functions as Lean terms
+
+`import Macaulean.Verification.Handles` and `open M2`. Then every M2 function
+definition also defines a Lean constant, and theorems about it are plain Lean
+`theorem`s. There is no contract command, and no measure is needed: termination
+is the induction you choose.
+
+```lean
+gcdNat = (a,b) -> if b == 0 then a else gcdNat(b, a % b);
+-- now also  M2.gcdNat : Macaulean.M2.Fn  (written `gcdNat` under `open M2`)
+
+theorem gcdNat_spec (b a : Nat) : gcdNat (a, b) ⇓ Nat.gcd a b := by
+  induction b using Nat.strongRecOn generalizing a with
+  | ind b ih =>
+    m2_unfold
+    -- ⊢ if b = 0 then a = a.gcd b else gcdNat (b, a % b) ⇓ a.gcd b
+    split
+    · simp_all
+    · rw [show Nat.gcd a b = Nat.gcd b (a % b) by
+        rw [Nat.gcd_comm b, ← Nat.gcd_rec, Nat.gcd_comm]]
+      exact ih _ (Nat.mod_lt _ (by omega)) _
+
+twice = (a,b) -> gcdNat(a, b) + gcdNat(b, a);
+
+theorem twice_spec (a b : Nat) : twice (a, b) ⇓ 2 * Nat.gcd a b := by
+  m2_unfold
+  m2_use gcdNat_spec b a        -- a call is discharged by a theorem about it
+  m2_use gcdNat_spec a b
+  rw [Nat.gcd_comm b a]; omega   -- ⊢ a.gcd b + b.gcd a = 2 * a.gcd b
+```
+
+### Statements
+
+| Statement | Meaning |
+| --- | --- |
+| `f a ⇓ r` | The call returns `r`. |
+| `f a ↓` | The call terminates. |
+| `(f a).Sat Q` | The call returns some `v` with `Q v`. The other two are special cases. |
+
+Arguments and results are Lean values through the class `ToM2`: ℕ, ℤ, ℚ, `Bool`,
+lists, or raw `Value`s. A tuple `(a, b)` is the M2 sequence that a parameter list
+`(a,b) -> …` unpacks. `Returns.sound` and `Terminates.call` turn these statements
+back into raw runtime facts: some fuel gives `Runtime.call … = .ok (v, after)`, and
+every successful call at any fuel returns `r`.
+
+`Sat` is defined against the production runtime, started from the function's
+worksheet state or from any state that *extends* it. In an extension, existing
+globals keep their values, and cells and function records are only appended.
+This is what lets theorems compose:
+- calls nested inside a body start from states that only allocated more cells;
+- a theorem proved in an earlier worksheet state carries over to a later one
+  (`Fn.Call.Sat.transport`), unless a name was redefined in between.
+
+### Naming functions
+
+- **Automatic constants.** `gcdNat = …` defines `M2.gcdNat`, which captures the
+  worksheet just after that input. A redefinition gets a versioned name, such as
+  `M2.double_10`, and a message says which. If the body uses a global that is not
+  defined yet, a message says the constant captured the worksheet too early. The
+  option `m2.expose` turns this off.
+- **Live references.** `m2_fn% name` is the function bound to `name` at this point
+  of the file. It reuses the automatic constant when the worksheet has not changed
+  since, so `(m2_fn% gcdNat) = M2.gcdNat` holds by `rfl`. Use it after a
+  redefinition, or for a function that calls one defined later.
+
+### Tactics
+
+| Tactic | Effect |
+| --- | --- |
+| `m2_unfold` | Replaces the call in the goal by one step of the function's body, written in Lean terms. Inner calls remain as `g (x, y) ⇓ …` or `.Sat` goals, so induction hypotheses and other theorems apply to them. |
+| `m2_use h` | Discharges the next call with `h : g (x) ⇓ r`, possibly proved in an earlier worksheet state, and continues with what the caller does with `r`. |
+| `m2_eval` | Evaluates a call on concrete arguments, e.g. `gcdNat (12, 18) ⇓ 6`. |
+| `m2_extends` | Proves by evaluation that a later worksheet state extends an earlier one. `m2_use` calls it. |
+
+### How it works
+
+Files are under `Macaulean/Verification/Handles/`.
+
+- **`wpV`** (`Intro.lean`) generalizes `wpN` from ℕ to arbitrary runtime values.
+  - Arithmetic uses the production `evalBinOp`/`evalUnOp` directly.
+  - A call `g a` becomes `(g a).Sat Q`, i.e. a statement about another function,
+    instead of an inlined contract.
+  - It covers literals, parameters, globals, unary and binary operators, `and`,
+    `or`, `not`, `if`, `;`, lists, sequences and calls.
+  - Everything else is `False`: assignments, nested functions, `return` and rings.
+
+  The soundness theorem `Fn.Call.Sat.intro` is proved once, by the same induction
+  as for `#m2_verify`.
+- **The `m2_simp` simp set** (`Simp.lean`) evaluates operations on represented
+  values: integer arithmetic and comparisons, Booleans, list length and in-range
+  indexing. Tag lemmas `@[m2_simp]` to support new kinds of value.
+- **`m2_unfold`** (`Tactic.lean`) works in three steps:
+  1. it applies `Sat.intro` and evaluates the global lookups of the reflected
+     state with `decide +kernel`;
+  2. it simplifies with `m2_simp`. Branch conditions are made available to the
+     discharger, so `n - 1` stays a natural number and `l#i` is in range;
+  3. a display pass uses `change` to refold runtime values into handle calls on
+     Lean values. This step is checked by definitional equality, so it cannot
+     change what is proved.
+- **Automatic constants** use an input hook in `DSL.lean`. It is empty unless
+  `Handles` is imported.
+
+Trust is the same as for `#m2_verify`: the Lean kernel, plus the copy of the
+worksheet state made by `Targets.stateExpr`.
+
+**Not yet:**
+- non-termination proofs and partial correctness without termination. These need
+  the converse of `m2_unfold`, plus a theorem that results do not depend on
+  unrelated heap cells;
+- local variables and assignments in function bodies;
+- calls to library and builtin functions such as `normalForm` inside verified
+  bodies.
+
+Tests are in `MacauleanTest/VerificationHandles.lean`; `Examples/Handles.lean` is a
+worksheet.
+
 ## Extending beyond natural numbers
 
 Each new feature follows the same five-step recipe:
@@ -189,7 +312,13 @@ Each new feature follows the same five-step recipe:
    of the work.
 5. **Extend the fragment checker and the command's binder types.**
 
-Suggested next steps, roughly in order of effort:
+For the handle interface, steps 2 and 3 are already done for most of the
+language, because `wpV` works on arbitrary values. A new kind of value usually
+needs only step 4: `@[m2_simp]` lemmas, plus a `ToM2` instance so it can appear
+in statements.
+
+Suggested next steps, roughly in order of effort. Some of them are now available
+through the handle interface.
 
 - **Typed values (ℤ, ℚ, Booleans as results).** Replace `wpN`/`wpB` by a single
   `wp : Ty → Code → (Ty.denote → Prop) → Prop`. Here `Ty` lists the supported
@@ -199,12 +328,14 @@ Suggested next steps, roughly in order of effort:
   already characterized by `quot_rem_spec` in
   `Interpreter/Semantics.lean`, and `-` needs no side
   condition. For ℚ, `/` needs the obligation `y ≠ 0`.
-- **Calls to other verified functions.** Add a table of already-verified
+- **Calls to other verified functions** *(done for handles: `m2_use`)*. For
+  `#m2_verify`: add a table of already-verified
   contracts to `Ctx`. A call then uses the callee's postcondition, and soundness
   takes the callees' `correct` theorems as hypotheses. This gives modular
   verification, and the same mechanism gives library functions (`normalForm`, …)
   prebuilt contracts. Mutual recursion needs a shared measure.
-- **Lists and sequences.** These are immutable in the DSL, so they fit the
+- **Lists and sequences** *(done for handles: length and in-range indexing)*.
+  These are immutable in the DSL, so they fit the
   current state-free design. The domain is `List τ`, indexing gets an in-bounds
   obligation, and recursion over lists can use `length` as the measure.
 - **Polynomials.** The domain is `Views.Polynomial r` with its denotation. Much
