@@ -223,6 +223,12 @@ initialize sessionExt : EnvExtension Session ← registerEnvExtension (pure ({} 
 open Lean.Elab.Command
 def getSession : CommandElabM Session := return sessionExt.getState (← getEnv)
 def resetSession : CommandElabM Unit := modifyEnv fun env => sessionExt.setState env ({} : Session)
+
+/-- Run after every M2 input with the sessions before and after it, so that other
+modules can react to new bindings. Empty unless such a module is imported. -/
+abbrev InputHook := Session → Session → CommandElabM Unit
+initialize inputHooks : IO.Ref (Array InputHook) ← IO.mkRef #[]
+def registerInputHook (hook : InputHook) : IO Unit := inputHooks.modify (·.push hook)
 end Macaulean.M2.DSL
 namespace M2
 scoped syntax (name := inputCommand) (priority := low) m2 : command
@@ -250,4 +256,6 @@ def elabInput : CommandElab := fun stx => do
   | .error error => logErrorAt body error.toM2String
   | .ok _ => if let some output := result.output then
       logInfoAt body m!"o{output.input} = {output.value.toM2String} : {output.value.className}"
+  for hook in ← inputHooks.get do
+    withRef body <| hook state result.session
 end Macaulean.M2.DSL
