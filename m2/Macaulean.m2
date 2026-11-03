@@ -246,6 +246,13 @@ macauleanServer = () -> (
     registerMethod(server, "testMethod", (expr) -> (
 	    toExternalString value expr));
 
+    registerMethod(server, "evalValue", (expr) -> (
+        try (
+            v := value expr;
+            {"ok", toString class v, toExternalString v})
+        else {"error", "", ""}
+        ));
+
     registerMethod(server, "factorInt", (x) -> (
 	    toList \ toList factor x));
 
