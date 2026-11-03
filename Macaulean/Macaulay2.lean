@@ -23,7 +23,10 @@ structure Macaulay2 where
 def startM2Server : IO (IO.Process.Child {stdin := .null, stdout := .piped, stderr := .inherit} × Macaulay2) :=
   do let (m2stdin,m2Process) <-
       IO.Process.spawn {cmd := "M2"
-                       , args := #["--script", "./macaulean.m2"]
+                       , args := #["--stop", "--no-debug", "--silent", "-q",
+                                   "-e", "needsPackage \"Macaulean\"",
+                                   "-e", "macauleanStart()",
+                                   "-e", "exit 0"]
                        , cwd := .some "./m2/"
                        , env := .empty
                        , inheritEnv := true

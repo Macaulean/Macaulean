@@ -37,6 +37,31 @@ info:  3   *   1  /  2   *   y   ^   2   +   1  /  2   *   x   ^   2
       let exprSyntax ← PrettyPrinter.delab expr
       pure <| Syntax.prettyPrint exprSyntax
 
+-- negation is reified as Neg.neg, not as a constant containing a variable (#43)
+/--
+info: -Macaulean.Polynomial.ofVar (Fin.ofNat 2 0) + Macaulean.Polynomial.ofVar (Fin.ofNat 2 1)
+-/
+#guard_msgs in
+#eval do
+  let ringType := mkConst ``Rat
+  withLocalDecl `x .default ringType fun x =>
+    withLocalDecl `y .default ringType fun y => do
+      let expr ← mkAdd (← mkAppM ``Neg.neg #[x]) y
+      let vars : FVarIdMap Nat := (∅ : FVarIdMap Nat).insert x.fvarId! 0 |>.insert y.fvarId! 1
+      let poly ← toPolynomialExpr? vars ringType expr
+      ppExpr poly
+
+-- unsupported terms containing variables give an error rather than a kernel error
+/-- error: m2idealmem: unsupported term x⁻¹ -/
+#guard_msgs in
+#eval do
+  let ringType := mkConst ``Rat
+  withLocalDecl `x .default ringType fun x => do
+    let expr ← mkAppM ``Inv.inv #[x]
+    let vars : FVarIdMap Nat := (∅ : FVarIdMap Nat).insert x.fvarId! 0
+    let poly ← toPolynomialExpr? vars ringType expr
+    ppExpr poly
+
 --this theorem really should be proven elsewhere
 private theorem RArray_get_ofArray (h : i < arr.size) : (RArray.ofArray arr len_hyp).get i = arr[i] := by
   have irw : i = ↑(Fin.mk i h) := by simp
@@ -60,6 +85,13 @@ example {x y : Rat} (f : 2*x= 0) (g : 3*y = 0) : (x + y)^4 = 0 := by
 
 example {x y z : Rat} (f : 2*x= 0) (g : 3*y = 0) (h : y+z=0) : (x + y + z)^4 = 0 := by
   m2idealmem +grind [f, g, h]
+
+-- negated variables (#43)
+example {x y : Rat} (h1 : -x + y = 0) (h2 : y = 0) : x = 0 := by
+  m2idealmem +grind [h1, h2]
+
+example {x y : Rat} (f : x - y = 0) : -(x^2) + y^2 = 0 := by
+  m2idealmem +grind [f]
 
 -- determinential ideal example
 -- this is the ideal of 2x2 minors of a generic 3x3 **symmetric** matrix

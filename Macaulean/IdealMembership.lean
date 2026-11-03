@@ -163,6 +163,8 @@ partial def toPolynomialExpr?
     mkMul (← toPolynomialExpr? variables ring a) (← toPolynomialExpr? variables ring b)
   | HPow.hPow _ _ _ _ a b =>
     mkAppM ``HPow.hPow #[(← toPolynomialExpr? variables ring a), b]
+  | Neg.neg _ _ a =>
+    mkAppM ``Neg.neg #[← toPolynomialExpr? variables ring a]
   | _ =>
     match x with
     | .fvar varId =>
@@ -171,8 +173,9 @@ partial def toPolynomialExpr?
         ring, none, none,
         ← mkAppOptM ``Fin.ofNat #[toExpr variables.size, none, toExpr varName]]
     | _ =>
-      -- TODO in this case we should check that x doesn't contain any variables
-      -- and we should check that the expression is a "constant", whatever that means
+      if x.hasFVar then
+        throwError "m2idealmem: unsupported term {x}"
+      -- TODO we should check that the expression is a "constant", whatever that means
       mkAppOptM ``Macaulean.Polynomial.ofConst #[ring, toExpr variables.size, x]
 
 def toExprPoly (p : CommRing.Poly) : StateT VariableState MetaM (ExprPoly) := do

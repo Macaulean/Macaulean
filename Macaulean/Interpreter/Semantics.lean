@@ -58,8 +58,8 @@ def toTerm : IntExpr → Term
 and leaves the environment unchanged. -/
 theorem evalTerm_toTerm (t : IntExpr) (env : Env) :
     evalTerm t.toTerm env = .ok (zz t.denote, env) := by
-  induction t <;>
-    simp_all [toTerm, denote, evalTerm, evalBinOp, evalUnOp, bind, Except.bind, pure, Except.pure]
+induction t <;>
+  simp_all [toTerm, denote, evalTerm, evalBinOp, intZPow, evalUnOp, bind, Except.bind, pure, Except.pure]
 
 theorem evalProgram_toTerm (t : IntExpr) : evalProgram t.toTerm = .ok (zz t.denote) := by
   simp [evalProgram, evalTerm_toTerm, Functor.map, Except.map]

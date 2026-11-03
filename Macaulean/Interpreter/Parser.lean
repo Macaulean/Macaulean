@@ -12,6 +12,10 @@ Binding powers (highest first): `^` 50, `* / // %` 40, prefix signs 35,
 `+ -` 30, comparisons 20, assignment 10. Powers and arithmetic associate
 left, comparisons and assignment right. A prefix operand is read at
 `max minBP 35`, as required for `-7//3` versus `2 * -7 // 2`.
+
+Newlines end a statement, except directly after an operator or inside
+parentheses. Like the lexer, the parser recurses on fuel, so it is total and
+the kernel can run.
 -/
 
 namespace Macaulean.M2

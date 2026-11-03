@@ -104,3 +104,35 @@ def roundTrips (s : String) : Bool :=
 #guard roundTrips "-7//3 + 2 * -7 // 2 - 2^-2^2"
 #guard roundTrips "x = y = 3; x + y < 7 == true"
 #guard roundTrips "(1 +\n 2) * -(3 - 4)"
+
+-- Regression tests for unit powers, integral QQ exponents and Boolean comparisons.
+example : run "1^-1" = .ok (.zz 1) := by decide +kernel
+example : run "(-1)^-1" = .ok (.zz (-1)) := by decide +kernel
+example : run "(-1)^-2" = .ok (.zz 1) := by decide +kernel
+example : run "3 // (1^-1)" = .ok (.zz 3) := by decide +kernel
+example : run "2^(2/1)" = .ok (.zz 4) := by decide +kernel
+example : run "2^(-1/1)" = .ok (.qq (mkRat 1 2)) := by decide +kernel
+example : run "(1/2)^(2/1)" = .ok (.qq (mkRat 1 4)) := by decide +kernel
+example : run "(2/1)^(2/1)" = .ok (.qq 4) := by decide +kernel
+example : run "(-1)^(-3/1)" = .ok (.qq (-1)) := by decide +kernel
+example : run "1^(0/1)" = .ok (.zz 1) := by decide +kernel
+example : run "(1/1)^(-1/1)" = .ok (.qq 1) := by decide +kernel
+example : run "0^(-1/1)" = .error .divByZero := by decide +kernel
+example : run "true < true" = .ok (.bool false) := by decide +kernel
+example : run "true <= true" = .ok (.bool true) := by decide +kernel
+example : run "true > true" = .ok (.bool false) := by decide +kernel
+example : run "true >= true" = .ok (.bool true) := by decide +kernel
+example : run "true < false" = .error (.noMethod "<" ["Boolean", "Boolean"]) := by decide +kernel
+example : run "true <= false" = .error (.noMethod "<=" ["Boolean", "Boolean"]) := by decide +kernel
+example : run "true > false" = .error (.noMethod ">" ["Boolean", "Boolean"]) := by decide +kernel
+example : run "true >= false" = .error (.noMethod ">=" ["Boolean", "Boolean"]) := by decide +kernel
+example : run "false < true" = .error (.noMethod "<" ["Boolean", "Boolean"]) := by decide +kernel
+example : run "false <= true" = .error (.noMethod "<=" ["Boolean", "Boolean"]) := by decide +kernel
+example : run "false > true" = .error (.noMethod ">" ["Boolean", "Boolean"]) := by decide +kernel
+example : run "false >= true" = .error (.noMethod ">=" ["Boolean", "Boolean"]) := by decide +kernel
+example : run "false < false" = .ok (.bool false) := by decide +kernel
+example : run "false <= false" = .ok (.bool true) := by decide +kernel
+example : run "false > false" = .ok (.bool false) := by decide +kernel
+example : run "false >= false" = .ok (.bool true) := by decide +kernel
+example : run "1^(-1/1)" = .ok (.qq 1) := by decide +kernel
+example : run "(-1)^(-2/1)" = .ok (.qq 1) := by decide +kernel
