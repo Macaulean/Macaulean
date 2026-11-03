@@ -27,6 +27,14 @@ open Value
 def ratZPow (q : Rat) (n : Int) : Except Error Value :=
   if n < 0 ∧ q = 0 then .error .divByZero else .ok (qq (q ^ n))
 
+/-- Integer powers preserve `ZZ` for units, including negative exponents. -/
+def intZPow (m n : Int) : Except Error Value :=
+  if 0 ≤ n then .ok (zz (m ^ n.toNat))
+  else if m = 1 then .ok (zz 1)
+  else if m = -1 then .ok (zz (if n % 2 = 0 then 1 else -1))
+  else ratZPow m n
+
+/-- Apply a binary operator to two values. -/
 def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   match op, a, b with
   | .add, zz m, zz n => .ok (zz (m + n))
@@ -38,12 +46,31 @@ def evalBinOp (op : BinOp) (a b : Value) : Except Error Value :=
   | .quot, qq p, qq q => .ok (qq (if q = 0 then 0 else p / q))
   | .rem, qq p, zz n => .ok (qq (if n = 0 then p else 0))
   | .rem, qq p, qq q => .ok (qq (if q = 0 then p else 0))
-  | .pow, zz m, zz n => if 0 ≤ n then .ok (zz (m ^ n.toNat)) else ratZPow m n
+  -- powers
+  | .pow, zz m, zz n => intZPow m n
   | .pow, qq p, zz n => ratZPow p n
+  -- Integral QQ exponents preserve ZZ only when the exponent is nonnegative.
+  | .pow, zz m, qq q =>
+    if q.den = 1 then
+      if 0 ≤ q.num then .ok (zz (m ^ q.num.toNat)) else ratZPow m q.num
+    else .error (.noMethod "^" ["ZZ", "QQ"])
+  | .pow, qq p, qq q =>
+    if q.den = 1 then ratZPow p q.num else .error (.noMethod "^" ["QQ", "QQ"])
+  -- Boolean comparisons: distinct Booleans have no ordering in M2.
   | .eq, .bool x, .bool y => .ok (.bool (x == y))
   | .ne, .bool x, .bool y => .ok (.bool (x != y))
-  | .eq, .null, .null => .ok (.bool true)
-  | .ne, .null, .null => .ok (.bool false)
+  | .lt, .bool x, .bool y =>
+    if x == y then .ok (.bool false)
+    else .error (.noMethod op.symbol [a.className, b.className])
+  | .le, .bool x, .bool y =>
+    if x == y then .ok (.bool true)
+    else .error (.noMethod op.symbol [a.className, b.className])
+  | .gt, .bool x, .bool y =>
+    if x == y then .ok (.bool false)
+    else .error (.noMethod op.symbol [a.className, b.className])
+  | .ge, .bool x, .bool y =>
+    if x == y then .ok (.bool true)
+    else .error (.noMethod op.symbol [a.className, b.className])
   | _, _, _ =>
     match op, a.toRat?, b.toRat? with
     | .add, some p, some q => .ok (qq (p + q))

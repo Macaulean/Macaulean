@@ -2,7 +2,9 @@ import Lean.Data.Json.FromToJson
 import MRDI.Uuid
 open Lean Json
 
-def Lean.githubURL := "https://github.com/leanprover/lean4"
+def Macaulean.githubURL := "https://github.com/Macaulean/Macaulean"
+-- keep in sync with lakefile.toml
+def Macaulean.versionString := "0.1.0"
 
 inductive MrdiTypeDesc where
   | string : String → MrdiTypeDesc
@@ -141,7 +143,8 @@ def runEncode [Monad m] (ns: Json) (act : MrdiEncodeT m MrdiData) : MrdiT m Mrdi
 def toMrdi [Monad m] [MrdiType α] (x: α) : MrdiT m Mrdi :=
   runEncode ns (toMrdiData x)
   where
-    ns := .mkObj [("Lean", .arr #[.str Lean.githubURL, .str Lean.versionString])]
+    ns := .mkObj [("Macaulean",
+      .arr #[.str Macaulean.githubURL, .str Macaulean.versionString])]
 
 --- Either calls encode and stores it in the reference table or looks it up in the reference table
 unsafe def addReference [Monad m] [TypeName α] [MrdiType α] (x : α) : MrdiEncodeT m Uuid := do

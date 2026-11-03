@@ -1,7 +1,6 @@
 name: Lean Action CI
 
 on:
-  push:
   pull_request:
   workflow_dispatch:
 
@@ -17,4 +16,6 @@ jobs:
         run: |
           apt-get update
           apt-get install -y curl
+      - name: Check the Macaulay2 package
+        run: cd m2 && M2 --stop -e 'check "Macaulean"' -e 'exit 0'
       - uses: leanprover/lean-action@v1
