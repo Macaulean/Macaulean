@@ -53,3 +53,16 @@ and [the checked worksheet](MacauleanTest/InterpreterPolynomialsDSL.lean).
 For the univariate GCD implementation, proved input-derived execution budget,
 total correctness, and reusable worksheet certificates, see
 [GCD verification](docs/m2-gcd.md).
+
+## Lean definitions from M2 worksheets
+
+Bindings written under `open M2` automatically get persistent Lean declarations.
+Use `#m2_definition "f"` to find a binding's latest export, then `#print` its
+Lean definition, lowered `.code`, or generated `.definition` theorem. Data exports
+use native Lean types where available; function exports execute their captured
+M2 program with explicit fuel and return both result and state. Reassignments get
+new immutable revisions so existing Lean proofs keep their meaning.
+
+See [the executable example](Examples/DefinitionExposure.lean) and
+[definition exposure](docs/m2-definition-exposure.md) for naming, imports,
+polynomial views, examples of proofs, and the current interpreter-backed boundary.

@@ -1,6 +1,7 @@
 import Lean
 import Macaulean.Interpreter.Input
 import Macaulean.Interpreter.Session
+import Macaulean.Interpreter.DefinitionExposure
 
 /-! # Bare, scoped M2 commands with structured syntax and pure lexical sessions -/
 declare_syntax_cat m2
@@ -235,6 +236,13 @@ def elabInput : CommandElab := fun stx => do
     | .ok value => pure value | .error error => throwErrorAt stx error
   let state ← getSession
   let result := state.step term silent (m2.maxDepth.get (← getOptions))
+  if result.outcome.isOk then
+    let original ← getEnv
+    try
+      DefinitionExposure.record term state result.session
+    catch error =>
+      setEnv original
+      throw error
   modifyEnv fun env => sessionExt.setState env result.session
   let body := parsed.raw[0][0]
   for warning in result.warnings do logWarningAt body warning
