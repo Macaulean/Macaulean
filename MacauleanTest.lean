@@ -56,3 +56,4 @@ import MacauleanTest.VerificationHandles
 import MacauleanTest.ProofJobKernel
 import MacauleanTest.RuntimeEnvironment
 import MacauleanTest.ReductionFoundations
+import MacauleanTest.ReductionRepresentation

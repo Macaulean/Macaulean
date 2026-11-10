@@ -1,9 +1,32 @@
-# Source reduction representation proof: work in progress
+# Source reduction representation correctness
 
-This branch combines the row-representation theorem from #53 and the corrected
-runtime-environment hypotheses from #54. The complete
-`RuntimeReduction.RepresentationStatement` is still an open obligation. No
-complete reduction, irreducibility, termination, or Buchberger theorem is claimed.
+`ReductionRepresentation.representation` proves the exact
+`RuntimeReduction.RepresentationStatement` for the tracked four-argument
+`m2gbReduce` source helper. It is available from `Macaulean.Verification`.
+
+Given same-ring generators, a dimension-indexed coefficient row, represented
+reducers, and an initial coefficientwise equation
+`pending + remainder = row · generators`, every successful runtime call returns
+a polynomial and a row of the original dimension with
+`returned remainder = returned row · generators`. The runtime state must retain
+the production protected prelude bindings. Inputs need not be normalized,
+univariate, or nonzero, and reducers need not form a Gröbner basis.
+
+The proof follows the actual tracked source AST by strong induction on evaluation
+fuel. Source-body identities, evaluator arithmetic, indexing, private assignments,
+and helper calls are checked; no alternative reduction algorithm is assumed.
+Each recursive branch exposes a call at a strictly smaller original budget.
+
+This is successful-return correctness. It does not prove that every input
+terminates successfully, that the remainder is irreducible, or that Buchberger
+is correct. A zero reducer can still cause a runtime error. The separate
+`RuntimeReduction.IrreducibleStatement` remains open. No intent approval or
+proof-acceptance policy is changed.
+
+Dependencies: this branch combines #53 (row linear-combination preservation,
+which depends on #52) and #54 (protected-binding condition), on the #49 DSL
+stack. `stack/dsl-row-and-environment` is their integration/review base, not a
+separate feature to merge. #33/#34 are assumed as upstream prerequisites.
 
 The checked foundations currently cover:
 
@@ -52,12 +75,25 @@ Function allocation is permitted. The result is useful for preserving the
 caller's current reduction frame across recursive search and row helpers.
 
 Run `lake build MacauleanTest.ReductionFoundations` for the focused tests and
-27 transitive axiom audits. The tests include noncanonical cancellation, a
+38 transitive axiom audits. The tests include noncanonical cancellation, a
 selector that must skip a non-divisor, exact move fuel boundaries, caller-cell
 retention, and rejection of
 unsupported effect-checker syntax. Only `propext`, `Classical.choice`, and
 `Quot.sound` are admitted by the audits.
 
-Next: invert the cancellation branch, thread its row invariant,
-and assemble the universal representation theorem. Leading-term irreducibility
-and full termination are subsequent, separate obligations.
+`ReductionRow.successful` identifies the actual row helper result at any
+successful budget and carries its representation and allocation effects.
+`ReductionCoefficient.successful` proves that the source coefficient expression
+returns a same-ring polynomial without changing state; `normal` excludes an
+early-return signal. `ReductionCancel.successful` and `ReductionCancelTail.successful`
+connect both private assignments, the row helper, and the decreasing recursive
+call. The final theorem combines these with the zero and move branches.
+
+`lake build MacauleanTest.ReductionRepresentation` checks the exact universal
+target and a two-variable, two-column regression that skips a reducer, cancels
+a term, then moves a term into the remainder from a noncanonical input. It also
+checks the zero-reducer error boundary and audits all theorem dependencies.
+The complete validation commands are `lake test` and `lake build`.
+
+Next mathematical work: leading-term irreducibility, a DSL-facing ideal-membership
+corollary, and full termination as separate obligations.

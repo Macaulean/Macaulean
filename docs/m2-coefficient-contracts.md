@@ -82,14 +82,14 @@ and `Quot.sound` are allowed. No proof hole or native-evaluation axiom is allowe
 The polynomial-row specialization now proves dimension preservation, sufficient
 depth, and pointwise coefficient correctness for the executed `m2gbSubtractRow`
 helper; see [polynomial rows](m2-polynomial-rows.md). The representation follow-up
-now proves preservation of its linear combination as well. Next come the actual reduction loop's representation
-invariant, leading-term selection and irreducibility, and an ideal-membership
-proof exposed to DSL users. This change does not discharge
-`RuntimeReduction.RepresentationStatement` or `IrreducibleStatement`, prove
-termination, or certify Buchberger. It adds no new intent approvals or proof
-acceptance rules.
+now proves preservation of its linear combination as well. The subsequent
+[source reduction theorem](m2-reduction-proof.md) discharges
+`RuntimeReduction.RepresentationStatement` by induction through the actual
+runtime. Leading-term selection and irreducibility, termination, a DSL-facing
+ideal-membership corollary, and Buchberger correctness remain separate work.
+These results add no intent approvals or proof-acceptance rules.
 
-The pending generic reduction targets require the production bindings for
+The generic reduction targets require the production bindings for
 protected prelude names. See [the environment condition and its checked
 counterexample](m2-reduction-environment.md); arbitrary runtime environments
 make the unrestricted target false.

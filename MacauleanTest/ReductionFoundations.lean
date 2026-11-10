@@ -1,5 +1,8 @@
 import Macaulean.Verification.ReductionDispatch
 import Macaulean.Verification.ReductionTypes
+import Macaulean.Verification.ReductionRow
+import Macaulean.Verification.ReductionCoefficient
+import Macaulean.Verification.ReductionRepresentation
 import Macaulean.Verification.ReductionEffects
 import Macaulean.Verification.CallNormal
 
@@ -57,6 +60,18 @@ example : evalBinOp .mul (.qq 0) (monomial2 2 1).value =
 example : evalBinOp .index (.list [(monomial2 2 1).value,(monomial2 1 1).value]) (.zz (-1)) =
     .ok (monomial2 1 1).value := by decide +kernel
 
+-- The source coefficient expression executes without changing its frame.
+private def coefficientLocals : List Value :=
+  [(monomial2 2 1).value,.list [],.list [],(monomial2 0 0).value,
+    .zz 0,.null,.list [(monomial2 1 1).value,.list []],.null]
+private def coefficientState := (initial.allocate coefficientLocals).2
+example : (Runtime.eval 10 GCD.Execution.reductionCoefficient
+    [GCD.Execution.frame initial 8] coefficientState).toOption.map
+    (fun (v,s) => (v,s.heap.cells)) =
+    some ((monomial2 1 0).value,coefficientState.heap.cells) := by decide +kernel
+example : (ReductionCoefficient.operations (monomial2 2 1)
+    (Views.Polynomial.mk (ring := ring2) ⟨[]⟩)).toOption = none := by decide +kernel
+
 -- The effect checker must not silently accept global mutation, arbitrary
 -- dynamic calls, or the special remainder dispatch to normalForm.
 example : ¬ ReadOnly [] (.set (.global "x") (.int 1)) := by intro h; cases h
@@ -81,7 +96,12 @@ run_cmd do
     ``ReductionDispatch.expose, ``ReductionDispatch.successful,
     ``ReductionTypes.quotient_shape, ``ReductionTypes.lead_coefficient,
     ``ReductionTypes.lead_monomial, ``ReductionTypes.monomial_quotient,
-    ``ReductionTypes.scalar_mul, ``ReductionTypes.index_member, ``ReductionTypes.selected_reducer]
+    ``ReductionTypes.scalar_mul, ``ReductionTypes.index_member, ``ReductionTypes.selected_reducer,
+    ``ReductionRow.invariant, ``ReductionRow.successful,
+    ``ReductionCoefficient.operations_typed, ``ReductionCoefficient.execute,
+    ``ReductionCoefficient.successful, ``ReductionCoefficient.normal,
+    ``ReductionCancelTail.expose, ``ReductionCancelTail.successful,
+    ``ReductionCancel.expose, ``ReductionCancel.successful, ``ReductionRepresentation.representation]
   for name in names do
     for dependency in ← Lean.collectAxioms name do
       unless dependency ∈ [``propext, ``Classical.choice, ``Quot.sound] do
