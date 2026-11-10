@@ -212,6 +212,25 @@ macauleanMainLoop (JSONRPCServer, File) := (server, file) -> (
 ---------------------
 
 -- a function rather than a global so that each test gets a fresh server
+-- Typed preorder data, not M2 source: the Lean grammar is not its own oracle.
+-- Explicit tags/counts preserve empty/singleton sequences and nested classes.
+macauleanEncodeInterpreterValue = v -> (
+    cls := class v;
+    if cls === ZZ then {"ZZ", toString v}
+    else if cls === QQ then {"QQ", toString numerator v, toString denominator v}
+    else if cls === Boolean then {"Boolean", toString v}
+    else if cls === Nothing then {"Nothing"}
+    else if cls === List or cls === Sequence then
+        join({toString cls, toString (#v)},
+            flatten apply(toList v, x -> macauleanEncodeInterpreterValue x))
+    else {"unsupported", toString cls})
+
+macauleanRegisterInterpreterValues = server -> registerMethod(server, "evalValueTree", expr -> (
+    try (
+        v := value expr;
+        join({"ok"}, macauleanEncodeInterpreterValue v))
+    else {"error"}))
+
 macauleanServer = () -> (
     server := new JSONRPCServer;
     -- setLogger(server, str -> stderr << str << endl);
@@ -267,6 +286,7 @@ macauleanServer = () -> (
 	    apply(toList \ toList factor f, term -> (
 		    saveMRDI(term#0, Namespace => "Macaulean"), term#1))));
 
+    macauleanRegisterInterpreterValues server;
     server)
 
 macauleanStart = () -> macauleanMainLoop(macauleanServer(), stdio);
@@ -1008,4 +1028,17 @@ assert Equation(f, sum(#q, i -> q#i * I_i))
 
 close server
 removeFile startfile
+///
+
+
+TEST ///
+-- Typed interpreter transport is registered on every package server.
+needsPackage "JSON"
+server = macauleanServer()
+call = expr -> (fromJSON handleRequest(server,
+    makeRequest("evalValueTree", {expr}, 1)))#"result"
+assert Equation(call "{1/1,1:(),null}",
+    {"ok", "List", "3", "QQ", "1", "1", "Sequence", "1", "Sequence", "0", "Nothing"})
+assert Equation(call "1/0", {"error"})
+assert Equation(call "2+3", {"ok", "ZZ", "5"})
 ///
