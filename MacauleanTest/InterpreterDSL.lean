@@ -288,7 +288,7 @@ run_cmd do
     "(-7)//3", "-7//3", "2 * -7 // 2", "2^-2^2", "2^3^2",
     "2 * -3 ^ 2", "-2+3", "2-3-4", "x = y = 3", "(x) = 3",
     "1/2 + 1/3", "1 < 2 == true", "(1\n+2)", "1 +\n2",
-    "(1 + -- λ\n 2) * 3", "x = 3;"
+    "(1 + -- λ\n 2) * 3", "x = 3;", "1 2"
   ]
   for source in sources do
     let stx ← match Parser.runParserCategory (← getEnv) `m2 source with
@@ -305,10 +305,14 @@ run_cmd do
     unless silent == source.endsWith ";" do
       throwError "wrong terminator for {repr source}"
 
+-- Adjacency now parses as application; applying an integer is a runtime error.
+example : Macaulean.M2.parse "1 2" = .ok (.apply (.int 1) (.int 2)) := by decide +kernel
+example : Macaulean.M2.run "1 2" = .error (.noMethod "SPACE" ["ZZ", "ZZ"]) := by decide +kernel
+
 -- Rejected inputs are tested through the same pure reader, without requiring a
 -- deliberately malformed Lean file or depending on Lean parser-recovery wording.
 run_cmd do
-  for source in #["", "1;;", "(1 + 2", "1.5", "1 2", "2 = 3", "1 +", ";", "1 $ 2"] do
+  for source in #["", "1;;", "(1 + 2", "1.5", "2 = 3", "1 +", ";", "1 $ 2"] do
     -- `1;;` consists of one valid input followed by an invalid second input.
     if source == "1;;" then
       let .ok first := Macaulean.M2.Input.parse source | throwError "first input should parse"

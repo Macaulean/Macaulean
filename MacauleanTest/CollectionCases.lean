@@ -137,12 +137,16 @@ def errors : List (String × Error) := [
   ("true and {}#0", .indexOutOfBounds 0 0),
   ("{1}#0=2", .immutableCollection "List"),
   ("(1:1)#0=2", .immutableCollection "Sequence"),
-  ("{1}#0=1/0", .divByZero)
+  ("{1}#0=1/0", .divByZero),
+  -- Adjacency is now legal application syntax, but integers are not callable.
+  ("{1 2}", .noMethod "SPACE" ["ZZ", "ZZ"]),
+  ("(1 2)", .noMethod "SPACE" ["ZZ", "ZZ"]),
+  ("{1\n2}", .noMethod "SPACE" ["ZZ", "ZZ"])
 ]
 
 def invalidSyntax : List String := [
   "{", "{1", "(1,2", "{1,2)", "(1,2}", "{(1,2}",
-  "{1 2}", "(1 2)", "{1\n2}", "{1,,2", "{1;;}", "{;1}",
+  "{{1}", "(1,2))", "{1,2]", "{1,,2", "{1;;}", "{;1}",
   "1...3", "1..", "1..<", "#", "{1}#", "{1}#?", "{1}.0",
   "{1}=2", "1: =2", "{1.25}", "(,1 +)", "{if true then 1 else }"
 ]
