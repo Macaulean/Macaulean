@@ -1,4 +1,4 @@
-import Macaulean.Verification.Handles.Intro
+import Macaulean.Verification.Handles.LocalWp
 import Macaulean.Verification.Handles.Attr
 
 /-!
@@ -6,12 +6,12 @@ import Macaulean.Verification.Handles.Attr
 
 These `m2_simp` lemmas evaluate the interpreter's own `evalBinOp`/`evalUnOp` on
 integers (naturals are integers `.zz ↑n`) and Booleans, and discharge the side
-conditions of `wpV`. They are all proved from the production definitions.
+conditions of `wpLocal` and `wpV`. They are all proved from the production definitions.
 -/
 namespace Macaulean.M2.Handles
 open Lexical Macaulean.M2.Runtime
 
-attribute [m2_simp] wpV wpArgs BinopPure UnopPure isBasis callable LogicOp.shortCircuit
+attribute [m2_simp] wpLocal wpLocalArgs wpV wpArgs BinopPure UnopPure isBasis callable LogicOp.shortCircuit
   Verification.NatContracts.logicBool boolCase_bool Int.natCast_inj
 
 section
