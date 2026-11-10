@@ -85,8 +85,9 @@ helper; see [polynomial rows](m2-polynomial-rows.md). The representation follow-
 now proves preservation of its linear combination as well. The subsequent
 [source reduction theorem](m2-reduction-proof.md) discharges
 `RuntimeReduction.RepresentationStatement` by induction through the actual
-runtime. Leading-term selection and irreducibility, termination, a DSL-facing
-ideal-membership corollary, and Buchberger correctness remain separate work.
+runtime; its ordered-selector follow-up also proves remainder irreducibility.
+Termination, a DSL-facing ideal-membership corollary, and Buchberger correctness
+remain separate work.
 These results add no intent approvals or proof-acceptance rules.
 
 The generic reduction targets require the production bindings for

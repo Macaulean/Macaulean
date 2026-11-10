@@ -65,20 +65,24 @@ private theorem exhausted (parent s next : State)
     builtin_call _ _ _ _ _ ht, hw, hp,
     liftResult, Except.mapError, bind, Except.bind, pure, Except.pure]
 
-/-- Invert a successful move branch at its original budget, preserving the
-input representation invariant and protected bindings for the recursive call. -/
-theorem successful (fuel : Nat) (parent s : State)
-    (generators : Row r n) (pending remainder : Views.Polynomial r)
+/-- Expose a successful move at its original budget, retaining arithmetic
+results and protected bindings without assuming a representation invariant. -/
+theorem successful_step (fuel : Nat) (parent s : State)
+    (pending remainder : Views.Polynomial r)
     (coefficients : Row r n) (gs j oldTerm divisor coefficient result : Value)
     (after : State)
     (hf : InFrame parent
       [pending.value,coefficients.value,gs,remainder.value,j,oldTerm,divisor,coefficient] s)
     (globals : PreludeBindings parent)
-    (input : ProofJobs.RuntimeReduction.InputInvariant generators pending remainder coefficients)
     (success : catchReturn (eval fuel reductionMoveHead [frame parent 8] s) = .ok (result,after)) :
     ∃ (nextPending nextRemainder : Views.Polynomial r) (next : State) (depth : Nat),
       depth < fuel ∧ PreludeBindings next ∧
-      ProofJobs.RuntimeReduction.InputInvariant generators nextPending nextRemainder coefficients ∧
+      evalBinOp .sub pending.value
+        (Views.Polynomial.mk ⟨(KernelPolynomial.normalize pending.data).terms.take 1⟩).value =
+          .ok nextPending.value ∧
+      evalBinOp .add remainder.value
+        (Views.Polynomial.mk ⟨(KernelPolynomial.normalize pending.data).terms.take 1⟩).value =
+          .ok nextRemainder.value ∧
       call depth (.algebra (.library "m2gbReduce"))
         (.sequence [nextPending.value,coefficients.value,gs,nextRemainder.value]) next =
           .ok (result,after) := by
@@ -106,11 +110,30 @@ theorem successful (fuel : Nat) (parent s : State)
   rw [execute extra parent s next pending remainder term np nr coefficients.value gs j
     oldTerm divisor coefficient hf hl hc ht hp hr hw,
     (library_call_normal _ _ _ _).catchReturn_eq] at success
-  refine ⟨np,nr,next,extra+7,by omega,?_,?_,success⟩
-  · intro name protectedName
-    rw [hn.env]
-    exact globals name protectedName
-  · intro powers
-    exact (move_balance_coefficients pending remainder term np nr hp hr powers).trans (input powers)
+  exact ⟨np,nr,next,extra+7,by omega,globals.of_env_eq hn.env,hp,hr,success⟩
+
+/-- Invert a successful move branch at its original budget, preserving the
+input representation invariant and protected bindings for the recursive call. -/
+theorem successful (fuel : Nat) (parent s : State)
+    (generators : Row r n) (pending remainder : Views.Polynomial r)
+    (coefficients : Row r n) (gs j oldTerm divisor coefficient result : Value)
+    (after : State)
+    (hf : InFrame parent
+      [pending.value,coefficients.value,gs,remainder.value,j,oldTerm,divisor,coefficient] s)
+    (globals : PreludeBindings parent)
+    (input : ProofJobs.RuntimeReduction.InputInvariant generators pending remainder coefficients)
+    (success : catchReturn (eval fuel reductionMoveHead [frame parent 8] s) = .ok (result,after)) :
+    ∃ (nextPending nextRemainder : Views.Polynomial r) (next : State) (depth : Nat),
+      depth < fuel ∧ PreludeBindings next ∧
+      ProofJobs.RuntimeReduction.InputInvariant generators nextPending nextRemainder coefficients ∧
+      call depth (.algebra (.library "m2gbReduce"))
+        (.sequence [nextPending.value,coefficients.value,gs,nextRemainder.value]) next =
+          .ok (result,after) := by
+  obtain ⟨np,nr,next,depth,smaller,bindings,hp,hr,run⟩ :=
+    successful_step fuel parent s pending remainder coefficients gs j oldTerm divisor coefficient
+      result after hf globals success
+  refine ⟨np,nr,next,depth,smaller,bindings,?_,run⟩
+  intro powers
+  exact (move_balance_coefficients pending remainder _ np nr hp hr powers).trans (input powers)
 
 end Macaulean.M2.Verification.ReductionMove

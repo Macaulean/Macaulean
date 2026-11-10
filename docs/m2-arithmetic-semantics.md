@@ -71,11 +71,12 @@ arithmetic to the existing Stage 1 coefficient and finite-convolution views.
 The subsequent [source reduction proof](m2-reduction-proof.md) discharges
 `RuntimeReduction.RepresentationStatement`, using the executed row helper's
 dimension and linear-combination laws. The original arithmetic milestone alone
-does not imply that theorem. `RuntimeReduction.IrreducibleStatement`, full
-termination, and full Buchberger correctness remain separate obligations.
+does not imply that theorem. The linked follow-up also discharges
+`RuntimeReduction.IrreducibleStatement`; full termination and full Buchberger
+correctness remain separate obligations.
 There are no changes to algorithm execution, approval tokens, or proof acceptance.
 
-Remaining focused work includes leading-term selection and irreducibility, and
+Remaining focused work includes full termination and
 an ideal-membership theorem usable through Macaulean's mathematical interface.
 No parser-correctness theorem is claimed.
 
