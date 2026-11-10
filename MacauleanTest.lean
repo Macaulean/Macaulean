@@ -52,3 +52,4 @@ import MacauleanTest.VerificationGraph
 import MacauleanTest.VerificationNatContracts
 import MacauleanTest.VerificationHandles
 import MacauleanTest.ProofJobKernel
+import MacauleanTest.PolynomialExprMRDI

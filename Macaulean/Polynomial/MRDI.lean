@@ -48,4 +48,41 @@ instance [MrdiType R] : MrdiType (Polynomial R n) where
         (error := fun err => pure <| .error err)
     | _ => pure <| .error s!"Expected an Array of terms"
 
-instance [MrdiType R] : MrdiType (Polynomial.Expr R n) := sorry
+namespace Macaulean.Polynomial.Expr
+
+mutual
+  /-- Encode the expression tree without normalizing or flattening it. -/
+  def encode [MrdiType R] : Expr R n → MrdiEncodeM Json
+    | .sum terms => do pure <| .arr #[.str "sum", .arr (← encodeList terms).toArray]
+    | .product factors => do pure <| .arr #[.str "product", .arr (← encodeList factors).toArray]
+    | .pow p k => do pure <| .arr #[.str "pow", ← encode p, .str (toString k)]
+    | .term t => do pure <| .arr #[.str "term", ← encodePolyTerm t]
+  def encodeList [MrdiType R] : List (Expr R n) → MrdiEncodeM (List Json)
+    | [] => pure []
+    | p :: ps => do pure <| (← encode p) :: (← encodeList ps)
+end
+
+/-- Budget derived from the compact JSON character count by `decode?`; not a fixed
+limit on supported expression depth. Coefficients use their own MRDI decoder. -/
+def decodeWithFuel? [MrdiType R] : Nat → Json → ExceptT String MrdiDecodeM (Expr R n)
+  | 0, _ => throw "Polynomial.Expr: exhausted JSON nesting budget"
+  | fuel+1, .arr #[.str "sum", .arr terms] =>
+    do return .sum (← terms.mapM (decodeWithFuel? fuel)).toList
+  | fuel+1, .arr #[.str "product", .arr factors] =>
+    do return .product (← factors.mapM (decodeWithFuel? fuel)).toList
+  | fuel+1, .arr #[.str "pow", p, .str exponent] => do
+    let some k := exponent.toNat? | throw "Polynomial.Expr: expected a natural exponent string"
+    return .pow (← decodeWithFuel? fuel p) k
+  | _+1, .arr #[.str "term", t] => .term <$> decodeTerm? t
+  | _+1, _ => throw "Polynomial.Expr: expected a tagged sum, product, pow, or term"
+
+def decode? [MrdiType R] (json : Json) : MrdiDecodeM (Except String (Expr R n)) :=
+  (decodeWithFuel? (json.compress.length + 1) json).run
+
+end Macaulean.Polynomial.Expr
+
+instance [MrdiType R] : MrdiType (Polynomial.Expr R n) where
+  mrdiType := .parameterized "Macaulean.Polynomial.Expr" (.mkObj [
+    ("coefficient", toJson (MrdiType.mrdiType R)), ("variables", .str (toString n))])
+  encode := Polynomial.Expr.encode
+  decode? := Polynomial.Expr.decode?
