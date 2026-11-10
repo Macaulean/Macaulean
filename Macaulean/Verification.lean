@@ -4,6 +4,7 @@ import Macaulean.Verification.PolynomialArithmetic
 import Macaulean.Verification.PolynomialRows
 import Macaulean.Verification.RowRepresentation
 import Macaulean.Verification.ReductionRepresentation
+import Macaulean.Verification.ReductionIrreducibility
 import Macaulean.Verification.Contracts
 import Macaulean.Verification.Snapshot
 import Macaulean.Verification.Intent

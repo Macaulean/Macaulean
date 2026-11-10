@@ -28,6 +28,22 @@ theorem invariant (generators coefficients updated : Row r n)
   rw [← result powers, coeff_sub, coeff_mul]
   simpa only [balance, coeff_add] using balanceEq
 
+/-- The row helper's execution facts do not require a representation invariant. -/
+theorem successful_step (coefficients : Row r n) (c : Views.Polynomial r)
+    (other : Row r n) (s after : Runtime.State) (fuel : Nat) (v : Value)
+    (global : s.env.lookup "m2gbSubtractRow" = some (.algebra (.library "m2gbSubtractRow")))
+    (success : Runtime.call fuel (.algebra (.library "m2gbSubtractRow"))
+      (.sequence [coefficients.value,c.value,other.value,.zz 0]) s = .ok (v,after)) :
+    ∃ updated : Row r n, v = updated.value ∧
+      Subtracts c coefficients.values other.values updated.values ∧
+      RowProgram.AllocatesOnly s after := by
+  obtain ⟨updated,expected,run,rows,effects⟩ := execute c coefficients other s 0 global
+  have same := Fuel.call_success_unique fuel (0+16*(n+1)) _ _ s _ _ success run
+  refine ⟨updated,congrArg Prod.fst same,rows,?_⟩
+  have stateEq : after = expected := congrArg Prod.snd same
+  rw [stateEq]
+  exact effects
+
 /-- A successful actual row-helper call at any budget supplies the updated
 representation invariant and retains all pre-existing cells and bindings.
 The known total execution is compared at the original budget; the caller's
@@ -46,13 +62,9 @@ theorem successful (generators coefficients : Row r n)
     ∃ updated : Row r n, v = updated.value ∧
       InputInvariant generators nextPending remainder updated ∧
       RowProgram.AllocatesOnly s after := by
-  obtain ⟨updated,expected,run,rows,effects⟩ := execute c coefficients g.coefficients s 0 global
-  have same := Fuel.call_success_unique fuel (0+16*(n+1)) _ _ s _ _ success run
-  have valueEq := congrArg Prod.fst same
-  have stateEq : after = expected := congrArg Prod.snd same
-  refine ⟨updated,valueEq,invariant generators coefficients updated pending remainder c product
-    nextPending g input reducer rows multiply subtract,?_⟩
-  rw [stateEq]
-  exact effects
+  obtain ⟨updated,valueEq,rows,effects⟩ :=
+    successful_step coefficients c g.coefficients s after fuel v global success
+  exact ⟨updated,valueEq,invariant generators coefficients updated pending remainder c product
+    nextPending g input reducer rows multiply subtract,effects⟩
 
 end Macaulean.M2.Verification.ReductionRow

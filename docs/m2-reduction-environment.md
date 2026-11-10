@@ -30,7 +30,7 @@ regression ensures the condition does not pin the entire environment. The proofs
 use the existing `checkWritable` behavior; interpreter semantics are unchanged.
 
 These lemmas are prerequisites for the [source reduction representation
-proof](m2-reduction-proof.md), which now discharges `RepresentationStatement`.
+proof](m2-reduction-proof.md), which now discharges both `RepresentationStatement` and `IrreducibleStatement`.
 The environment lemmas alone do not establish preservation through every evaluator
 construct or either mathematical reduction target. The correction does not
 approve a contract or install an algorithm-correctness theorem.
