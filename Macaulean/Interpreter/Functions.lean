@@ -201,7 +201,7 @@ theorem runtime_eval (t : IntExpr) (fuel : Nat) (fs : Frames) (s : State)
         cases k with
         | zero => omega
         | succ j => rfl
-      simp [code, eval, ih k ha, hn, denote, evalBinOp, liftResult, Except.mapError,
+      simp [code, eval, ih k ha, hn, denote, evalBinOp, intZPow, liftResult, Except.mapError,
         bind, Except.bind, pure, Except.pure]
 
 /-- The source runtime's resolution/allocation adapter also preserves arithmetic. -/
