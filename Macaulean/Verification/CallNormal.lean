@@ -30,6 +30,14 @@ theorem Normal.catchReturn (r : Result Value) : Normal (Runtime.catchReturn r) :
     | error e => exact .error e
     | returned v s => exact .ok (v,s)
 
+theorem Normal.catchReturn_eq {r : Result Value} (h : Normal r) :
+    Runtime.catchReturn r = r := by
+  cases r with
+  | ok x => rfl
+  | error e => cases e with
+    | error e => rfl
+    | returned v s => exact False.elim (h v s rfl)
+
 theorem library_call_normal (fuel : Nat) (name : String) (arg : Value) (s : State) :
     Normal (call fuel (.algebra (.library name)) arg s) := by
   cases fuel with
