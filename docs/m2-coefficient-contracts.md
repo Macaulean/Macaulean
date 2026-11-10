@@ -81,8 +81,8 @@ and `Quot.sound` are allowed. No proof hole or native-evaluation axiom is allowe
 
 The polynomial-row specialization now proves dimension preservation, sufficient
 depth, and pointwise coefficient correctness for the executed `m2gbSubtractRow`
-helper; see [polynomial rows](m2-polynomial-rows.md). Preservation of its linear
-combination remains open. Then come the actual reduction loop's representation
+helper; see [polynomial rows](m2-polynomial-rows.md). The representation follow-up
+now proves preservation of its linear combination as well. Next come the actual reduction loop's representation
 invariant, leading-term selection and irreducibility, and an ideal-membership
 proof exposed to DSL users. This change does not discharge
 `RuntimeReduction.RepresentationStatement` or `IrreducibleStatement`, prove
