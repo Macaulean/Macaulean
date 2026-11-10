@@ -7,7 +7,7 @@ in the existing Stage 1 views. Convolution is the independent finite sum in
 namespace Macaulean.M2.Verification.Views
 open Macaulean.M2.KernelPolynomial Lean.Grind
 
-private def coefficientWeight (powers : List Nat) (m : Macaulean.Mon n) : Rat :=
+def coefficientWeight (powers : List Nat) (m : Macaulean.Mon n) : Rat :=
   if m.powers = powers then 1 else 0
 
 private theorem coefficient_terms (ts : List (Macaulean.PolyTerm Rat n)) (powers : List Nat) :
@@ -19,7 +19,7 @@ private theorem coefficient_terms (ts : List (Macaulean.PolyTerm Rat n)) (powers
     simp only [List.map_cons, coefficient_cons, weightedSum, ih, coefficientWeight]
     split <;> grind
 
-private theorem coeff_weighted (p : Polynomial r) (powers : List Nat) :
+theorem coeff_weighted (p : Polynomial r) (powers : List Nat) :
     p.coeff powers = weightedSum (coefficientWeight powers) p.data.terms :=
   coefficient_terms p.data.terms powers
 
