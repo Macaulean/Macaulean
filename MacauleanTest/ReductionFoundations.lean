@@ -1,4 +1,5 @@
 import Macaulean.Verification.ReductionDispatch
+import Macaulean.Verification.ReductionTypes
 import Macaulean.Verification.ReductionEffects
 import Macaulean.Verification.CallNormal
 
@@ -41,6 +42,21 @@ example : Runtime.call 9 (.algebra (.library "m2gbReduce"))
     (.sequence [(poly [(1,1)]).value,.list [],.list [],(poly []).value]) initial =
     .error (.error .fuelExhausted) := by rfl
 
+private def ring2 : Polynomials.RingInfo := ⟨17,["x","y"]⟩
+private def monomial2 (a b : Nat) : Views.Polynomial ring2 :=
+  ⟨⟨[⟨1,⟨[a,b],rfl⟩⟩]⟩⟩
+example : Polynomials.callPrimitive .monomialQuotient
+    (.sequence [(monomial2 2 1).value,(monomial2 1 1).value]) =
+    .ok (monomial2 1 0).value := by decide +kernel
+-- Failed divisibility and malformed dimensions cannot masquerade as typed results.
+example : (Polynomials.callPrimitive .monomialQuotient
+    (.sequence [(monomial2 1 1).value,(monomial2 2 1).value])).toOption = none := by decide +kernel
+example : (Polynomials.monomialQuotient 2 [(1,[2,1])] [(1,[1])]).toOption = none := by decide +kernel
+example : evalBinOp .mul (.qq 0) (monomial2 2 1).value =
+    .ok (Views.Polynomial.mk (ring := ring2) ⟨[]⟩).value := by decide +kernel
+example : evalBinOp .index (.list [(monomial2 2 1).value,(monomial2 1 1).value]) (.zz (-1)) =
+    .ok (monomial2 1 1).value := by decide +kernel
+
 -- The effect checker must not silently accept global mutation, arbitrary
 -- dynamic calls, or the special remainder dispatch to normalForm.
 example : ¬ ReadOnly [] (.set (.global "x") (.int 1)) := by intro h; cases h
@@ -62,7 +78,10 @@ run_cmd do
     ``Runtime.library_call_normal, ``Runtime.builtin_call_normal,
     ``Fuel.eval_mono, ``Runtime.Normal.catchReturn_eq,
     ``ReductionMove.execute, ``ReductionMove.successful,
-    ``ReductionDispatch.expose, ``ReductionDispatch.successful]
+    ``ReductionDispatch.expose, ``ReductionDispatch.successful,
+    ``ReductionTypes.quotient_shape, ``ReductionTypes.lead_coefficient,
+    ``ReductionTypes.lead_monomial, ``ReductionTypes.monomial_quotient,
+    ``ReductionTypes.scalar_mul, ``ReductionTypes.index_member, ``ReductionTypes.selected_reducer]
   for name in names do
     for dependency in ← Lean.collectAxioms name do
       unless dependency ∈ [``propext, ``Classical.choice, ``Quot.sound] do

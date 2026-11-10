@@ -27,6 +27,11 @@ The checked foundations currently cover:
   frame, assigning its result to the private slot preserves protected bindings,
   and only a Boolean comparison can reach a branch. No selector correctness
   hypothesis or extra nonzero-reducer restriction is assumed.
+- `ReductionTypes`: successful leading-monomial and monomial-quotient primitives
+  retain the input ring and exponent dimension. Leading coefficients are rational
+  scalars, and rational scaling returns a same-ring polynomial. Successful reducer
+  indexing selects an existing supplied reducer, including negative indices.
+  Malformed dimensions and failed divisibility remain errors.
 - `ExecutionEffects.evaluate`: expressions in the supported read-only fragment
   preserve existing cells and globals under explicit callee effect contracts.
   The fragment includes arithmetic, indexing, conditionals, sequencing,
@@ -47,7 +52,7 @@ Function allocation is permitted. The result is useful for preserving the
 caller's current reduction frame across recursive search and row helpers.
 
 Run `lake build MacauleanTest.ReductionFoundations` for the focused tests and
-20 transitive axiom audits. The tests include noncanonical cancellation, a
+27 transitive axiom audits. The tests include noncanonical cancellation, a
 selector that must skip a non-divisor, exact move fuel boundaries, caller-cell
 retention, and rejection of
 unsupported effect-checker syntax. Only `propext`, `Classical.choice`, and
