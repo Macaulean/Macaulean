@@ -81,7 +81,7 @@ theorem sumTo_spec (n : Nat) : sumTo n ⇓ triangle n := by
 error: unsolved goals
 n : Nat
 ⊢ if n = 0 then 0 = triangle n
-  else (sumTo (n - 1)).Sat fun vb => evalBinOp BinOp.add (Value.zz ↑n) vb = Except.ok (Value.zz ↑(triangle n))
+  else (sumTo (n - 1)).Sat fun v => evalBinOp BinOp.add (Value.zz ↑n) v = Except.ok (Value.zz ↑(triangle n))
 -/
 #guard_msgs in
 example (n : Nat) : sumTo n ⇓ triangle n := by

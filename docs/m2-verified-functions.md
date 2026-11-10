@@ -259,21 +259,34 @@ This is what lets theorems compose:
 
 Files are under `Macaulean/Verification/Handles/`.
 
-- **`wpV`** (`Intro.lean`) generalizes `wpN` from ℕ to arbitrary runtime values.
-  - Arithmetic uses the production `evalBinOp`/`evalUnOp` directly.
-  - A call `g a` becomes `(g a).Sat Q`, i.e. a statement about another function,
-    instead of an inlined contract.
-  - It covers literals, parameters, globals, unary and binary operators, `and`,
-    `or`, `not`, `if`, `;`, lists, sequences and calls.
-  - Everything else is `False`: assignments, nested functions, `return` and rings.
+- **`wpLocal`** (`LocalWp.lean`) computes verification conditions over runtime
+  values and the current list of private local values. Arithmetic uses the
+  production operations. A call `g a` becomes `(g a).Sat Q` for modular reuse.
+  It covers literals, parameters, globals, unary and binary operators, Boolean
+  short-circuiting, conditionals, sequencing, lists, sequences, calls, private
+  local assignment and early `return`. Local values flow left to right through
+  operands. A return uses a separate continuation and skips the remaining work,
+  including when it occurs inside an operand, condition or collection element.
 
-  The soundness theorem `Fn.Call.Sat.intro` is proved once, by the same induction
-  as for `#m2_verify`.
+  `LocalFrame.lean` relates private slots to fresh heap cells. Assignment can
+  rewrite those cells while preserving every cell that existed before the call.
+  `LocalExecution.lean` handles normal and returned outcomes, including fuel
+  monotonicity. `Fn.Call.Sat.introLocalWp` proves the verification conditions
+  sound against the production evaluator. Extra local slots initially hold
+  `null`, exactly as in the runtime. The original read-only `wpV` and
+  `Fn.Call.Sat.intro` remain available.
+
+  Global or captured-cell writes, captured-slot reads, simultaneous assignment,
+  nested function creation, symbolic references and ring construction have
+  precondition `False`. Arithmetic operations that create functions or invoke
+  hidden calls also retain the existing purity restrictions. These exclusions
+  preserve the existing `Fn.Call.Sat` contract; it still guarantees that a call
+  preserves all caller cells, globals, function records and the ring counter.
 - **The `m2_simp` simp set** (`Simp.lean`) evaluates operations on represented
   values: integer arithmetic and comparisons, Booleans, list length and in-range
   indexing. Tag lemmas `@[m2_simp]` to support new kinds of value.
 - **`m2_unfold`** (`Tactic.lean`) works in three steps:
-  1. it applies `Sat.intro` and evaluates the global lookups of the reflected
+  1. it applies `Sat.introLocalWp` and evaluates the global lookups of the reflected
      state with `decide +kernel`;
   2. it simplifies with `m2_simp`. Branch conditions are made available to the
      discharger, so `n - 1` stays a natural number and `l#i` is in range;
@@ -290,12 +303,37 @@ worksheet state made by `Targets.stateExpr`.
 - non-termination proofs and partial correctness without termination. These need
   the converse of `m2_unfold`, plus a theorem that results do not depend on
   unrelated heap cells;
-- local variables and assignments in function bodies;
+- mutation of captured cells or globals, simultaneous assignment and nested
+  closure creation in verified bodies;
 - calls to library and builtin functions such as `normalForm` inside verified
   bodies.
 
-Tests are in `MacauleanTest/VerificationHandles.lean`; `Examples/Handles.lean` is a
-worksheet.
+Tests are in `MacauleanTest/VerificationHandles.lean` and
+`MacauleanTest/VerificationLocalHandles.lean`; `Examples/Handles.lean` is a worksheet.
+
+### Local variables and early return
+
+```lean
+#guard_msgs in
+localIncrement = n -> (x := n; x = x+1; x);
+
+theorem localIncrement_spec (n : Nat) : localIncrement n ⇓ n+1 := by
+  m2_unfold
+
+#guard_msgs in
+privateCaller = n -> (x := n; y := localIncrement(x); x = x+y; x);
+
+theorem privateCaller_spec (n : Nat) : privateCaller n ⇓ 2*n+1 := by
+  m2_unfold
+  m2_use localIncrement_spec n
+  omega
+```
+
+`m2_use` can reuse a callee that modifies its own locals: its contract preserves
+all cells that existed when that nested call began, including the caller's
+current locals. Recursive functions use the same workflow with an induction
+hypothesis. This extension is for handle proofs; the separate `#m2_verify`
+natural-contract language retains its documented restricted syntax.
 
 ## Extending beyond natural numbers
 
