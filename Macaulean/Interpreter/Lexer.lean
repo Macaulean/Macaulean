@@ -1,18 +1,17 @@
 /-!
-# Lexer
+# Total lexer for the scalar Macaulay2 fragment
 
-The lexer (like the parser) is total: it recurses on a fuel parameter rather
-than using `partial` or well-founded recursion, so the kernel can run it and
-theorems can be stated about Macaulay2 *source strings*.
+`identifierToken` is shared with the located worksheet reader. Keywords are
+recognized only as whole words; `ifx`, `then$1`, and `not'` remain identifiers.
 -/
 
 namespace Macaulean.M2
 
-/-- Operator and punctuation symbols. -/
 inductive Sym where
   | plus | minus | star | slash | slashslash | percent | caret
   | eqeq | ne | lt | le | gt | ge | assign
   | lparen | rparen | semi
+  | kwIf | kwThen | kwElse | kwAnd | kwOr | kwNot
   deriving Repr, DecidableEq, Inhabited
 
 inductive Token where
@@ -24,7 +23,6 @@ inductive Token where
 
 namespace Lexer
 
-/-- The value of `c` as a digit in base `base`, if it is one. -/
 def digitVal (base : Nat) (c : Char) : Option Nat :=
   let d :=
     if '0' ≤ c ∧ c ≤ '9' then some (c.toNat - '0'.toNat)
@@ -35,7 +33,6 @@ def digitVal (base : Nat) (c : Char) : Option Nat :=
   | some d => if d < base then some d else none
   | none => none
 
-/-- Read digits in base `base`, returning the accumulated number and the rest. -/
 def digits (base : Nat) (acc : Nat) : List Char → Nat × List Char
   | [] => (acc, [])
   | c :: cs =>
@@ -47,7 +44,11 @@ def isIdentStart (c : Char) : Bool := c.isAlpha
 
 def isIdentChar (c : Char) : Bool := c.isAlphanum || c == '\'' || c == '$'
 
-/-- Split off the longest prefix whose characters satisfy `p`. -/
+def identifierToken : String → Token
+  | "if" => .sym .kwIf | "then" => .sym .kwThen | "else" => .sym .kwElse
+  | "and" => .sym .kwAnd | "or" => .sym .kwOr | "not" => .sym .kwNot
+  | name => .ident name
+
 def span (p : Char → Bool) : List Char → List Char × List Char
   | [] => ([], [])
   | c :: cs =>
@@ -56,13 +57,11 @@ def span (p : Char → Bool) : List Char → List Char × List Char
       (c :: a, b)
     else ([], c :: cs)
 
-/-- Drop everything up to (but not including) the next newline. -/
 def dropComment : List Char → List Char
   | [] => []
   | '\n' :: cs => '\n' :: cs
   | _ :: cs => dropComment cs
 
-/-- Read an integer literal: decimal, or `0b`/`0o`/`0x` prefixed. -/
 def number : List Char → Nat × List Char
   | '0' :: b :: c :: cs =>
     let base? := if b = 'b' ∨ b = 'B' then some 2
@@ -76,7 +75,6 @@ def number : List Char → Nat × List Char
     | none => digits 10 0 ('0' :: b :: c :: cs)
   | cs => digits 10 0 cs
 
-/-- Recognize an operator or punctuation symbol at the start of the input. -/
 def symbol : List Char → Option (Sym × List Char)
   | '/' :: '/' :: cs => some (.slashslash, cs)
   | '=' :: '=' :: cs => some (.eqeq, cs)
@@ -97,8 +95,6 @@ def symbol : List Char → Option (Sym × List Char)
   | ';' :: cs => some (.semi, cs)
   | _ => none
 
-/-- The lexer loop.  Each step consumes at least one character, so `fuel`
-equal to the length of the input suffices. -/
 def lexAux : Nat → List Char → Except String (List Token)
   | _, [] => .ok []
   | 0, _ => .error "lexer ran out of fuel"
@@ -113,16 +109,14 @@ def lexAux : Nat → List Char → Except String (List Token)
       else (Token.num n :: ·) <$> lexAux fuel rest
     else if isIdentStart c then
       let (x, rest) := span isIdentChar cs
-      (Token.ident (String.ofList (c :: x)) :: ·) <$> lexAux fuel rest
+      (identifierToken (String.ofList (c :: x)) :: ·) <$> lexAux fuel rest
     else match symbol (c :: cs) with
       | some (s, rest) => (Token.sym s :: ·) <$> lexAux fuel rest
       | none => .error s!"unsupported character '{c}'"
 
-/-- Tokenize Macaulay2 source. -/
 def lex (s : String) : Except String (List Token) :=
   let cs := s.toList
   lexAux cs.length cs
 
 end Lexer
-
 end Macaulean.M2
