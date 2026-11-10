@@ -22,6 +22,11 @@ The checked foundations currently cover:
   dimensions, and noncanonical polynomials. `execute` identifies the exact
   production call at depth `fuel + 7` from branch depth `fuel + 9`; the depth-8
   boundary is exhausted, and evaluation monotonicity excludes every lower depth.
+- `ReductionDispatch.successful`: every successful nonzero source call reaches
+  one of the two source branches at smaller fuel. The selector preserves the
+  frame, assigning its result to the private slot preserves protected bindings,
+  and only a Boolean comparison can reach a branch. No selector correctness
+  hypothesis or extra nonzero-reducer restriction is assumed.
 - `ExecutionEffects.evaluate`: expressions in the supported read-only fragment
   preserve existing cells and globals under explicit callee effect contracts.
   The fragment includes arithmetic, indexing, conditionals, sequencing,
@@ -42,13 +47,12 @@ Function allocation is permitted. The result is useful for preserving the
 caller's current reduction frame across recursive search and row helpers.
 
 Run `lake build MacauleanTest.ReductionFoundations` for the focused tests and
-18 transitive axiom audits. The tests include noncanonical cancellation, a
+20 transitive axiom audits. The tests include noncanonical cancellation, a
 selector that must skip a non-divisor, exact move fuel boundaries, caller-cell
 retention, and rejection of
 unsupported effect-checker syntax. Only `propext`, `Classical.choice`, and
 `Quot.sound` are admitted by the audits.
 
-Next: invert the source dispatch and cancellation branch, thread the row
-invariant through cancellation,
+Next: invert the cancellation branch, thread its row invariant,
 and assemble the universal representation theorem. Leading-term irreducibility
 and full termination are subsequent, separate obligations.

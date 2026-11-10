@@ -1,4 +1,4 @@
-import Macaulean.Verification.ReductionMove
+import Macaulean.Verification.ReductionDispatch
 import Macaulean.Verification.ReductionEffects
 import Macaulean.Verification.CallNormal
 
@@ -36,6 +36,11 @@ example : (Runtime.eval 9 GCD.Execution.reductionMoveHead moveFrames moveState).
     (fun (v,s) => (v,s.heap.cells.take 1)) =
     some (.list [(poly [(1,1)]).value,.list []],[.zz 99]) := by decide +kernel
 
+-- Dispatch also has a checked low-fuel boundary on a nonzero input.
+example : Runtime.call 9 (.algebra (.library "m2gbReduce"))
+    (.sequence [(poly [(1,1)]).value,.list [],.list [],(poly []).value]) initial =
+    .error (.error .fuelExhausted) := by rfl
+
 -- The effect checker must not silently accept global mutation, arbitrary
 -- dynamic calls, or the special remainder dispatch to normalForm.
 example : ¬ ReadOnly [] (.set (.global "x") (.int 1)) := by intro h; cases h
@@ -56,7 +61,8 @@ run_cmd do
     ``ReductionValues.reduction_zero, ``representation_zero,
     ``Runtime.library_call_normal, ``Runtime.builtin_call_normal,
     ``Fuel.eval_mono, ``Runtime.Normal.catchReturn_eq,
-    ``ReductionMove.execute, ``ReductionMove.successful]
+    ``ReductionMove.execute, ``ReductionMove.successful,
+    ``ReductionDispatch.expose, ``ReductionDispatch.successful]
   for name in names do
     for dependency in ← Lean.collectAxioms name do
       unless dependency ∈ [``propext, ``Classical.choice, ``Quot.sound] do
