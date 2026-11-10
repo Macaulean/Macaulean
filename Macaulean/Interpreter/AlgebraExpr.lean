@@ -23,11 +23,21 @@ def rawPolynomialsExpr : List Polynomials.Raw → Expr
   | [] => mkApp (mkConst ``List.nil [0]) (mkConst ``Polynomials.Raw)
   | p :: ps => mkApp3 (mkConst ``List.cons [0]) (mkConst ``Polynomials.Raw)
       (rawPolynomialExpr p) (rawPolynomialsExpr ps)
+def rawMatrixExpr : List (List Polynomials.Raw) → Expr
+  | [] => mkApp (mkConst ``List.nil [0]) (mkApp (mkConst ``List [0]) (mkConst ``Polynomials.Raw))
+  | p :: ps => mkApp3 (mkConst ``List.cons [0])
+      (mkApp (mkConst ``List [0]) (mkConst ``Polynomials.Raw))
+      (rawPolynomialsExpr p) (rawMatrixExpr ps)
 def algebraObjectExpr : Polynomials.Object → Expr
   | .rationals => mkConst ``Polynomials.Object.rationals
   | .ring r => mkApp (mkConst ``Polynomials.Object.ring) (algebraRingExpr r)
   | .poly r p => mkApp2 (mkConst ``Polynomials.Object.poly) (algebraRingExpr r) (rawPolynomialExpr p)
   | .ideal r ps => mkApp2 (mkConst ``Polynomials.Object.ideal) (algebraRingExpr r) (rawPolynomialsExpr ps)
   | .row r ps => mkApp2 (mkConst ``Polynomials.Object.row) (algebraRingExpr r) (rawPolynomialsExpr ps)
+  | .matrix r cols rows => mkApp3 (mkConst ``Polynomials.Object.matrix)
+      (algebraRingExpr r) (toExpr cols) (rawMatrixExpr rows)
+  | .basis r input ps rows => mkApp4 (mkConst ``Polynomials.Object.basis)
+      (algebraRingExpr r) (rawPolynomialsExpr input) (rawPolynomialsExpr ps) (rawMatrixExpr rows)
   | .builtin p => mkApp (mkConst ``Polynomials.Object.builtin) (toExpr p)
+  | .library name => mkApp (mkConst ``Polynomials.Object.library) (toExpr name)
 end Macaulean.M2
