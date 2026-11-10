@@ -1,0 +1,52 @@
+import Macaulean.Verification.ReductionValues
+import Macaulean.Verification.ReductionEffects
+import Macaulean.Verification.CallNormal
+
+namespace Macaulean.M2.Verification.ReductionFoundations.Tests
+open Views ExecutionEffects ReductionEffects ReductionValues
+set_option maxRecDepth 10000
+set_option maxHeartbeats 1000000
+
+private def ring : Polynomials.RingInfo := ⟨13,["x"]⟩
+private def poly (ts : List (Rat × Nat)) : Views.Polynomial ring :=
+  ⟨⟨ts.map fun (c,n) => ⟨c,⟨[n],rfl⟩⟩⟩⟩
+private def canceled := poly [(2,3),(-2,3),(0,0)]
+
+example : evalBinOp .eq canceled.value (.zz 0) = .ok (.bool true) := by decide +kernel
+example (powers : List Nat) : canceled.coeff powers = 0 :=
+  eq_zero_coefficients canceled (by decide +kernel) powers
+
+private def initial : Runtime.State := { heap := { cells := [.zz 99] } }
+private def selectorArg : Value := .sequence [(poly [(1,1)]).value,
+  .list [.list [(poly [(1,2)]).value,.list []], .list [(poly [(1,1)]).value,.list []]],.zz 0]
+
+-- The selector must recurse past the first non-divisor and retain caller cells.
+example : (Runtime.call 100 (.algebra (.library "m2gbReducer")) selectorArg initial).toOption.map
+    (fun (v,s) => (v,s.heap.cells.take 1)) = some (.zz 1,[.zz 99]) := by decide +kernel
+
+-- The effect checker must not silently accept global mutation, arbitrary
+-- dynamic calls, or the special remainder dispatch to normalForm.
+example : ¬ ReadOnly [] (.set (.global "x") (.int 1)) := by intro h; cases h
+example : ¬ ReadOnly [] (.apply (.read (.global "unknown")) (.int 1)) := by
+  intro h
+  cases h with
+  | globalCall member _ => simp at member
+example : ¬ ReadOnly [] (.binop .rem (.int 1) (.int 1)) := by
+  intro h
+  cases h with
+  | binop notRem _ _ => exact notRem rfl
+
+open Lean Elab Command in
+run_cmd do
+  let names := [``ExecutionEffects.evaluate, ``ExecutionEffects.library_safe,
+    ``selector_readOnly, ``selector_safe, ``selector_preserves, ``row_readOnly, ``row_safe,
+    ``ReductionValues.eval_eq_zero, ``eq_zero_coefficients, ``lead_term,
+    ``ReductionValues.reduction_zero, ``representation_zero,
+    ``Runtime.library_call_normal, ``Runtime.builtin_call_normal]
+  for name in names do
+    for dependency in ← Lean.collectAxioms name do
+      unless dependency ∈ [``propext, ``Classical.choice, ``Quot.sound] do
+        throwError "{name} depends on unapproved axiom {dependency}"
+  logInfo m!"REDUCTION_FOUNDATIONS_COMPLETE: {names.length} theorem dependency audits"
+
+end Macaulean.M2.Verification.ReductionFoundations.Tests
