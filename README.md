@@ -41,6 +41,12 @@ From command line:
 lake build MacauleanTest
 ```
 
+## Supported M2 language
+
+See the [language reference and feature matrix](docs/m2-language-reference.md)
+for supported syntax, precedence, binding/state semantics, algebra interfaces,
+intentional restrictions, and the distinction between execution and proof coverage.
+
 ## Pure M2 worksheet: QQ polynomials
 
 `import Macaulean.Interpreter.DSL` followed by `open M2` enables bare inputs such
