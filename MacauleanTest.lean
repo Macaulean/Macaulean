@@ -23,3 +23,9 @@ import MacauleanTest.InterpreterFunctions
 import MacauleanTest.InterpreterFunctionsM2
 import MacauleanTest.InterpreterFunctionsDSL
 import MacauleanTest.InterpreterFunctionsImport
+import MacauleanTest.PolynomialReference
+import MacauleanTest.InterpreterPolynomials
+import MacauleanTest.InterpreterPolynomialsM2
+import MacauleanTest.InterpreterPolynomialsDSL
+import MacauleanTest.InterpreterPolynomialsImport
+import MacauleanTest.PolynomialCIReference

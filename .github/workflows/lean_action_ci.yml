@@ -9,7 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/macaulay2/testbot
-
     steps:
       - uses: actions/checkout@v7
       - name: Install dependencies

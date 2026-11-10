@@ -3,20 +3,15 @@ import Macaulean.Interpreter.Syntax
 /-!
 # Static, source-ordered lexical resolution
 
-A := declaration allocates a new slot before resolving its initializer. Earlier
-references never change when the spelling is redeclared. In contrast, `local x`
-reuses x in the current scope, introducing it only if absent. Both branches are
-resolved, even if one is not executed. Only function bodies introduce new scopes;
-parentheses and collections do not. Runtime name search never decides capture.
+:= creates a slot before resolving its initializer. `local` reuses current-scope
+bindings. Only function bodies create scopes. Bracket identifiers are resolved to their current bindings. Ring construction
+can publish global generators without treating those identifiers as assignments.
 -/
 namespace Macaulean.M2.Lexical
-
 inductive Ref where
   | global (name : String)
   | slot (depth index : Nat)
   deriving Repr, DecidableEq, Inhabited
-
-/-- Resolved code is distinct from surface syntax; local references have addresses. -/
 inductive Code where
   | int (n : Int)
   | read (ref : Ref)
@@ -36,50 +31,40 @@ inductive Code where
   | apply (fn arg : Code)
   | symbol (name : String) (ref : Ref)
   | returnTerm (arg : Code)
+  | polyRing (base : Code) (names : List (String × Ref))
   deriving Repr, Inhabited
-
 structure Scope where
   names : List (String × Nat) := []
   count : Nat := 0
   deriving Repr, DecidableEq, Inhabited
-
 structure Resolver where
   current : Scope := {}
   outers : List Scope := []
   warnings : List String := []
   deriving Repr, Inhabited
-
 def findOuter (name : String) : List Scope → Nat → Ref
   | [], _ => .global name
   | s :: ss, d => match s.names.lookup name with
     | some i => .slot d i | none => findOuter name ss (d + 1)
-
 def Resolver.lookup (r : Resolver) (name : String) : Ref :=
   match r.current.names.lookup name with
   | some i => .slot 0 i | none => findOuter name r.outers 1
-
-/-- := redeclaration creates a fresh binding, not an update of the previous slot. -/
 def Resolver.declare (r : Resolver) (name : String) : Ref × Resolver :=
   let i := r.current.count
   let warnings := if (r.current.names.lookup name).isSome then
       r.warnings ++ [s!"redeclaration of local variable '{name}'"] else r.warnings
   (.slot 0 i, { r with current := ⟨(name, i) :: r.current.names, i + 1⟩, warnings })
-
-/-- `local` quotes an existing current-scope binding without resetting its value. -/
 def Resolver.localRef (r : Resolver) (name : String) : Ref × Resolver :=
   match r.current.names.lookup name with
   | some i => (.slot 0 i, r)
   | none => r.declare name
-
 def Resolver.declareMany : List String → Resolver → List Ref × Resolver
   | [], r => ([], r)
   | x :: xs, r =>
     let (v, r) := r.declare x
     let (vs, r) := r.declareMany xs
     (v :: vs, r)
-
 mutual
-
 def resolve : Term → Resolver → Code × Resolver
   | .int n, r => (.int n, r)
   | .var x, r => (.read (r.lookup x), r)
@@ -146,7 +131,9 @@ def resolve : Term → Resolver → Code × Resolver
   | .returnTerm a, r =>
     let (a, r) := resolve a r
     (.returnTerm a, r)
-
+  | .polyRing a names, r =>
+    let (a, r) := resolve a r
+    (.polyRing a (names.map fun x => (x,r.lookup x)), r)
 def resolveMany : List Term → Resolver → List Code × Resolver
   | [], r => ([], r)
   | a :: xs, r =>
@@ -154,10 +141,7 @@ def resolveMany : List Term → Resolver → List Code × Resolver
     let (xs, r) := resolveMany xs r
     (a :: xs, r)
 end
-
-/-- The current file scope is extended; nested function scopes are never exported. -/
 def prepare (t : Term) (scope : Scope := {}) : Code × Scope × List String :=
   let (code, r) := resolve t { current := scope }
   (code, r.current, r.warnings)
-
 end Macaulean.M2.Lexical
