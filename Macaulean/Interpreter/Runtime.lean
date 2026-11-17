@@ -270,25 +270,25 @@ def call (depth : Nat) (fn arg : Value) (s : State)
       let (frame,s) := s.allocate (values ++ List.replicate (slots - values.length) .null)
       catchReturn (eval fuel body [frame] s handler)
     else
-      let .closure id := fn
-        | .error (.error (.noMethod "SPACE" [fn.className, arg.className]))
-      let some entry := s.heap.functions[id]? | .error (.error .invalidReference)
-      match entry with
-      | .closure params slots body captured =>
-        let values ← liftResult (arguments params arg)
-        let (frame, s) := s.allocate (values ++ List.replicate (slots - values.length) .null)
-        catchReturn (eval fuel body (frame :: captured) s handler)
-      | .composition f g =>
-        let (v, s) ← call fuel g arg s handler
-        call fuel f v s handler
-      | .predicate op f g =>
-        let (v, s) ← call fuel f arg s handler
-        if v = .bool op.shortCircuit then return (v, s)
-        let (w, s) ← call fuel g arg s handler
-        return (← liftResult (evalLogicOp op v w), s)
-      | .negated f =>
-        let (v, s) ← call fuel f arg s handler
-        return (← liftResult (evalUnOp .notOp v), s)
+    let .closure id := fn
+      | .error (.error (.noMethod "SPACE" [fn.className, arg.className]))
+    let some entry := s.heap.functions[id]? | .error (.error .invalidReference)
+    match entry with
+    | .closure params slots body captured =>
+      let values ← liftResult (arguments params arg)
+      let (frame, s) := s.allocate (values ++ List.replicate (slots - values.length) .null)
+      catchReturn (eval fuel body (frame :: captured) s handler)
+    | .composition f g =>
+      let (v, s) ← call fuel g arg s handler
+      call fuel f v s handler
+    | .predicate op f g =>
+      let (v, s) ← call fuel f arg s handler
+      if v = .bool op.shortCircuit then return (v, s)
+      let (w, s) ← call fuel g arg s handler
+      return (← liftResult (evalLogicOp op v w), s)
+    | .negated f =>
+      let (v, s) ← call fuel f arg s handler
+      return (← liftResult (evalUnOp .notOp v), s)
 end
 
 def defaultFuel : Nat := 4096
