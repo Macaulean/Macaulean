@@ -9,6 +9,7 @@ import MacauleanTest.InterpreterM2
 import MacauleanTest.InterpreterDSL
 import MacauleanTest.DefinitionExposure
 import MacauleanTest.MathematicalExport
+import MacauleanTest.PrimeFieldAlgebra
 import MacauleanTest.DefinitionExposureImport
 import MacauleanTest.DefinitionExposureLarge
 import MacauleanTest.DefinitionExposureVerification

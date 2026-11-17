@@ -45,3 +45,29 @@ proofs; avoid modifying it or silently depending on unmerged declarations.
    documentation, and upstream PR.
 
 The sequence is an implementation order, not a reduction of the acceptance scope.
+
+## Implemented checkpoints
+
+* `IdealView` and `MathematicalExport`: QQ polynomial/ideal presentation exports,
+  exact snapshot decoding theorems, stable names after reassignment, and
+  round-trip/foreign-ring/malformed-dimension tests.
+* `Algebra.PrimeField`: canonical modular residues with a standard
+  `Lean.Grind.Field` instance derived from an exhaustive inverse-law check.
+  Small prime characteristics pass; composite characteristics fail. This first
+  checker is intentionally for small primes and is not a fast primality test.
+* `KernelPolynomial` and its weighted-observation proofs are generalized from
+  Rat to commutative coefficient rings. Existing QQ coefficient/runtime proofs
+  still build.
+* `Algebra.Polynomial`: coefficientwise meanings, generic arithmetic soundness,
+  ideals closed under equivalence/addition/multiplication, and their generated
+  ideals with the least-ideal theorem.
+* `Algebra.CoefficientField` packages QQ and checked prime fields.
+  `FinitePolynomialData` validates canonical residue/exponent encodings and
+  proves decode/encode and arithmetic bridge identities.
+* `PrimeFieldAlgebra` proves the requested membership example over F_5 at the
+  mathematical layer and distinguishes x^5-x from zero as a formal polynomial.
+
+Still required: finite-field worksheet values and primitive dispatch, ring and
+field exports, integration of the mathematical ideal semantics with exports,
+Gröbner certificate soundness and commands, worksheet membership demonstrations
+over both fields, remaining regressions/documentation, and the upstream PR.
