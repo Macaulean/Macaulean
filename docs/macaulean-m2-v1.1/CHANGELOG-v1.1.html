@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="source-file" content="CHANGELOG-v1.1.md"><meta name="source-sha256" content="8083d34edf8e7b591b1c6962800872c80a1dc180eb3c06c2629f22caa8f261af">
+<title>Revision 1.1 change ledger</title><style>:root{--ink:#192a38;--muted:#546574;--accent:#146671;--line:#d9e1e7;--paper:#fff;--back:#f2f5f7}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--back);font:16px/1.63 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{background:#142b3b;color:#fff;padding:22px 34px;display:flex;gap:20px;align-items:center;justify-content:space-between}header span{font-size:12px;letter-spacing:.12em}header strong{font-size:15px;font-weight:500}
+.layout{max-width:1480px;margin:auto;display:grid;grid-template-columns:270px minmax(0,1fr);gap:30px;padding:30px 26px}
+nav{position:sticky;top:20px;align-self:start;max-height:94vh;overflow:auto;padding:10px 14px 24px 0;font-size:12px;line-height:1.4}nav h2{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0 0 16px}nav a{display:block;text-decoration:none;color:var(--muted);padding:5px 0}nav a.h2{font-weight:650;color:var(--ink);padding-top:12px}nav a.h3{padding-left:12px}
+main{background:var(--paper);min-width:0;padding:34px 42px 42px;border:1px solid var(--line);border-radius:5px}.edition-note{font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:30px}
+h1{font-size:35px;line-height:1.16;margin:0 0 26px;letter-spacing:-.025em}h2{font-size:25px;line-height:1.25;margin:46px 0 18px;border-bottom:1px solid var(--line);padding-bottom:11px}h3{font-size:19px;line-height:1.35;margin:32px 0 13px}h4{font-size:17px;margin:26px 0 10px}p{margin:13px 0}a{color:var(--accent)}a[id]{scroll-margin-top:24px}code{font: .88em/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;background:#edf3f6;border-radius:3px;padding:2px 4px}pre{background:#f3f6f8;padding:16px 18px;border:1px solid var(--line);overflow:auto;border-radius:4px}pre code{background:none;padding:0;font-size:13px;white-space:pre}
+.table-wrap{overflow:auto;margin:20px 0}table{width:100%;border-collapse:collapse;font-size:13px;line-height:1.5}th,td{text-align:left;padding:10px 12px;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f5;font-weight:650}tbody tr:nth-child(even){background:#fafcfd}td code{white-space:pre-wrap;overflow-wrap:anywhere}blockquote{border-left:3px solid var(--accent);margin:20px 0;padding:1px 20px;color:var(--muted)}ul,ol{padding-left:24px}li{margin:6px 0}hr{border:0;border-top:1px solid var(--line);margin:32px 0}footer{margin-top:45px;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+@media(max-width:950px){.layout{display:block;padding:15px}nav{position:static;max-height:240px;margin-bottom:20px;border-bottom:1px solid var(--line)}main{padding:25px}h1{font-size:29px}header{padding:18px;display:block}header strong{display:block;margin-top:6px}}
+@media print{header,nav,.edition-note,footer{display:none}.layout{display:block;padding:0}main{padding:0;border:0}body{background:#fff;font-size:10pt}h1{font-size:23pt}h2{font-size:17pt;break-after:avoid}h3,h4{break-after:avoid}table{font-size:8pt}.table-wrap{overflow:visible}pre{white-space:pre-wrap}pre code{white-space:pre-wrap}a{color:inherit;text-decoration:none}}
+</style></head>
+<body><header><span>MACAULEAN · M2 1.26.06</span><strong>Audit-integrated revision 1.1</strong></header>
+<div class="layout"><nav aria-label="Contents"><h2>Contents</h2><a class="h2" href="#audit-disposition">Audit disposition</a>
+<a class="h2" href="#earlier-v1-0-reconciliations-retained">Earlier v1.0 reconciliations retained</a>
+<a class="h2" href="#artifact-changes">Artifact changes</a></nav><main>
+<div class="edition-note">Reading edition of <code>CHANGELOG-v1.1.md</code>. The Markdown is the active text; companion and archive links resolve inside the bundle.</div>
+<article><h1 id="revision-1-1-change-ledger">Revision 1.1 change ledger</h1>
+<p>29 September 2026. This file is <strong>informative</strong>, not another normative rule layer.
+The active text is <code>Macaulean-M2-specification-v1.1.md</code>. Both original documents and the
+audit remain unchanged in <code>archive/</code>. Changes are based on the supplied findings and
+existing source excerpts, not a new native execution campaign.</p>
+<h2 id="audit-disposition">Audit disposition</h2>
+<p>“Integrated” means the text/data correction was made, <strong>not</strong> native validation or a
+completed proof. A partial/open finding identifies contract work the audit itself did
+not finish. All 24 findings are accounted for; they are not all claimed closed.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Finding</th>
+<th>Disposition</th>
+<th>Location / change</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>F01</td>
+<td>The claimed core boundary omits native primitives and a bootstrap ABI</td>
+<td>partial — boundary corrected, inventory open</td>
+<td>§0.1; §5.8; bootstrap-contracts.json — Native apply/scan and identified primitives are no longer excluded as library-only. OC-BOOTSTRAP/OC-ACTOR remain.</td>
+</tr>
+<tr>
+<td>F02</td>
+<td>AfterEval has the wrong method key</td>
+<td>integrated</td>
+<td>§7.4 HOOK-KEYS — Unqualified BeforeEval/AfterEval keys, exact arguments and result roles.</td>
+</tr>
+<tr>
+<td>F03</td>
+<td>Standalone semicolons are incorrectly accepted by the source-unit grammar</td>
+<td>integrated</td>
+<td>§2.6; §7.1 UNIT-STEP — No standalone-semicolon skipping; source-unit and parse-utility observations kept separate.</td>
+</tr>
+<tr>
+<td>F04</td>
+<td>Loop control cannot be specified by a uniform innermost-loop rule</td>
+<td>integrated for audited clause matrix</td>
+<td>§6.9.1 LOOP-CLAUSE — Ten clause rows define bare/valued continue and break; domain/iterator boundary remains OC-ITERATOR.</td>
+</tr>
+<tr>
+<td>F05</td>
+<td>The typed completion taxonomy changes try on step and finish</td>
+<td>integrated for audited predicate</td>
+<td>§6.9.2 TRY-CATCHABILITY — Step/finish caught under active suppression; datatype split does not define catchability; OC-DEBUG retained.</td>
+</tr>
+<tr>
+<td>F06</td>
+<td>The second left evaluation of &lt;=/&gt;= does not obey blanket error propagation</td>
+<td>integrated for audited actor</td>
+<td>§6.10.1 COMPARE-SECOND — First comparison checked; second delivered lhs result inspected without blanket abrupt check, including interval branches.</td>
+</tr>
+<tr>
+<td>F07</td>
+<td>Binding failure effects and traversal are not optional</td>
+<td>partial — confirmed ordering corrected</td>
+<td>§3.7 BIND-FAILURE — RHS precedes method-capability validation, explicit early branches preserved; full remaining low-level edges OC-BIND.</td>
+</tr>
+<tr>
+<td>F08</td>
+<td>Assignment-hook lookup time is unspecified</td>
+<td>integrated</td>
+<td>§6.6.1 ASSIGN-HOOK-SCHEDULE — Capture old release before symbol hooks; late new-class assignment lookup.</td>
+</tr>
+<tr>
+<td>F09</td>
+<td>Symbol identity immutability is conflated with isMutable</td>
+<td>integrated</td>
+<td>§5.3 MUTABILITY — Native isMutable representation predicate separated from stable identity.</td>
+</tr>
+<tr>
+<td>F10</td>
+<td>CacheTable equality omits class and parent conditions</td>
+<td>integrated</td>
+<td>§5.5 CACHE-EQUALITY — Class and parent checks precede exact-class hash-zero CacheTable special case.</td>
+</tr>
+<tr>
+<td>F11</td>
+<td>Augmented Default dispatch is name-based, not canonical-symbol identity</td>
+<td>integrated</td>
+<td>§6.7 AUGMENT-SCHEDULE — Canonical word bytes Default request fallback; not one distinguished global identity.</td>
+</tr>
+<tr>
+<td>F12</td>
+<td>Augmented hash-table assignment needs an explicit operand schedule</td>
+<td>partial — audited schedules integrated</td>
+<td>§6.7 AUGMENT-SCHEDULE — HashTable container -&gt; RHS -&gt; key -&gt; lookup schedule and cached-vs-other paths; remaining edges OC-AUGMENT.</td>
+</tr>
+<tr>
+<td>F13</td>
+<td>Not every assignment expression returns its supplied RHS</td>
+<td>integrated</td>
+<td>§6.6; §6.6.2 — Per-form result rules; recursive actual results and one-target unwrapping replace universal RHS claim.</td>
+</tr>
+<tr>
+<td>F14</td>
+<td>Reflective frame APIs have aliasing semantics, not just display semantics</td>
+<td>partial — core aliasing fixed</td>
+<td>§5.7 FRAME-VIEW — Shared backing sequence, existing-slot writes and global hiding required; extension/stale/empty-frame boundary OC-FRAME.</td>
+</tr>
+<tr>
+<td>F15</td>
+<td>Dictionary history, enumeration and cardinality are not fixed by “shadowing map”</td>
+<td>partial — entry model fixed</td>
+<td>§3.8 DICT-HISTORY — Retained duplicate entries/counts separated from lookup; full erase/rehash/enumeration policy OC-DICT.</td>
+</tr>
+<tr>
+<td>F16</td>
+<td>Source-unit hook failures and wrappers need a total policy table</td>
+<td>partial — audited driver paths fixed</td>
+<td>§7.2; §7.4; §7.5 — Hook substitutions/continuation, wrapper transfer set, exit and close precedence integrated; OC-UNIT/OC-DEBUG remain.</td>
+</tr>
+<tr>
+<td>F17</td>
+<td>Actor and host interfaces are named but not completely contracted</td>
+<td>open, explicitly inventoried</td>
+<td>§5.8; §8.1 — Partial bootstrap register and actor/host/numeric open contracts replace an unsupported completeness claim.</td>
+</tr>
+<tr>
+<td>F18</td>
+<td>Method state and class hash tables need one authoritative view</td>
+<td>design decision integrated</td>
+<td>§6.5.5 METHOD-AUTHORITY — Class/object tables authoritative; indexes/caches derived. Full installation edge contract OC-INSTALL remains.</td>
+</tr>
+<tr>
+<td>F19</td>
+<td>Strict native conformance and intentional safe departures need separate labels</td>
+<td>integrated</td>
+<td>§0.3 — PN and PS profiles with explicit departures/domain boundaries; no arbitrary cleanup permission.</td>
+</tr>
+<tr>
+<td>F20</td>
+<td>The structural validator misses inconsistencies within its own data boundary</td>
+<td>validator strengthened; tested separately</td>
+<td>validate_spec.py; test_validator.py — Active table/JSON agreement, exact quote-word policy, routes, checksum and HTML source binding checks; behavior remains unvalidated.</td>
+</tr>
+<tr>
+<td>F21</td>
+<td>The 146-case corpus is a test plan, not an executable conformance oracle</td>
+<td>partial — typed audit fixtures added</td>
+<td>audit-regressions-v1.1.json; §8.3 — Exact-source and controlled configuration fixtures are unexecuted; legacy 146-case plan archived, complete native harness/coverage pending.</td>
+</tr>
+<tr>
+<td>F22</td>
+<td>The normative organization duplicates too much and obscures authority</td>
+<td>integrated</td>
+<td>Whole revision — One active contract, separate architecture and non-normative ledger/archive; no verbatim normative Annex A.</td>
+</tr>
+<tr>
+<td>F23</td>
+<td>Do not make every logical identity a mandatory hot-path allocation</td>
+<td>integrated</td>
+<td>§3.9; §4.4; architecture §§3,8 — Logical addresses can be activation/slot; no mandatory per-cell object or redundant ID on each hot read.</td>
+</tr>
+<tr>
+<td>F24</td>
+<td>The proof roadmap has no fully defined runtime transition relation to refine yet</td>
+<td>open — scope made explicit</td>
+<td>§6.0; §8; architecture §9 — Known transitions fixed; no full runtime relation/proof claimed until OC-* contracts close.</td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="earlier-v1-0-reconciliations-retained">Earlier v1.0 reconciliations retained</h2>
+<p>The effective rules from the prior R1–R13 ledger are integrated into the active chapters,
+not left as corrections an implementer must apply to a simultaneous normative archive:
+byte strings; literal-versus-word registration and first-wins history; infix SPACE;
+all-delimiter fixed-parameter parsing; quotation of id tokens; first writable dictionary;
+actor-controlled primitive/fallback ordering; reached effects on failure; distinct &lt;-;
+real decoding at lowering; explicit malformed-literal policy; no BNF impossibility claim;
+and flagLookup as a binding diagnostic. Prior safe departures now have PN/PS labels.</p>
+<h2 id="artifact-changes">Artifact changes</h2>
+<p>The normative annex/body duplication is removed. The main document is based on the
+reference's chapter organization, with corrected runtime and source-unit rules in place.
+A generated grammar table exposes quote policies and lexical routes in the same checked
+projection. The implementation/refinement discussion moved to a separate short document.
+Open contracts, identified primitive interfaces and stable rule IDs have machine-readable
+registers. The legacy test plan remains archived rather than silently relabeled as an
+executed or corrected oracle.</p>
+<p>The updated validator checks active artifact consistency; negative controls separate
+schema/integrity validation from behavioral truth. Generated reports state exactly which
+Python checks ran. No M2, Lean or performance/proof test is implied.</p>
+</article><footer>Revision 1.1 · 29 September 2026 · No native M2 execution, Lean compilation or proof verification is claimed.</footer>
+</main></div></body></html>

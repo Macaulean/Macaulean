@@ -1,0 +1,472 @@
+{
+  "audit_date": "2026-09-29",
+  "native_source_commit": "1a37f6fe95badb1e5f99707a485503d213fd9d49",
+  "inputs": {
+    "Macaulay2-language-spec.md": {
+      "sha256": "624cf55004f11afd9b728e8ad73df707ce1f190b4fa8089368729b6600065fca",
+      "bytes": 85949,
+      "lines": 1515
+    },
+    "Macaulean-M2-complete-specification.md": {
+      "sha256": "26d3c19b818ac11077f494002140c15592b25e063595d818dc2fe7ddeff75a6e",
+      "bytes": 176674,
+      "lines": 2683
+    }
+  },
+  "status": "source-review and structural experiments; no native/Lean execution",
+  "findings": [
+    {
+      "id": "F01",
+      "severity": "High",
+      "evidence_kind": "source-confirmed omission",
+      "affects": "Reference and specification",
+      "title": "The claimed core boundary omits native primitives and a bootstrap ABI",
+      "sections": "R §0.1, §§5–7; S §§0, 9.1, 10.3, 11",
+      "problem": "The reference describes apply and scan as functions supplied by the M2-language library. It then excludes that library from the core specification. This is not an accurate division of the pinned implementation. The new specification incorporates the same boundary without repairing it.",
+      "evidence": "actors3.d registers setupfun(\"apply\",map) and setupfun(\"scan\",scan). It also implements override. Other native interfaces used by Core include frame, frames, localDictionaries, lookup/installMethod, value', symbolBody and dictionary operations. Merely naming a Value representation or requiring that Core eventually load does not specify these APIs.",
+      "consequence": "An independent implementation can implement every grammar production and every table row yet still be unable to bootstrap Core. The current K/L distinction does not tell it which interpreter-provided names, calling conventions and effects must already exist.",
+      "fix": "Add a versioned bootstrap/primitive manifest: exported name, initial binding and protection, arity, accepted values, evaluation/control policy, result, state effects and errors. Distinguish native primitives, library wrappers/overloads, and external host/engine primitives. Contracts may incorporate a pinned external standard, but each required interface must be enumerated.",
+      "native_references": [
+        "N4",
+        "N7",
+        "N10"
+      ],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F02",
+      "severity": "High",
+      "evidence_kind": "source-confirmed mismatch",
+      "affects": "Reference and specification",
+      "title": "AfterEval has the wrong method key",
+      "sections": "R §7.4; S §§9.1, 10.1–10.2",
+      "problem": "R requires {mode, AfterEval}, alongside mode-qualified printing hooks. S adopts that protocol without an amendment.",
+      "evidence": "readeval4 calls runmethod(AfterEval,lastvalue). It separately constructs modeBeforePrint, modeNoPrint/modePrint and modeAfterNoPrint/modeAfterPrint. BeforeEval is likewise unqualified and is invoked on null. The source comment explicitly states that BeforeEval is mode-independent.",
+      "consequence": "An implementation following the document searches a different method-table key, so it misses a valid AfterEval hook. This can affect the result passed to subsequent printing/history logic, not just formatting.",
+      "fix": "Specify exact keys and arguments: BeforeEval(null), AfterEval(value), then the mode-qualified BeforePrint, Print/NoPrint and AfterPrint/AfterNoPrint. Include success-result handling and the failure policies in F16.",
+      "native_references": [
+        "N1"
+      ],
+      "regression_probe": {
+        "scenario": "Install different handlers under AfterEval and {Standard,AfterEval}; evaluate one printing-enabled input.",
+        "expected": "Only the unqualified AfterEval hook is selected by the driver."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F03",
+      "severity": "High",
+      "evidence_kind": "source-confirmed mismatch",
+      "affects": "Reference and specification",
+      "title": "Standalone semicolons are incorrectly accepted by the source-unit grammar",
+      "sections": "R §§2.6, 7.1; S §§6.6, 10.1",
+      "problem": "Both documents instruct the driver to skip semicolon tokens between statements, admitting leading semicolons and repeated empty semicolon statements.",
+      "evidence": "readeval4 skips NewlineW and wordEOC, and terminates on wordEOF. It does not skip SemicolonW. A semicolon encountered at the start of the next statement therefore reaches parse(...,8,true), whose leading action for semicolon is Error. A semicolon is valid when consumed as the terminator of a preceding expression.",
+      "consequence": "The documented accepted source language differs from the pinned driver: ;1 and 1;;2 are not interchangeable with 1 and 1;2. A separate parse utility is not necessarily an oracle for source-unit execution.",
+      "fix": "Remove semicolon from the driver's initial skip set. Keep it in the post-expression terminator set. Test parse-tree APIs and source-unit APIs separately, including leading/repeated/trailing semicolons.",
+      "native_references": [
+        "N1",
+        "N12"
+      ],
+      "regression_probe": {
+        "source": ";1",
+        "phase": "source-unit",
+        "expected": "Syntax failure at a leading semicolon, not successful evaluation of 1."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F04",
+      "severity": "High",
+      "evidence_kind": "source-confirmed mismatch",
+      "affects": "Reference and specification",
+      "title": "Loop control cannot be specified by a uniform innermost-loop rule",
+      "sections": "R §§6.2, 6.9; S §§9.2, 9.4–9.5",
+      "problem": "The reference says continue is intercepted by the innermost loop and summarizes collecting loops with one rule. S preserves this broad rule. Native behavior depends on which loop form and which clause produced the completion.",
+      "evidence": "In while-do, bare Continue is handled in the do body but not the predicate. In while-list-do, Continue from the collector skips the append but still runs the do clause; even bare Continue from the do clause propagates. In for, bare Continue from do is handled, but Continue(value) from do propagates; Continue from when propagates. Bare Break in a while-list predicate returns null, whereas bare Break in a while-list-do predicate returns the collected list.",
+      "consequence": "A generic handler around the whole loop changes control flow, collection contents, outer-loop behavior and termination. These distinctions are observable without any exotic engine objects.",
+      "fix": "Replace the prose shortcut with a matrix indexed by loop form, active clause and completion kind. Define a continuation for each clause. Keep typed completions, but dispatch them at exactly the native catch boundaries.",
+      "native_references": [
+        "N2"
+      ],
+      "regression_probe": {
+        "source": "i=0; a=while (if i==1 then break else true) list (i=i+1); i=0; b=while (if i==1 then break else true) list (i=i+1) do null; (a,b)",
+        "phase": "evaluate",
+        "expected": "a is null; b is the one-element List {1}. Source-derived, not executed."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F05",
+      "severity": "High",
+      "evidence_kind": "source-confirmed mismatch",
+      "affects": "Reference and specification",
+      "title": "The typed completion taxonomy changes try on step and finish",
+      "sections": "R §§6.2, 6.9; S §9.2",
+      "problem": "S states that try catches only Error and excludes the distinct control completions. R categorizes step/finish as debugger transfers and excludes control completions in its try description. This tidy taxonomy is not the pinned catchability predicate.",
+      "evidence": "tryEval excludes break, return, both continue forms, unwind and throw from caught errors. Its exclusion list does not contain step, step-with-argument or finish. Those messages are produced by the corresponding actors and can be caught when ordinary suppression remains enabled.",
+      "consequence": "For example, the source predicts try finish 3 else 7 selects the else branch. An evaluator that propagates every DebugControl completion instead is incompatible.",
+      "fix": "Define an explicit catchableByTry predicate, including suppression/interrupt conditions, rather than deriving it from a broad Error-versus-Control type split. Classify a deliberate cleanup of this behavior as a separate compatibility policy.",
+      "native_references": [
+        "N3"
+      ],
+      "regression_probe": {
+        "source": "try finish 3 else 7",
+        "phase": "evaluate",
+        "expected": "7 under the pinned tryEval policy; unexecuted."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F06",
+      "severity": "High",
+      "evidence_kind": "source-confirmed mismatch",
+      "affects": "Reference and specification",
+      "title": "The second left evaluation of <=/>= does not obey blanket error propagation",
+      "sections": "R §§6.2, 6.10; S §9.5",
+      "problem": "The reference correctly notices that <= and >= evaluate their left operand twice, but omits the behavior of a failure on the second evaluation. Its universal abrupt-propagation rule is consequently false. S inherits the incomplete operator rule.",
+      "evidence": "lessequalfun2 and greaterequalfun2 first run compareop(lhs,rhs) and propagate its Error. They then evaluate lhs again into L. They inspect whether L is an RR interval but do not branch on L being an Error; the non-interval branch returns a Boolean derived from the earlier comparison. Their interval cases also recognize <=/>= comparison keywords and distinguish degenerate intervals, unlike the abbreviated truth rule in R.",
+      "consequence": "A conventional monadic eval of the second operand propagates a completion that the native actor ignores. Implementations can disagree on returned value, side effects and diagnostics while both claiming to obey the current prose.",
+      "fix": "Specify these actor branches explicitly: first comparison, failure check, second evaluation, interval inspection, final Boolean. Separate the native compatibility rule from any corrected language mode. Add second-evaluation failure/control and interval cases, not just the existing counter-increment test.",
+      "native_references": [
+        "N4"
+      ],
+      "regression_probe": {
+        "source": "n=0; f=()->(n=n+1; if n==1 then 1 else error \"second\"); r=try(f()<=2); (r,n)",
+        "phase": "evaluate",
+        "expected": "Source predicts (true,2), with the second evaluation inside error suppression; unexecuted."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F07",
+      "severity": "High",
+      "evidence_kind": "source-confirmed ordering gap",
+      "affects": "Specification; reference under-specifies errors",
+      "title": "Binding failure effects and traversal are not optional",
+      "sections": "R §3; S §§7.1, 7.6",
+      "problem": "S permits diagnostic recovery to continue the native binding traversal, but also allows return of the state reached at failure. Its assignment table places capability validation in LHS processing before the RHS. Neither choice is harmless because binding allocates globally visible symbols.",
+      "evidence": "bindassignment binds the RHS before checking unary/postfix/binary method capability. bind records errors through HadError and often continues traversing later children; localBind only returns the aggregate success flag afterward. There are also explicit early returns for some invalid target shapes. Thus there is a definite per-branch traversal, not permission to stop or continue arbitrarily.",
+      "consequence": "The input #AuditTarget := AuditRhsAfterInvalidMethod fails binding, but the pinned traversal creates the RHS global before reporting the unsupported method target. A fail-fast binder following the table can leave it absent. Later isGlobalSymbol observations distinguish the states.",
+      "fix": "Specify every validation point and error-continuation edge. Model ordered diagnostics and reached state, but make the traversal deterministic. Do not implement the binder as a generic short-circuit Except monad unless its continuations reproduce those edges.",
+      "native_references": [
+        "N5"
+      ],
+      "regression_probe": {
+        "source": "try value \"#AuditTarget := AuditRhsAfterInvalidMethod\"; isGlobalSymbol \"AuditRhsAfterInvalidMethod\"",
+        "phase": "binding-effects",
+        "expected": "true in a fresh session after the caught binding failure; unexecuted."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F08",
+      "severity": "High",
+      "evidence_kind": "source-confirmed ordering gap",
+      "affects": "Reference and specification",
+      "title": "Assignment-hook lookup time is unspecified",
+      "sections": "R §6.6.1; S §9.6; corpus S011",
+      "problem": "The documents give hook invocation order, but do not distinguish when each hook is selected. A symbol-specific hook can modify the relevant class method tables.",
+      "evidence": "globalAssignmentHook looks up and captures the old-class GlobalReleaseHook before invoking symbol-specific hooks. It later invokes that captured method. It looks up the new-class GlobalAssignHook only after the symbol-specific and release-hook calls.",
+      "consequence": "Re-looking up the release hook after a symbol hook changes it selects a different function. The existing test S011 checks only the call order and will miss this difference.",
+      "fix": "Specify the sequence capture-release; invoke-symbol-hooks; invoke-captured-release; lookup-and-invoke-new-assignment; store. Test a symbol hook that replaces/removes the release method and one that changes the new-class assignment method.",
+      "native_references": [
+        "N6"
+      ],
+      "regression_probe": {
+        "scenario": "A symbol-specific assignment hook replaces the old class GlobalReleaseHook before the release call.",
+        "expected": "The previously captured release method runs; later assignments can observe the replacement."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F09",
+      "severity": "Medium",
+      "evidence_kind": "source-confirmed mismatch",
+      "affects": "Reference and specification",
+      "title": "Symbol identity immutability is conflated with isMutable",
+      "sections": "R §5.3; S §§9.1, 9.3",
+      "problem": "The reference lists symbols among immutable values without specifying the native isMutable behavior. S incorporates that statement while treating protection separately.",
+      "evidence": "mutablefun returns !symbol.Protected for SymbolClosure and !dictionary.Protected for DictionaryClosure. A symbol can keep the same identity/hash while the language reports it as mutable; protect changes that report.",
+      "consequence": "Reading “symbols are immutable” as an implementation rule produces the wrong user-visible isMutable result and confuses suitability as a stable key with assignment capability.",
+      "fix": "Separate immutable declaration/activation identity, mutation of the stored binding value, and the native isMutable predicate. State the predicate explicitly for every representation covered by the API.",
+      "native_references": [
+        "N7"
+      ],
+      "regression_probe": {
+        "source": "s=symbol AuditMutable; a=isMutable s; protect s; (a,isMutable s)",
+        "phase": "evaluate",
+        "expected": "(true,false) for a fresh unprotected global symbol; unexecuted."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F10",
+      "severity": "Medium",
+      "evidence_kind": "source-confirmed mismatch",
+      "affects": "Reference and specification",
+      "title": "CacheTable equality omits class and parent conditions",
+      "sections": "R §§5.3, 5.5; S §9.1",
+      "problem": "The reference says CacheTables have hash zero and are all strictly equal to one another. The new document does not amend that claim.",
+      "evidence": "equal(HashTable,HashTable) first handles object identity, rejects different hashes, then rejects different Class or parent identities. Only afterward does it accept hash-zero objects whose exact class is cacheTableClass. This is not a blanket rule for all cache tables or their subclasses.",
+      "consequence": "Cache tables with different parents can be unequal. An implementation using one universal equality class for them changes strict comparisons and hash-key semantics.",
+      "fix": "State the equality branch in source order. Keep the special case separate from ordinary mutable-table identity and from subclass behavior.",
+      "native_references": [
+        "N8"
+      ],
+      "regression_probe": {
+        "scenario": "Construct two direct CacheTable instances with different valid parents and compare with ===.",
+        "expected": "false, because the parent comparison precedes the cache special case."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F11",
+      "severity": "Medium",
+      "evidence_kind": "source-confirmed mismatch",
+      "affects": "Reference and specification",
+      "title": "Augmented Default dispatch is name-based, not canonical-symbol identity",
+      "sections": "R §6.7; S §9.6",
+      "problem": "The phrase “the symbol Default” suggests a distinguished global sentinel identity, consistent with the rest of the proposed SymbolId architecture.",
+      "evidence": "augmentedAssignmentFun checks whether the method result is a SymbolClosure and then compares s.symbol.word.name with the bytes \"Default\". It does not compare the result with a single predefined Default SymbolId.",
+      "consequence": "A different local/dictionary symbol with canonical spelling Default also requests fallback. An identity-only sentinel test produces a different result.",
+      "fix": "Specify the exact canonical-spelling test. Alternatively declare identity-only behavior an explicit non-native change; do not silently infer it from the general identity model.",
+      "native_references": [
+        "N9"
+      ],
+      "regression_probe": {
+        "scenario": "An augmented assignment method returns a non-global SymbolClosure whose canonical spelling is Default.",
+        "expected": "The native actor falls back rather than returning that symbol as the completed augmented result."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F12",
+      "severity": "High",
+      "evidence_kind": "source-confirmed ordering gap",
+      "affects": "Reference and specification",
+      "title": "Augmented hash-table assignment needs an explicit operand schedule",
+      "sections": "R §6.7; S §§8.5, 9.6",
+      "problem": "R says that the container and key are evaluated once and the RHS precedes lookup. That does not uniquely specify the order of key evaluation relative to RHS evaluation. S delegates to this prose.",
+      "evidence": "For a hash-table # target, augmentedAssignmentFun evaluates the container, then the RHS, then the key, then performs lookup/locking. This is different from the ordinary element-store container/key/RHS schedule. Field keys use the reified symbol path instead.",
+      "consequence": "An RHS that changes a variable read by the key expression can change which entry gets updated. Caching the key before RHS is not faithful even though it evaluates the key once and performs lookup after RHS.",
+      "fix": "Give a per-target evaluation schedule for variable, hash-table index, field, other operator and parallel targets. Explicitly identify cached versus re-evaluated subexpressions, including the special ??= path.",
+      "native_references": [
+        "N9"
+      ],
+      "regression_probe": {
+        "source": "i=0; T=new MutableHashTable from {0=>10,1=>20}; T#i += (i=1;5); (T#0,T#1)",
+        "phase": "evaluate",
+        "expected": "Source predicts (10,25), since the key i is read after RHS; unexecuted."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F13",
+      "severity": "Medium",
+      "evidence_kind": "internal contradiction and source-confirmed correction",
+      "affects": "Reference and specification",
+      "title": "Not every assignment expression returns its supplied RHS",
+      "sections": "R §6.6 introduction versus §§6.6.4, 6.7; S §9.6",
+      "problem": "R begins assignment semantics with the universal claim that every assignment expression has the assigned value. Later custom assignment and augmented-method rules allow a method-produced result instead.",
+      "evidence": "The native operator-assignment paths return the invoked assignment method result. An augmented method can intercept the operation and return without performing the fallback store. parallelAssignmentFun assembles actual per-target results and unwraps the single-target result.",
+      "consequence": "The blanket rule contradicts the more specific rules and encourages invalid rewrites of assignment expressions. It also leaves one-target List/Sequence result shaping easy to misread.",
+      "fix": "Replace the universal sentence with per-form results: direct store result; method result; intercepted augmented result; recursive parallel result with the native single-target unwrapping.",
+      "native_references": [
+        "N9",
+        "N6"
+      ],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F14",
+      "severity": "High",
+      "evidence_kind": "source-confirmed omission",
+      "affects": "Reference and specification",
+      "title": "Reflective frame APIs have aliasing semantics, not just display semantics",
+      "sections": "R core/API coverage; S §§3, 8.1, 9.4, 12.4",
+      "problem": "The documents require preservation of frame observations while never specifying frame/frames as native APIs. Describing logical frames and shared closures is not sufficient for this interface.",
+      "evidence": "actors5.d listFrame(f) returns a MutableList wrapping f.values for a non-global frame. frame and frames expose these wrappers; the global-frame case returns an empty sequence to avoid defeating global protection. Existing-slot writes through such a wrapper can modify the live frame values. localDictionaries exposes related dictionary/frame closures.",
+      "consequence": "Returning a copied list, always materializing an extra empty logical frame, or optimizing away a frame without the native observation projection can break Core code that inspects or accesses captured state. This is also a memory/aliasing obligation for any flattened-cell implementation.",
+      "fix": "Specify exact frame API shapes, live aliasing, global hiding, and empty-frame behavior. Define views into storage, not just copied object values. Use these contracts to delimit frame-elision and closure-conversion proofs.",
+      "native_references": [
+        "N10",
+        "N15"
+      ],
+      "regression_probe": {
+        "scenario": "Obtain a live non-global frame wrapper, overwrite an existing slot, then read the captured variable through its closure.",
+        "expected": "The closure observes the overwritten value; not a detached snapshot."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F15",
+      "severity": "Medium",
+      "evidence_kind": "design under-specification",
+      "affects": "Specification",
+      "title": "Dictionary history, enumeration and cardinality are not fixed by “shadowing map”",
+      "sections": "R dictionary APIs; S §§3.3, 7.7",
+      "problem": "S says a later := replaces the visible mapping and retains old symbols in stores/layouts. It does not define whether dictionary enumeration and length include retained shadowed entries, or how those differ from active lookup.",
+      "evidence": "Native makeEntry inserts a new symbol-table entry; insert increments numEntries and prepends the entry. Native dictionary values/pairs walk table entries rather than a deduplicated visible-name map. The phrase “ordered shadowing map” could support this, but only with additional specified operations.",
+      "consequence": "A normal finite-map implementation can preserve lexical lookup while reporting different #dictionary, keys, values or pairs results after redeclaration.",
+      "fix": "Define lookup separately from ordered entry storage and enumeration. Specify alias insertion, redeclaration, protection and erase effects on each view. Do not assume retaining SymbolInfo alone reproduces dictionary observations.",
+      "native_references": [
+        "N5",
+        "N14"
+      ],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F16",
+      "severity": "High",
+      "evidence_kind": "source-confirmed omission",
+      "affects": "Reference and specification",
+      "title": "Source-unit hook failures and wrappers need a total policy table",
+      "sections": "R §§7.2–7.5; S §10",
+      "problem": "The source-unit driver is only schematic about hook failures, stopIfError/returnIfError, and which abrupt results file/value wrappers consume. These policies are essential when traces and reached states are part of conformance.",
+      "evidence": "In readeval4, a BeforeEval error can be recorded and execution still proceeds when neither stop flag demands return. A non-stopping AfterEval error replaces lastvalue with null before later printing steps. load/value wrappers recognize step and finish as well as return, break and both continue forms; throw is not included in that wrapper-unwrapping list. File exit hooks run in their own defined order and retain the last exit error.",
+      "consequence": "Two interpreters following the current pseudocode can both claim conformance while one skips an input that the other executes, or they return/print different values after hook failures.",
+      "fix": "Provide a table by source-unit kind, driver flags, failure stage and completion. Include BeforeEval, evaluation, AfterEval, BeforePrint, Print/NoPrint, AfterPrint/AfterNoPrint, file-exit and close failures, together with precise propagation and state behavior.",
+      "native_references": [
+        "N1"
+      ],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F17",
+      "severity": "High",
+      "evidence_kind": "design under-specification",
+      "affects": "Specification",
+      "title": "Actor and host interfaces are named but not completely contracted",
+      "sections": "S §§3.3, 9.1, 9.5, 10.3, 11; R §6.10",
+      "problem": "ActorId is used in SymbolInfo without a complete actor universe, bootstrap assignment/default rule or per-actor transition definition. The host interface likewise refers to admissible results satisfying primitive contracts that are not enumerated in the bundle.",
+      "evidence": "The document supplies a useful complete parser-action algebra, but no analogous complete runtime-actor catalog. R's broad numeric promotion/MPFR summaries and operator fallback rows do not define every accepted/error/control case. Named primitives outside the table remain unspecified.",
+      "consequence": "The K-level interpreter is not uniquely implementable from the document. “Run the native actor” and “satisfy the primitive contract” are references to work still to specify, not closed definitions.",
+      "fix": "Give each actor/primitive a contract ID, bootstrap symbol, operand schedule, core case dispatch, fallback key and errors. Parameterize platform limits and numerical backend details explicitly; refer to pinned external arithmetic contracts where appropriate. Keep external engine implementation out of scope without leaving its interface undefined.",
+      "native_references": [
+        "N4",
+        "N7"
+      ],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F18",
+      "severity": "Medium",
+      "evidence_kind": "design under-specification",
+      "affects": "Specification",
+      "title": "Method state and class hash tables need one authoritative view",
+      "sections": "R §6.5; S §§3.5, 9.7",
+      "problem": "S has both methods/nullaryMethods/typicalValues stores and mutable class objects. It says reflective equivalence must be maintained, but does not define the ownership or synchronization law for direct M2 table writes.",
+      "evidence": "Native method entries are ordinary observable entries in class hash tables, and lookup searches those tables. Code can inspect and mutate those entries. The new spec correctly recognizes the issue, but recognizing it is not a definition of which store controls a later dispatch.",
+      "consequence": "An implementation can accidentally create a hidden method registry that diverges from visible class objects. Cache invalidation alone does not repair two authoritative sources of truth.",
+      "fix": "Define method operations as views of the authoritative class/object store, with any separate method table explicitly derived and guarded. State entry placement/observation policy and the effects of direct table mutations. Avoid a second mutable registry unless a preservation invariant is supplied.",
+      "native_references": [
+        "N7"
+      ],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F19",
+      "severity": "Medium",
+      "evidence_kind": "design boundary ambiguity",
+      "affects": "Reference and specification",
+      "title": "Strict native conformance and intentional safe departures need separate labels",
+      "sections": "R §1.8; S R11, §§6.3, 8.4",
+      "problem": "The specification explicitly rejects malformed radix/real literals and introduces safe handling of invalid delimiter aliases; it also requires a valid global-key invariant for some alias-created field code. These are not all claims of byte-for-byte native behavior.",
+      "evidence": "The R11 rejection is honestly documented, and the native source can have unsafe or inconsistent internal paths. The issue is not that safe rejection is wrong; it is that the same conformance label can otherwise obscure whether a failed native differential test is expected.",
+      "consequence": "A tester cannot infer from “K-conforming” whether to demand exact source behavior, an intentional portable deviation, or rejection outside the admitted native domain.",
+      "fix": "Define a strict pinned-native profile on its valid domain and a separately named portable/safe profile with an explicit deviation ledger. For native undefined behavior, state domain restrictions rather than requiring a crash. Give each deviation an expected test outcome and phase.",
+      "native_references": [
+        "N11",
+        "N12",
+        "N13"
+      ],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F20",
+      "severity": "Medium",
+      "evidence_kind": "executed validator limitation",
+      "affects": "Bundle",
+      "title": "The structural validator misses inconsistencies within its own data boundary",
+      "sections": "S §§4.2, 13.2, 14; validate_spec.py",
+      "problem": "The validator compares the JSON against the supplied reference table, not the normative table in the new document, and validates quotation policy membership without validating which policy belongs to which quote word. Its native_table_words_compared field names a comparison against the supplied document, not a direct native-source extraction.",
+      "evidence": "On isolated copies I changed the main document plus/minus lbp from 50 to 49: PASS. I changed quote_symbol.quote_policy from ordinary to global: PASS. I also changed E001's expected arithmetic value from 7 to 999: PASS. The last result is expected for a structural validator; the first two identify useful additional structural consistency checks.",
+      "consequence": "G0 does not currently establish agreement among all normative grammar artifacts. A PASS should not be cited as source-verified grammar correctness or correct behavioral expectations.",
+      "fix": "Compare the normative main table and JSON, check fixed quote-policy/word associations and lexical routes, validate all checksum entries and HTML generation if those are claimed, and rename the supplied-table metric. Keep behavioral checking separate and independent.",
+      "native_references": [],
+      "regression_probe": {
+        "experiment": "Three isolated mutations, original inputs unchanged.",
+        "observed": "All three mutated copies still pass validate_spec.py."
+      },
+      "native_probe_executed": false
+    },
+    {
+      "id": "F21",
+      "severity": "Medium",
+      "evidence_kind": "executed inventory; design gap",
+      "affects": "Bundle",
+      "title": "The 146-case corpus is a test plan, not an executable conformance oracle",
+      "sections": "conformance-cases.json; S §14",
+      "problem": "The corpus truthfully labels itself UNEXECUTED and uses human-readable tree/value/state descriptions. Fourteen entries are scenario steps rather than complete M2 source. Negative examples and setup do not yet form an automated typed oracle.",
+      "evidence": "The file contains 50 parse cases, 10 source-unit-parse cases, 15 lex-or-literal-decode cases, one lex case, one literal-decode case, 19 bind-or-lower cases, 36 evaluation cases and 14 state scenarios. The planned all-word/operator-pair and every-primitive generation is a requirement for future work, not delivered coverage.",
+      "consequence": "Case count is not a completeness measure. Current examples miss the loop-clause matrix, AfterEval qualification, second-evaluation failure, standalone semicolons, binding-error state, and mutable reflection identified here.",
+      "fix": "Build typed expectations with precise initial state, source-unit kind, phase, completion, state delta and trace. Add the audit regressions. Generate coverage from stable rule IDs, but obtain expectations independently of the implementation under test. Preserve raw native version/exit/stdout/stderr records.",
+      "native_references": [],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F22",
+      "severity": "Medium",
+      "evidence_kind": "editorial/architecture recommendation",
+      "affects": "Specification",
+      "title": "The normative organization duplicates too much and obscures authority",
+      "sections": "S §0, §1, §§4–10 and Annex A",
+      "problem": "The new file adds approximately 12,885 whitespace-delimited words before reproducing the approximately 14,046-word reference. Many runtime clauses delegate to the reference, while others amend it. A reader must combine the original rule, amendment ledger, body refinements and manifest to know the effective requirement.",
+      "evidence": "This is particularly costly where an incorporated runtime sentence is wrong or where a body refinement is only qualitative. Verbatim preservation is useful for provenance, but it should not force an erroneous archived text to remain a concurrent normative source.",
+      "consequence": "The structure makes omissions hard to see and allows the apparent completeness of the larger document to exceed the actual precision of its runtime rules.",
+      "fix": "Maintain one corrected normative language contract, a generated grammar manifest, a separate architecture/refinement document, and a non-normative change ledger/archive. Link stable rule IDs across them. Generate duplicate tables rather than hand-maintaining them.",
+      "native_references": [],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F23",
+      "severity": "Medium",
+      "evidence_kind": "architecture/performance recommendation",
+      "affects": "Specification",
+      "title": "Do not make every logical identity a mandatory hot-path allocation",
+      "sections": "S §§3, 12, 15",
+      "problem": "Distinct semantic IDs are useful, but the specification risks turning a frame-to-cell-ID-to-cell object graph and SymbolId-bearing ordinary reads into mandatory machine layouts. That adds indirection and proof obligations that M2 fidelity does not require.",
+      "evidence": "A cell can be modeled as a pair (activation,slot), with a separate first-class reification operation. Ordinary resolved reads may carry only a direct address plus validated metadata, while debug/reification paths retain declaration identity. The document already permits refinement, so these representation freedoms should be explicit rather than obscured by normative schema language.",
+      "consequence": "Unnecessary per-local cell objects, redundant declaration fields on every hot instruction, and eagerly duplicated method stores can cost memory and allocation without improving semantic fidelity.",
+      "fix": "Keep logical domains distinct in the specification; allow frame-slot addresses or compact cells in the machine. Require identity/reification observations and proof obligations, not redundant physical records. Retain interned words, profile caching, indexed storage and snapshot-aware benchmarking.",
+      "native_references": [],
+      "regression_probe": null,
+      "native_probe_executed": false
+    },
+    {
+      "id": "F24",
+      "severity": "High",
+      "evidence_kind": "verification/completeness gap",
+      "affects": "Specification",
+      "title": "The proof roadmap has no fully defined runtime transition relation to refine yet",
+      "sections": "S §§9, 11–13",
+      "problem": "The parser has explicit procedures, but the runtime relies on broad actor/host descriptions and an incomplete annex. Naming StepResult, Rep and theorem families does not complete the semantics those theorems quantify over.",
+      "evidence": "The completion distinctions, method-store ownership, hook lookup timing, primitive catalog and source-unit failure policies still permit materially different transition systems. The document appropriately says proofs are not completed; the issue is that the stated target relation is not fully fixed either.",
+      "consequence": "Two implementations could prove refinement to different reasonable interpretations of the same prose. Storage-level proofs cannot repair this semantic ambiguity.",
+      "fix": "Define configurations and the transition/evaluation rules for every core actor and source-unit stage; make native catchability, state-on-failure and observation projection explicit. Then state determinism/adequacy and machine simulation against that single relation. A prose specification is acceptable, but it must uniquely determine these cases.",
+      "native_references": [],
+      "regression_probe": null,
+      "native_probe_executed": false
+    }
+  ]
+}

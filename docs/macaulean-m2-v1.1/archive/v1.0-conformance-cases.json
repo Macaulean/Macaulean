@@ -1,0 +1,1690 @@
+{
+  "schema": "macaulean.m2.conformance-plan.v1",
+  "language_version": "1.26.06",
+  "native_source_commit": "1a37f6fe95badb1e5f99707a485503d213fd9d49",
+  "status": "UNEXECUTED test plan; this file is not a test-results report",
+  "expected_description_format": "Human-readable normative observations; a test adapter must encode typed native-tree/value projections before execution.",
+  "initial_state": "Fresh Core-loaded native session for evaluation cases unless steps state otherwise; fresh isolated source parser for parse cases.",
+  "cases": [
+    {
+      "id": "P001",
+      "phase": "parse",
+      "source": "x",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Atom(x)"
+      },
+      "source_basis": "A 2.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P002",
+      "phase": "parse",
+      "source": "(x)",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Parentheses((, Atom(x), ))"
+      },
+      "source_basis": "A 2.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P003",
+      "phase": "parse",
+      "source": "()",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "EmptyParentheses((, ))"
+      },
+      "source_basis": "A 2.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P004",
+      "phase": "parse",
+      "source": "a + b * c",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(a,+,Binary(b,*,c))"
+      },
+      "source_basis": "A 2.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P005",
+      "phase": "parse",
+      "source": "a ^ b ^ c",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(Binary(a,^,b),^,c)"
+      },
+      "source_basis": "A 2.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P006",
+      "phase": "parse",
+      "source": "a = b = c",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(a,=,Binary(b,=,c))"
+      },
+      "source_basis": "A 2.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P007",
+      "phase": "parse",
+      "source": "a : b : c",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(a,:,Binary(b,:,c))"
+      },
+      "source_basis": "A 2.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P008",
+      "phase": "parse",
+      "source": "a \\ b \\ c",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(a,\\,Binary(b,\\,c))"
+      },
+      "source_basis": "A 2.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P009",
+      "phase": "parse",
+      "source": "-a*b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Unary(-,Binary(a,*,b))"
+      },
+      "source_basis": "A 2.5.2",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P010",
+      "phase": "parse",
+      "source": "-a+b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(Unary(-,a),+,b)"
+      },
+      "source_basis": "A 2.5.2",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P011",
+      "phase": "parse",
+      "source": "-a^2",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Unary(-,Binary(a,^,2))"
+      },
+      "source_basis": "A 2.5.2",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P012",
+      "phase": "parse",
+      "source": "f x y",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Adjacent(f,Adjacent(x,y))"
+      },
+      "source_basis": "A 2.5.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P013",
+      "phase": "parse",
+      "source": "f(x)(y)",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Adjacent(f,Adjacent(Parentheses(x),Parentheses(y)))"
+      },
+      "source_basis": "A 2.5.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P014",
+      "phase": "parse",
+      "source": "#f x",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Unary(#,Adjacent(f,x))"
+      },
+      "source_basis": "A 2.5.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P015",
+      "phase": "parse",
+      "source": "a*f[x]",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Adjacent(Binary(a,*,f),Parentheses([,x,]))"
+      },
+      "source_basis": "A 2.5.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P016",
+      "phase": "parse",
+      "source": "R[x,y]",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Adjacent(R,Parentheses([,Binary(x,comma,y),]))"
+      },
+      "source_basis": "A 2.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P017",
+      "phase": "parse",
+      "source": "<|1,2|>",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Parentheses(<|,Binary(1,comma,2),|>)"
+      },
+      "source_basis": "A 2.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P018",
+      "phase": "parse",
+      "source": "(1,,2)",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Parentheses(Binary(Binary(1,comma,Dummy),comma,2))"
+      },
+      "source_basis": "A 2.5.4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P019",
+      "phase": "parse",
+      "source": "(a;)",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Parentheses(Binary(a,semicolon,Dummy))"
+      },
+      "source_basis": "A 2.5.4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P020",
+      "phase": "parse",
+      "source": "symbol +",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Quote(ordinary,+)"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P021",
+      "phase": "parse",
+      "source": "global x",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Quote(global,x)"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P022",
+      "phase": "parse",
+      "source": "local x",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Quote(currentLocal,x)"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P023",
+      "phase": "parse",
+      "source": "threadLocal x",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Quote(threadGlobal,x)"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P024",
+      "phase": "parse",
+      "source": "a SPACE b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(a,SPACE,b)"
+      },
+      "source_basis": "R3; native adjacentFun",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P025",
+      "phase": "parse",
+      "source": "1 -> 2",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Arrow(1,2); parser success, binding failure later"
+      },
+      "source_basis": "A 2.5.6",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P026",
+      "phase": "parse",
+      "source": "if a then b else c",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "If(a,b,Some(c))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P027",
+      "phase": "parse",
+      "source": "while p do b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "While(p,Do(b))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P028",
+      "phase": "parse",
+      "source": "while p list l",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "While(p,List(l,None))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P029",
+      "phase": "parse",
+      "source": "while p list l do b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "While(p,List(l,Some(b)))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P030",
+      "phase": "parse",
+      "source": "for i in xs when p list l do b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "For(i,In(xs),Some(p),List(l,Some(b)))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P031",
+      "phase": "parse",
+      "source": "for i from a to b do c",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "For(i,Range(Some(a),Some(b)),None,Do(c))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P032",
+      "phase": "parse",
+      "source": "for i to b list i",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "For(i,Range(None,Some(b)),None,List(i,None))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P033",
+      "phase": "parse",
+      "source": "new T",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "New(T,None,None)"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P034",
+      "phase": "parse",
+      "source": "new T of P",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "New(T,Some(P),None)"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P035",
+      "phase": "parse",
+      "source": "new T from I",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "New(T,None,Some(I))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P036",
+      "phase": "parse",
+      "source": "new T of P from I",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "New(T,Some(P),Some(I))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P037",
+      "phase": "parse",
+      "source": "try p",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Try(p,None,None)"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P038",
+      "phase": "parse",
+      "source": "try p then s",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Try(p,Some(s),None)"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P039",
+      "phase": "parse",
+      "source": "try p else a",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Try(p,None,Else(a))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P040",
+      "phase": "parse",
+      "source": "try p then s else a",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Try(p,Some(s),Else(a))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P041",
+      "phase": "parse",
+      "source": "try p except e do b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Try(p,None,Except(e,b))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P042",
+      "phase": "parse",
+      "source": "try p then s except e do b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Try(p,Some(s),Except(e,b))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P043",
+      "phase": "parse",
+      "source": "catch throw x",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Catch(Unary(throw,x))"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P044",
+      "phase": "parse",
+      "source": "return",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Unary(return,Dummy)"
+      },
+      "source_basis": "A 2.4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P045",
+      "phase": "parse",
+      "source": "x (*)",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Postfix(x,(*))"
+      },
+      "source_basis": "A 2.5.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P046",
+      "phase": "parse",
+      "source": "symbol SPACE",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Quote(ordinary,SPACE)"
+      },
+      "source_basis": "R3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P047",
+      "phase": "parse",
+      "source": "a += b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(a,+=,b)"
+      },
+      "source_basis": "A 1.11",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P048",
+      "phase": "parse",
+      "source": "a ??= b",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(a,??=,b)"
+      },
+      "source_basis": "A 1.11",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P049",
+      "phase": "parse",
+      "source": "f -1",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Binary(f,-,1)"
+      },
+      "source_basis": "A 2.5.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "P050",
+      "phase": "parse",
+      "source": "(f\n + x)",
+      "expected": {
+        "kind": "tree-description",
+        "tree": "Parentheses(Binary(f,+,x))"
+      },
+      "source_basis": "A 2.5.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE001",
+      "phase": "source-unit-parse",
+      "source": "(f\n x)",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "A 2.5.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE002",
+      "phase": "source-unit-parse",
+      "source": "SPACE",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "R3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE003",
+      "phase": "source-unit-parse",
+      "source": "symbol 123",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE004",
+      "phase": "source-unit-parse",
+      "source": "symbol (x)",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE005",
+      "phase": "source-unit-parse",
+      "source": "while p then x",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE006",
+      "phase": "source-unit-parse",
+      "source": "for i in xs from 1 do b",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE007",
+      "phase": "source-unit-parse",
+      "source": "try p else a except e do b",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE008",
+      "phase": "source-unit-parse",
+      "source": "try p except e b",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "A 2.5.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE009",
+      "phase": "source-unit-parse",
+      "source": "(x]",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "A 2.4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "PE010",
+      "phase": "source-unit-parse",
+      "source": "if p then x\nelse y",
+      "expected": {
+        "kind": "syntax-error"
+      },
+      "source_basis": "A 2.5.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L001",
+      "phase": "lex-or-literal-decode",
+      "source": "1..3",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "int:1",
+          "word:..",
+          "int:3"
+        ]
+      },
+      "source_basis": "A 1.8",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L002",
+      "phase": "lex-or-literal-decode",
+      "source": "x.5",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "id:x",
+          "real:.5"
+        ]
+      },
+      "source_basis": "A 1.8",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L003",
+      "phase": "lex-or-literal-decode",
+      "source": "0x1F",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "int-raw:0x1F"
+        ]
+      },
+      "source_basis": "A 1.8",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L004",
+      "phase": "lex-or-literal-decode",
+      "source": "1.5p100e2",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "real-raw:1.5p100e2"
+        ]
+      },
+      "source_basis": "A 1.8",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L005",
+      "phase": "lex-or-literal-decode",
+      "source": "x'''",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "id:x'''"
+        ]
+      },
+      "source_basis": "A 1.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L006",
+      "phase": "lex-or-literal-decode",
+      "source": "x$1",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "id:x$1"
+        ]
+      },
+      "source_basis": "A 1.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L007",
+      "phase": "lex-or-literal-decode",
+      "source": "a->-b",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "id:a",
+          "word:->",
+          "word:-",
+          "id:b"
+        ]
+      },
+      "source_basis": "A 1.11",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L008",
+      "phase": "lex-or-literal-decode",
+      "source": "x ..<= y",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "id:x",
+          "word:..<=",
+          "id:y"
+        ]
+      },
+      "source_basis": "A 1.11",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L009",
+      "phase": "lex-or-literal-decode",
+      "source": "∞=",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "id:∞="
+        ]
+      },
+      "source_basis": "A 1.6",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L010",
+      "phase": "lex-or-literal-decode",
+      "source": "·=",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "word:·="
+        ]
+      },
+      "source_basis": "A 1.6",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L011",
+      "phase": "lex-or-literal-decode",
+      "source": "-- comment\nx",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "newline",
+          "id:x"
+        ]
+      },
+      "source_basis": "A 1.3; obeylines=true",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L012",
+      "phase": "lex-or-literal-decode",
+      "source": "#! /usr/bin/M2\nx",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "newline",
+          "id:x"
+        ]
+      },
+      "source_basis": "A 1.3; source starts line1 col0",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L013",
+      "phase": "lex-or-literal-decode",
+      "source": "\"\\xFF\"",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "string-bytes:ff"
+        ]
+      },
+      "source_basis": "A 1.9",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L014",
+      "phase": "lex-or-literal-decode",
+      "source": "\"\\000\"",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "string-bytes:00"
+        ]
+      },
+      "source_basis": "A 1.9",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L015",
+      "phase": "lex-or-literal-decode",
+      "source": "///abc\\d\"e///",
+      "expected": {
+        "kind": "token-or-byte-description",
+        "items": [
+          "string-bytes:6162635c642265"
+        ]
+      },
+      "source_basis": "A 1.9.2",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "L016",
+      "phase": "lex",
+      "source": null,
+      "expected": {
+        "kind": "identifier-bytes",
+        "hex": "ff"
+      },
+      "source_basis": "A 1.2",
+      "evidence": "source-derived expectation; not executed",
+      "source_bytes_hex": "ff"
+    },
+    {
+      "id": "L017",
+      "phase": "literal-decode",
+      "source": "0b1E5",
+      "expected": {
+        "kind": "literal-decoding-error"
+      },
+      "source_basis": "R11",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B001",
+      "phase": "bind-or-lower",
+      "source": "f = () -> freshName",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "global freshName is allocated while binding f, before calling it"
+      },
+      "source_basis": "A 3.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B002",
+      "phase": "bind-or-lower",
+      "source": "if false then freshName",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "global freshName exists after binding the statement"
+      },
+      "source_basis": "A 3.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B003",
+      "phase": "bind-or-lower",
+      "source": "x := x",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "RHS resolves to new local declaration; initial read is null"
+      },
+      "source_basis": "A 3.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B004",
+      "phase": "bind-or-lower",
+      "source": "x := 1; f = () -> x; x := 2",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "f retains first declaration; later x uses fresh declaration"
+      },
+      "source_basis": "A 3.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B005",
+      "phase": "bind-or-lower",
+      "source": "f = x -> x",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "rest parameter convention"
+      },
+      "source_basis": "A 3.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B006",
+      "phase": "bind-or-lower",
+      "source": "f = (x) -> x",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "one fixed parameter convention"
+      },
+      "source_basis": "A 3.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B007",
+      "phase": "bind-or-lower",
+      "source": "f = {x} -> x",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "one fixed parameter convention"
+      },
+      "source_basis": "R4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B008",
+      "phase": "bind-or-lower",
+      "source": "f = [x] -> x",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "one fixed parameter convention"
+      },
+      "source_basis": "R4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B009",
+      "phase": "bind-or-lower",
+      "source": "f = <|x|> -> x",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "one fixed parameter convention"
+      },
+      "source_basis": "R4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B010",
+      "phase": "bind-or-lower",
+      "source": "f = {} -> 7",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "zero fixed parameters"
+      },
+      "source_basis": "R4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B011",
+      "phase": "bind-or-lower",
+      "source": "f = ((x)) -> x",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "binding error: nested parameter delimiters"
+      },
+      "source_basis": "R4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B012",
+      "phase": "bind-or-lower",
+      "source": "f = (x,x) -> x",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "binding error: duplicate parameter"
+      },
+      "source_basis": "A 3.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B013",
+      "phase": "bind-or-lower",
+      "source": "1 -> 2",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "binding error after successful parse"
+      },
+      "source_basis": "A 2.5.6",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B014",
+      "phase": "bind-or-lower",
+      "source": "f = (field) -> obj.field",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "field key binds globally, not to parameter"
+      },
+      "source_basis": "A 3.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B015",
+      "phase": "bind-or-lower",
+      "source": "for i from x to y when i<3 list i",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "domain outside; i/when/list inside new scope"
+      },
+      "source_basis": "A 3.4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B016",
+      "phase": "bind-or-lower",
+      "source": "try p then s except e do e",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "primary/sequel outside; e/handler inside new scope"
+      },
+      "source_basis": "A 3.4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B017",
+      "phase": "bind-or-lower",
+      "source": "A + B := f",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "method-installation target, not local variable declaration"
+      },
+      "source_basis": "A 4.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B018",
+      "phase": "bind-or-lower",
+      "source": "new T of P from I := f",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "NewOfFromMethod installation"
+      },
+      "source_basis": "A 4.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "B019",
+      "phase": "bind-or-lower",
+      "source": "(x,L#0) = (1,2)",
+      "expected": {
+        "kind": "binding-description",
+        "behavior": "mixed parallel target accepted; evaluated stores in order"
+      },
+      "source_basis": "A 6.6.2",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E001",
+      "phase": "evaluate",
+      "source": "1+2*3",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "7 : ZZ"
+      },
+      "source_basis": "A 6.10",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E002",
+      "phase": "evaluate",
+      "source": "6/3",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "2 : QQ"
+      },
+      "source_basis": "A 6.10",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E003",
+      "phase": "evaluate",
+      "source": "(1,)",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "Sequence(1,null)"
+      },
+      "source_basis": "A 4.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E004",
+      "phase": "evaluate",
+      "source": "(,1)",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "Sequence(null,1)"
+      },
+      "source_basis": "A 4.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E005",
+      "phase": "evaluate",
+      "source": "(1,,2)",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "Sequence(1,null,2)"
+      },
+      "source_basis": "A 4.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E006",
+      "phase": "evaluate",
+      "source": "[1,2]",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "Array(1,2)"
+      },
+      "source_basis": "A 2.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E007",
+      "phase": "evaluate",
+      "source": "<|1,2|>",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "AngleBarList(1,2)"
+      },
+      "source_basis": "A 2.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E008",
+      "phase": "evaluate",
+      "source": "1:7",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "Sequence(7), not scalar 7"
+      },
+      "source_basis": "A 4.2",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E009",
+      "phase": "evaluate",
+      "source": "f=x->x; f(1,2)",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "Sequence(1,2)"
+      },
+      "source_basis": "A 6.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E010",
+      "phase": "evaluate",
+      "source": "f=(x,y)->x+y; f(1,2)",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "3 : ZZ"
+      },
+      "source_basis": "A 6.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E011",
+      "phase": "evaluate",
+      "source": "f=(x,y)->x+y; f {1,2}",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "arity error"
+      },
+      "source_basis": "A 6.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E012",
+      "phase": "evaluate",
+      "source": "y=z; z=444; value y",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "444 : ZZ"
+      },
+      "source_basis": "A 3.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E013",
+      "phase": "evaluate",
+      "source": "x=t; x<-4; t",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "4 : ZZ"
+      },
+      "source_basis": "A 6.10",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E014",
+      "phase": "evaluate",
+      "source": "for i from 1 to 3 list (() -> i)",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "each resulting closure returns 3"
+      },
+      "source_basis": "A 6.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E015",
+      "phase": "evaluate",
+      "source": "try (1/0) except e do 7",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "7 : ZZ"
+      },
+      "source_basis": "A 6.9",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E016",
+      "phase": "evaluate",
+      "source": "catch throw 9",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "9 : ZZ"
+      },
+      "source_basis": "A 6.9",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E017",
+      "phase": "evaluate",
+      "source": "f=()->(try return 7 else 8); f()",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "7 : ZZ"
+      },
+      "source_basis": "A 6.2",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E018",
+      "phase": "evaluate",
+      "source": "for i to 3 list if i==2 then break else i",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "List(0,1)"
+      },
+      "source_basis": "A 6.9",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E019",
+      "phase": "evaluate",
+      "source": "for i to 3 list if i==2 then break null else i",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "null"
+      },
+      "source_basis": "A 6.9",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E020",
+      "phase": "evaluate",
+      "source": "for i to 2 list if i==1 then continue else i",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "List(0,2)"
+      },
+      "source_basis": "A 6.9",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E021",
+      "phase": "evaluate",
+      "source": "for i to 2 list if i==1 then continue null else i",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "List(0,null,2)"
+      },
+      "source_basis": "A 6.9",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E022",
+      "phase": "evaluate",
+      "source": "x=1; try (x=2; 1/0); x",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "2 : ZZ; no native rollback"
+      },
+      "source_basis": "R8",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E023",
+      "phase": "evaluate",
+      "source": "false and (1/0)",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "false"
+      },
+      "source_basis": "A 6.10",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E024",
+      "phase": "evaluate",
+      "source": "true or (1/0)",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "true"
+      },
+      "source_basis": "A 6.10",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E025",
+      "phase": "evaluate",
+      "source": "null ?? 7",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "7 : ZZ"
+      },
+      "source_basis": "A 6.9",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E026",
+      "phase": "evaluate",
+      "source": "x=null; x ??= 7; x",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "7 : ZZ"
+      },
+      "source_basis": "A 6.7",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E027",
+      "phase": "evaluate",
+      "source": "i=0; (i=i+1)<=5; i",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "2 : ZZ"
+      },
+      "source_basis": "A 6.10",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E028",
+      "phase": "evaluate",
+      "source": "2 SPACE 3",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "same application failure as 2 3"
+      },
+      "source_basis": "R3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E029",
+      "phase": "evaluate",
+      "source": "f=x->x+1; f SPACE 2",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "3 : ZZ"
+      },
+      "source_basis": "R3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E030",
+      "phase": "evaluate",
+      "source": "x:=x; x",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "null"
+      },
+      "source_basis": "A 3.5",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E031",
+      "phase": "evaluate",
+      "source": "class symbol x",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "Symbol"
+      },
+      "source_basis": "A 5.4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E032",
+      "phase": "evaluate",
+      "source": "class symbol +",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "Keyword"
+      },
+      "source_basis": "A 5.4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E033",
+      "phase": "evaluate",
+      "source": "f=()->local x; a=f(); b=f(); a===b",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "false"
+      },
+      "source_basis": "A 5.4",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E034",
+      "phase": "evaluate",
+      "source": "f=()->local x; a=f(); b=f(); symbolBody a===symbolBody b",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "true"
+      },
+      "source_basis": "native symbols test; spec 9.3",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E035",
+      "phase": "evaluate",
+      "source": "7;",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "last value 7, output suppressed at source-unit boundary"
+      },
+      "source_basis": "A 7.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "E036",
+      "phase": "evaluate",
+      "source": "(7;)",
+      "expected": {
+        "kind": "typed-observation-description",
+        "value": "null"
+      },
+      "source_basis": "A 4.1",
+      "evidence": "source-derived expectation; not executed"
+    },
+    {
+      "id": "S001",
+      "phase": "state-scenario",
+      "steps": [
+        "Start with unregistered spelling aliasPlus",
+        "Insert visible dictionary alias aliasPlus -> symbol +",
+        "Parse a aliasPlus b"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Alias has plus profile; Binary(a,aliasPlus,b); operator resolves to + SymbolId"
+      },
+      "source_basis": "R2; spec 7.7",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S002",
+      "phase": "state-scenario",
+      "steps": [
+        "Lex spelling aliasPlus as ordinary identifier first",
+        "Insert fresh-key dictionary alias aliasPlus -> symbol +",
+        "Parse a aliasPlus b"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Existing GenericProfile is retained; parse is adjacency, not addition"
+      },
+      "source_basis": "R2",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S003",
+      "phase": "state-scenario",
+      "steps": [
+        "Prepare two global dictionaries with distinct x symbols",
+        "Bind f to first visible x",
+        "Reorder globalPath",
+        "Bind g to newly first x"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "f keeps prior SymbolId/location; g uses new first binding"
+      },
+      "source_basis": "spec 7.7",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S004",
+      "phase": "state-scenario",
+      "steps": [
+        "Place protected dictionary first and writable dictionary second",
+        "Bind unknown name"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Create name in the second dictionary"
+      },
+      "source_basis": "A 3.3; R6",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S005",
+      "phase": "state-scenario",
+      "steps": [
+        "Register alias from target symbol under different spelling"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Canonical name, declaration ID and existing cells are unchanged"
+      },
+      "source_basis": "spec 7.7",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S006",
+      "phase": "state-scenario",
+      "steps": [
+        "Peek a token while skipping newlines",
+        "Request next token with obeylines=true"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Return the cached token with its existing followsNewline flag"
+      },
+      "source_basis": "A 1.10",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S007",
+      "phase": "state-scenario",
+      "steps": [
+        "Set default precision p",
+        "Lower f=()->1.0",
+        "Change default precision to q",
+        "Call f"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "f uses the real constant created with p at lowering time"
+      },
+      "source_basis": "R10",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S008",
+      "phase": "state-scenario",
+      "steps": [
+        "Execute a native-mode input that writes x then errors"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Reached state retains prior write; later input sees it"
+      },
+      "source_basis": "R8",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S009",
+      "phase": "state-scenario",
+      "steps": [
+        "Run discarded speculative Lean parse alternative that interns a name"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Live M2 session is unchanged; only selected parse delta commits"
+      },
+      "source_basis": "spec 10.4",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S010",
+      "phase": "state-scenario",
+      "steps": [
+        "Create thread-global declaration",
+        "Resolve one Code reference",
+        "Execute reference on two thread contexts"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Same declaration, distinct thread-relative cells; no capture of binder thread cell"
+      },
+      "source_basis": "spec 3.4",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S011",
+      "phase": "state-scenario",
+      "steps": [
+        "Install symbol-specific assignment hook, old-class release hook, new-class assignment hook",
+        "Perform ordinary global ="
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "symbol hook; old release; new assignment; final store, with stopping at first error"
+      },
+      "source_basis": "A 6.6.1",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S012",
+      "phase": "state-scenario",
+      "steps": [
+        "Use <- on an unprotected symbol with no symbol-specific assignment hook",
+        "Provide old/new class hooks"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Direct captured-cell store; no implicit class-hook invocation"
+      },
+      "source_basis": "R9",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S013",
+      "phase": "state-scenario",
+      "steps": [
+        "Create malformed incoming code with wrong SymbolId/CellId ownership"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Code/link validation fails, not an M2 unbound-name error"
+      },
+      "source_basis": "spec 11",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    },
+    {
+      "id": "S014",
+      "phase": "state-scenario",
+      "steps": [
+        "Exhaust implementation step budget during a finite/divergent computation"
+      ],
+      "expected": {
+        "kind": "state-description",
+        "behavior": "Resource suspension/exhaustion, never fabricated M2 null/result"
+      },
+      "source_basis": "spec 9.2",
+      "evidence": "source-derived or explicitly proposed contract; not executed"
+    }
+  ]
+}

@@ -1,0 +1,3294 @@
+{
+  "schema": "macaulean.audit-regressions.v1.1",
+  "status": "UNEXECUTED typed fixture plan; no native or Lean results",
+  "source_commit": "1a37f6fe95badb1e5f99707a485503d213fd9d49",
+  "all_expected_values_native_verified": false,
+  "runner_included": false,
+  "legacy_plan": "archive/v1.0-conformance-cases.json",
+  "fixtures": [
+    {
+      "id": "REG-BASE-ARITH",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "1+2*3",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "ZZ",
+            "decimal": "7"
+          }
+        }
+      },
+      "rules": [
+        "PRATT-CORE"
+      ],
+      "audit_findings": [],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "A structural validator must accept a well-typed incorrect number here; truth requires behavioral evidence."
+    },
+    {
+      "id": "REG-F03-LEADING",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "source-unit",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": ";1",
+      "expected": {
+        "phase": "parse",
+        "completion": {
+          "kind": "SyntaxFailure"
+        },
+        "diagnostic_projection": {
+          "offending_token_utf8": ";"
+        }
+      },
+      "rules": [
+        "UNIT-SYNTAX",
+        "UNIT-STEP"
+      ],
+      "audit_findings": [
+        "F03"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F03-REPEATED",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "source-unit",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "AuditSemi=1;;AuditLater=2",
+      "expected": {
+        "phase": "parse",
+        "completion": {
+          "kind": "SyntaxFailure"
+        },
+        "state_predicates": [
+          {
+            "kind": "global-value",
+            "name": "AuditSemi",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "1"
+            }
+          },
+          {
+            "kind": "symbol-absent",
+            "name": "AuditLater"
+          }
+        ]
+      },
+      "rules": [
+        "UNIT-SYNTAX",
+        "UNIT-STEP"
+      ],
+      "audit_findings": [
+        "F03"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "The first assignment completes; the second semicolon begins an invalid statement; the later name has not been bound."
+    },
+    {
+      "id": "REG-F03-TERMINATOR",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "7;",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "ZZ",
+            "decimal": "7"
+          }
+        }
+      },
+      "rules": [
+        "UNIT-STEP"
+      ],
+      "audit_findings": [
+        "F03"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Value-string last result retained; no interactive printing asserted."
+    },
+    {
+      "id": "REG-F03-BLOCK",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "(7;)",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "Nothing"
+          }
+        }
+      },
+      "rules": [
+        "PRATT-CORE"
+      ],
+      "audit_findings": [
+        "F03"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F04-PREDICATE-BREAK",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "i=0; a=while (if i==1 then break else true) list (i=i+1); i=0; b=while (if i==1 then break else true) list (i=i+1) do null; (a,b)",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "Sequence",
+            "items": [
+              {
+                "tag": "Nothing"
+              },
+              {
+                "tag": "List",
+                "items": [
+                  {
+                    "tag": "ZZ",
+                    "decimal": "1"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F05-FINISH",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "try finish 3 else 7",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "ZZ",
+            "decimal": "7"
+          }
+        }
+      },
+      "rules": [
+        "TRY-CATCHABILITY"
+      ],
+      "audit_findings": [
+        "F05"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F05-RETURN",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "f=()->(try return 7 else 8); f()",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "ZZ",
+            "decimal": "7"
+          }
+        }
+      },
+      "rules": [
+        "TRY-CATCHABILITY"
+      ],
+      "audit_findings": [
+        "F05"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F06-SECOND-ERROR",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "n=0; f=()->(n=n+1; if n==1 then 1 else error \"second\"); r=try(f()<=2); (r,n)",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "Sequence",
+            "items": [
+              {
+                "tag": "Boolean",
+                "value": true
+              },
+              {
+                "tag": "ZZ",
+                "decimal": "2"
+              }
+            ]
+          }
+        }
+      },
+      "rules": [
+        "COMPARE-SECOND"
+      ],
+      "audit_findings": [
+        "F06"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F07-BIND-EFFECT",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "try value \"#AuditTarget := AuditRhsAfterInvalidMethod\"; isGlobalSymbol \"AuditRhsAfterInvalidMethod\"",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "Boolean",
+            "value": true
+          }
+        }
+      },
+      "rules": [
+        "BIND-FAILURE"
+      ],
+      "audit_findings": [
+        "F07"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Nested value-string failure is caught by library-facing value/try; RHS symbol is created before capability check."
+    },
+    {
+      "id": "REG-F09-SYMBOL-MUTABILITY",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "s=symbol AuditMutable; a=isMutable s; protect s; (a,isMutable s)",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "Sequence",
+            "items": [
+              {
+                "tag": "Boolean",
+                "value": true
+              },
+              {
+                "tag": "Boolean",
+                "value": false
+              }
+            ]
+          }
+        }
+      },
+      "rules": [
+        "MUTABILITY"
+      ],
+      "audit_findings": [
+        "F09"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F12-KEY-AFTER-RHS",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "i=0; T=new MutableHashTable from {0=>10,1=>20}; T#i += (i=1;5); (T#0,T#1)",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "Sequence",
+            "items": [
+              {
+                "tag": "ZZ",
+                "decimal": "10"
+              },
+              {
+                "tag": "ZZ",
+                "decimal": "25"
+              }
+            ]
+          }
+        }
+      },
+      "rules": [
+        "AUGMENT-SCHEDULE"
+      ],
+      "audit_findings": [
+        "F12"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F13-SINGLE-LIST",
+      "kind": "source",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "value-string",
+      "initial_state": {
+        "bootstrap": "pinned-Core",
+        "fresh_session": true,
+        "setup_source_utf8": "",
+        "driver_flags": {
+          "returnIfError": true
+        }
+      },
+      "source_utf8": "(x)={5}",
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "ZZ",
+            "decimal": "5"
+          }
+        }
+      },
+      "rules": [
+        "PARALLEL-RESULT"
+      ],
+      "audit_findings": [
+        "F13"
+      ],
+      "observation_scope": "specified projections only; full diagnostics/trace must be recorded by native adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit and supplied contract; not an observed M2 result",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F04-M01-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-do",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M01-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-do",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M01-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-do",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-null",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M01-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-do",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M02-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "next-test",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M02-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M02-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-null",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M02-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M03-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M03-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M03-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-null",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M03-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M04-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "skip-append-next-test",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M04-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "append-next-test",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M04-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-collected",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M04-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M05-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M05-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M05-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-collected",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M05-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "predicate",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M06-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "skip-append-then-do",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M06-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "append-then-do",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M06-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-collected",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M06-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M07-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M07-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M07-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-collected",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M07-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "while-list-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M08-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "when",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M08-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "when",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M08-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "when",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-collected",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M08-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "when",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M09-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "skip-append-then-do",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M09-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "append-then-do",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M09-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-collected",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M09-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "collector",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M10-C0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "next-iteration",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M10-CV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Continue",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "propagate",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M10-B0",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Omitted"
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-collected",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F04-M10-BV",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "loop_form": "for-list-do",
+        "active_clause": "do",
+        "collected": {
+          "tag": "List",
+          "items": [
+            {
+              "tag": "ZZ",
+              "decimal": "4"
+            }
+          ]
+        },
+        "body_if_present": "normal null",
+        "other_state": "unchanged except effects already reached"
+      },
+      "request": {
+        "deliver": {
+          "kind": "Break",
+          "argument": {
+            "kind": "Present",
+            "value": {
+              "tag": "ZZ",
+              "decimal": "9"
+            }
+          }
+        }
+      },
+      "expected": {
+        "phase": "loop-clause",
+        "action": "return-argument",
+        "retains_reached_effects": true
+      },
+      "rules": [
+        "LOOP-CLAUSE"
+      ],
+      "audit_findings": [
+        "F04"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "Handler-boundary fixture, not a whole-source result. Collector append precedes any later do clause."
+    },
+    {
+      "id": "REG-F02-HOOK-KEYS",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "printing_enabled": true,
+        "mode": "Standard",
+        "lastvalue": {
+          "tag": "ZZ",
+          "decimal": "5"
+        },
+        "installed_handlers": [
+          {
+            "key": {
+              "kind": "symbol",
+              "name": "AfterEval"
+            },
+            "returns": {
+              "tag": "ZZ",
+              "decimal": "7"
+            }
+          },
+          {
+            "key": {
+              "kind": "mode-qualified",
+              "mode": "Standard",
+              "name": "AfterEval"
+            },
+            "returns": {
+              "tag": "ZZ",
+              "decimal": "999"
+            }
+          }
+        ]
+      },
+      "request": {
+        "step": "AfterEval"
+      },
+      "expected": {
+        "phase": "source-unit",
+        "selected_key": {
+          "kind": "symbol",
+          "name": "AfterEval"
+        },
+        "lastvalue": {
+          "tag": "ZZ",
+          "decimal": "7"
+        }
+      },
+      "rules": [
+        "HOOK-KEYS"
+      ],
+      "audit_findings": [
+        "F02"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F08-CAPTURE-RELEASE",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "old_class_release": "releaseOld",
+        "symbol_hook": {
+          "replace_old_class_release": "releaseNew"
+        },
+        "new_class_assign": "assignInitial"
+      },
+      "request": {
+        "operation": "global assignment"
+      },
+      "expected": {
+        "phase": "assignment",
+        "ordered_calls": [
+          "symbolHook",
+          "releaseOld",
+          "assignInitial"
+        ],
+        "final_store": true
+      },
+      "rules": [
+        "ASSIGN-HOOK-SCHEDULE"
+      ],
+      "audit_findings": [
+        "F08"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F08-LATE-ASSIGN",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "old_class_release": "releaseOld",
+        "symbol_hook": {
+          "replace_new_class_assign": "assignNew"
+        },
+        "new_class_assign": "assignInitial"
+      },
+      "request": {
+        "operation": "global assignment"
+      },
+      "expected": {
+        "phase": "assignment",
+        "ordered_calls": [
+          "symbolHook",
+          "releaseOld",
+          "assignNew"
+        ],
+        "final_store": true
+      },
+      "rules": [
+        "ASSIGN-HOOK-SCHEDULE"
+      ],
+      "audit_findings": [
+        "F08"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F10-CACHE-PARENT",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "lhs": {
+          "class": "exact CacheTable",
+          "hash": 0,
+          "parent_identity": "P1",
+          "object_identity": "O1"
+        },
+        "rhs": {
+          "class": "exact CacheTable",
+          "hash": 0,
+          "parent_identity": "P2",
+          "object_identity": "O2"
+        },
+        "P1_equals_P2": false
+      },
+      "request": {
+        "operation": "strict-equality"
+      },
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "Boolean",
+            "value": false
+          }
+        }
+      },
+      "rules": [
+        "CACHE-EQUALITY"
+      ],
+      "audit_findings": [
+        "F10"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F11-LOCAL-DEFAULT",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "augmented_method_result": {
+          "kind": "SymbolClosure",
+          "canonical_word_utf8": "Default",
+          "declaration": "fresh-local",
+          "activation": "call-1"
+        },
+        "global_Default_declaration": "different"
+      },
+      "request": {
+        "step": "classify augmented method result"
+      },
+      "expected": {
+        "phase": "assignment",
+        "action": "base-fallback",
+        "reason": "canonical-spelling equality, not global identity"
+      },
+      "rules": [
+        "AUGMENT-SCHEDULE"
+      ],
+      "audit_findings": [
+        "F11"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F13-METHOD-RESULT",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "rhs": {
+          "tag": "ZZ",
+          "decimal": "5"
+        },
+        "assignment_method": {
+          "normal_result": {
+            "tag": "ZZ",
+            "decimal": "9"
+          }
+        }
+      },
+      "request": {
+        "operation": "custom operator assignment"
+      },
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "ZZ",
+            "decimal": "9"
+          }
+        }
+      },
+      "rules": [
+        "ASSIGN-RESULT"
+      ],
+      "audit_findings": [
+        "F13"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F14-LIVE-SLOT",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "scope_kind": "non-global",
+        "backing_sequence_identity": "V1",
+        "frame_slot0": {
+          "tag": "ZZ",
+          "decimal": "1"
+        },
+        "wrapper_backing": "V1",
+        "closure_reads": {
+          "backing": "V1",
+          "slot": 0
+        }
+      },
+      "request": {
+        "write_wrapper_slot": 0,
+        "value": {
+          "tag": "ZZ",
+          "decimal": "8"
+        },
+        "then": "call closure"
+      },
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "ZZ",
+            "decimal": "8"
+          }
+        }
+      },
+      "rules": [
+        "FRAME-VIEW"
+      ],
+      "audit_findings": [
+        "F14"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": "No intervening resize/backing replacement; those cases remain OC-FRAME."
+    },
+    {
+      "id": "REG-F14-GLOBAL-HIDE",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "frame_kind": "global",
+        "frame_slots": [
+          {
+            "tag": "ZZ",
+            "decimal": "8"
+          }
+        ]
+      },
+      "request": {
+        "operation": "frame view"
+      },
+      "expected": {
+        "phase": "evaluate",
+        "completion": {
+          "kind": "Normal",
+          "value": {
+            "tag": "List",
+            "items": [],
+            "class": "MutableList"
+          }
+        }
+      },
+      "rules": [
+        "FRAME-VIEW"
+      ],
+      "audit_findings": [
+        "F14"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F15-RETAIN-ENTRIES",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "dictionary_entry_count": 1,
+        "visible_name": "x",
+        "existing_symbol": "S1",
+        "existing_layout": [
+          "S1"
+        ]
+      },
+      "request": {
+        "operation": "fresh current-scope declaration",
+        "name": "x",
+        "new_symbol": "S2"
+      },
+      "expected": {
+        "phase": "binding",
+        "dictionary_entry_count": 2,
+        "retained_symbols": [
+          "S1",
+          "S2"
+        ],
+        "visible_symbol": "S2",
+        "deduplication_permitted": false
+      },
+      "rules": [
+        "DICT-HISTORY"
+      ],
+      "audit_findings": [
+        "F15"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F16-BEFORE-NONSTOP",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "stopIfError": false,
+        "returnIfError": false,
+        "next_code": "assign x=7",
+        "BeforeEval": "Error"
+      },
+      "request": {
+        "step": "BeforeEval failure"
+      },
+      "expected": {
+        "phase": "source-unit",
+        "record_error": true,
+        "next_action": "evaluate statement"
+      },
+      "rules": [
+        "UNIT-FAILURE"
+      ],
+      "audit_findings": [
+        "F16"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F16-AFTER-NONSTOP",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "stopIfError": false,
+        "returnIfError": false,
+        "lastvalue": {
+          "tag": "ZZ",
+          "decimal": "5"
+        },
+        "printing_enabled": true
+      },
+      "request": {
+        "deliver_to": "AfterEval",
+        "completion": {
+          "kind": "Error"
+        }
+      },
+      "expected": {
+        "phase": "source-unit",
+        "lastvalue": {
+          "tag": "Nothing"
+        },
+        "next_action": "BeforePrint"
+      },
+      "rules": [
+        "UNIT-FAILURE"
+      ],
+      "audit_findings": [
+        "F16"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F16-BEFOREPRINT-NONSTOP",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "stopIfError": false,
+        "returnIfError": false,
+        "lastvalue": {
+          "tag": "ZZ",
+          "decimal": "5"
+        },
+        "printvalue": {
+          "tag": "Nothing"
+        },
+        "terminator": ";"
+      },
+      "request": {
+        "deliver_to": "BeforePrint",
+        "completion": {
+          "kind": "Error"
+        }
+      },
+      "expected": {
+        "phase": "source-unit",
+        "lastvalue": {
+          "tag": "ZZ",
+          "decimal": "5"
+        },
+        "printvalue": {
+          "tag": "Nothing"
+        },
+        "next_action": "NoPrint"
+      },
+      "rules": [
+        "UNIT-FAILURE"
+      ],
+      "audit_findings": [
+        "F16"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F16-EXIT-LAST",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "exit_hooks": [
+          "A",
+          "B",
+          "C"
+        ],
+        "hook_results": [
+          {
+            "kind": "Error",
+            "label": "EA"
+          },
+          {
+            "kind": "Normal"
+          },
+          {
+            "kind": "Error",
+            "label": "EC"
+          }
+        ],
+        "driver_result": {
+          "tag": "ZZ",
+          "decimal": "5"
+        }
+      },
+      "request": {
+        "operation": "run exit hooks"
+      },
+      "expected": {
+        "phase": "source-unit",
+        "calls": [
+          "A",
+          "B",
+          "C"
+        ],
+        "completion": {
+          "kind": "Error",
+          "label": "EC"
+        },
+        "restore_outer_hooks": true
+      },
+      "rules": [
+        "FILE-EXIT"
+      ],
+      "audit_findings": [
+        "F16"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F18-VISIBLE-METHOD-WRITE",
+      "kind": "configuration",
+      "profile": "PN",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "visible_class_entry": "methodA",
+        "derived_cache": "methodA"
+      },
+      "request": {
+        "write_visible_class_entry": "methodB",
+        "then": "same method lookup"
+      },
+      "expected": {
+        "phase": "dispatch",
+        "selected_method": "methodB",
+        "cache_must_not_override_store": true
+      },
+      "rules": [
+        "METHOD-AUTHORITY"
+      ],
+      "audit_findings": [
+        "F18"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    },
+    {
+      "id": "REG-F19-SAFE-REAL",
+      "kind": "configuration",
+      "profile": "PS",
+      "execution_mode": "native",
+      "entry": "instrumented-continuation",
+      "initial_state": {
+        "profile": "PS"
+      },
+      "request": {
+        "raw_literal_utf8": "0b1E5"
+      },
+      "expected": {
+        "phase": "literal-decode",
+        "completion": {
+          "kind": "LiteralDecodeFailure"
+        },
+        "deviation": "DEV-REAL-RADIX"
+      },
+      "rules": [
+        "LEX-BYTES"
+      ],
+      "audit_findings": [
+        "F19"
+      ],
+      "observation_scope": "contract-level configuration projection; requires a native fixture adapter",
+      "evidence": {
+        "status": "UNEXECUTED",
+        "basis": "attached audit source inspection",
+        "native_execution": false,
+        "lean_execution": false
+      },
+      "notes": ""
+    }
+  ]
+}

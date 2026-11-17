@@ -1,0 +1,59 @@
+{
+  "status": "PASS — structural control behavior only",
+  "baseline_status": "PASS — document/data/structure/integrity only",
+  "controls": [
+    {
+      "name": "main-table-drift",
+      "expected_structural_acceptance": false,
+      "actual_structural_acceptance": false,
+      "control_passed": true,
+      "reason": "Active document grammar table differs from manifest"
+    },
+    {
+      "name": "wrong-quote-policy-with-matching-projection",
+      "expected_structural_acceptance": false,
+      "actual_structural_acceptance": false,
+      "control_passed": true,
+      "reason": "Wrong per-word quotation policy for symbol"
+    },
+    {
+      "name": "wrong-lexical-route-with-matching-projection",
+      "expected_structural_acceptance": false,
+      "actual_structural_acceptance": false,
+      "control_passed": true,
+      "reason": "Wrong lexical route for +"
+    },
+    {
+      "name": "standalone-semicolon-skip",
+      "expected_structural_acceptance": false,
+      "actual_structural_acceptance": false,
+      "control_passed": true,
+      "reason": "Source-unit skip set incorrectly admits empty semicolon statements"
+    },
+    {
+      "name": "rendered-html-drift",
+      "expected_structural_acceptance": false,
+      "actual_structural_acceptance": false,
+      "control_passed": true,
+      "reason": "HTML does not match active Markdown/CSS: Macaulean-M2-specification-v1.1.md"
+    },
+    {
+      "name": "archived-source-drift",
+      "expected_structural_acceptance": false,
+      "actual_structural_acceptance": false,
+      "control_passed": true,
+      "reason": "Archived supplied reference checksum differs from pinned input"
+    },
+    {
+      "name": "well-typed-wrong-behavioral-expectation",
+      "expected_structural_acceptance": true,
+      "actual_structural_acceptance": true,
+      "control_passed": true,
+      "reason": null
+    }
+  ],
+  "behavioral_expectations_validated": false,
+  "native_M2_execution_performed": false,
+  "lean_execution_performed": false,
+  "original_inputs_modified": false
+}

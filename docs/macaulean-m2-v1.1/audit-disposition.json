@@ -1,0 +1,199 @@
+{
+  "schema": "macaulean.audit-disposition.v1.1",
+  "all_findings_accounted_for": true,
+  "all_findings_closed": false,
+  "entries": [
+    {
+      "id": "F01",
+      "title": "The claimed core boundary omits native primitives and a bootstrap ABI",
+      "disposition": "partial — boundary corrected, inventory open",
+      "locations": "§0.1; §5.8; bootstrap-contracts.json",
+      "change": "Native apply/scan and identified primitives are no longer excluded as library-only. OC-BOOTSTRAP/OC-ACTOR remain.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F02",
+      "title": "AfterEval has the wrong method key",
+      "disposition": "integrated",
+      "locations": "§7.4 HOOK-KEYS",
+      "change": "Unqualified BeforeEval/AfterEval keys, exact arguments and result roles.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F03",
+      "title": "Standalone semicolons are incorrectly accepted by the source-unit grammar",
+      "disposition": "integrated",
+      "locations": "§2.6; §7.1 UNIT-STEP",
+      "change": "No standalone-semicolon skipping; source-unit and parse-utility observations kept separate.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F04",
+      "title": "Loop control cannot be specified by a uniform innermost-loop rule",
+      "disposition": "integrated for audited clause matrix",
+      "locations": "§6.9.1 LOOP-CLAUSE",
+      "change": "Ten clause rows define bare/valued continue and break; domain/iterator boundary remains OC-ITERATOR.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F05",
+      "title": "The typed completion taxonomy changes try on step and finish",
+      "disposition": "integrated for audited predicate",
+      "locations": "§6.9.2 TRY-CATCHABILITY",
+      "change": "Step/finish caught under active suppression; datatype split does not define catchability; OC-DEBUG retained.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F06",
+      "title": "The second left evaluation of <=/>= does not obey blanket error propagation",
+      "disposition": "integrated for audited actor",
+      "locations": "§6.10.1 COMPARE-SECOND",
+      "change": "First comparison checked; second delivered lhs result inspected without blanket abrupt check, including interval branches.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F07",
+      "title": "Binding failure effects and traversal are not optional",
+      "disposition": "partial — confirmed ordering corrected",
+      "locations": "§3.7 BIND-FAILURE",
+      "change": "RHS precedes method-capability validation, explicit early branches preserved; full remaining low-level edges OC-BIND.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F08",
+      "title": "Assignment-hook lookup time is unspecified",
+      "disposition": "integrated",
+      "locations": "§6.6.1 ASSIGN-HOOK-SCHEDULE",
+      "change": "Capture old release before symbol hooks; late new-class assignment lookup.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F09",
+      "title": "Symbol identity immutability is conflated with isMutable",
+      "disposition": "integrated",
+      "locations": "§5.3 MUTABILITY",
+      "change": "Native isMutable representation predicate separated from stable identity.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F10",
+      "title": "CacheTable equality omits class and parent conditions",
+      "disposition": "integrated",
+      "locations": "§5.5 CACHE-EQUALITY",
+      "change": "Class and parent checks precede exact-class hash-zero CacheTable special case.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F11",
+      "title": "Augmented Default dispatch is name-based, not canonical-symbol identity",
+      "disposition": "integrated",
+      "locations": "§6.7 AUGMENT-SCHEDULE",
+      "change": "Canonical word bytes Default request fallback; not one distinguished global identity.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F12",
+      "title": "Augmented hash-table assignment needs an explicit operand schedule",
+      "disposition": "partial — audited schedules integrated",
+      "locations": "§6.7 AUGMENT-SCHEDULE",
+      "change": "HashTable container -> RHS -> key -> lookup schedule and cached-vs-other paths; remaining edges OC-AUGMENT.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F13",
+      "title": "Not every assignment expression returns its supplied RHS",
+      "disposition": "integrated",
+      "locations": "§6.6; §6.6.2",
+      "change": "Per-form result rules; recursive actual results and one-target unwrapping replace universal RHS claim.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F14",
+      "title": "Reflective frame APIs have aliasing semantics, not just display semantics",
+      "disposition": "partial — core aliasing fixed",
+      "locations": "§5.7 FRAME-VIEW",
+      "change": "Shared backing sequence, existing-slot writes and global hiding required; extension/stale/empty-frame boundary OC-FRAME.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F15",
+      "title": "Dictionary history, enumeration and cardinality are not fixed by “shadowing map”",
+      "disposition": "partial — entry model fixed",
+      "locations": "§3.8 DICT-HISTORY",
+      "change": "Retained duplicate entries/counts separated from lookup; full erase/rehash/enumeration policy OC-DICT.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F16",
+      "title": "Source-unit hook failures and wrappers need a total policy table",
+      "disposition": "partial — audited driver paths fixed",
+      "locations": "§7.2; §7.4; §7.5",
+      "change": "Hook substitutions/continuation, wrapper transfer set, exit and close precedence integrated; OC-UNIT/OC-DEBUG remain.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F17",
+      "title": "Actor and host interfaces are named but not completely contracted",
+      "disposition": "open, explicitly inventoried",
+      "locations": "§5.8; §8.1",
+      "change": "Partial bootstrap register and actor/host/numeric open contracts replace an unsupported completeness claim.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F18",
+      "title": "Method state and class hash tables need one authoritative view",
+      "disposition": "design decision integrated",
+      "locations": "§6.5.5 METHOD-AUTHORITY",
+      "change": "Class/object tables authoritative; indexes/caches derived. Full installation edge contract OC-INSTALL remains.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F19",
+      "title": "Strict native conformance and intentional safe departures need separate labels",
+      "disposition": "integrated",
+      "locations": "§0.3",
+      "change": "PN and PS profiles with explicit departures/domain boundaries; no arbitrary cleanup permission.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F20",
+      "title": "The structural validator misses inconsistencies within its own data boundary",
+      "disposition": "validator strengthened; tested separately",
+      "locations": "validate_spec.py; test_validator.py",
+      "change": "Active table/JSON agreement, exact quote-word policy, routes, checksum and HTML source binding checks; behavior remains unvalidated.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F21",
+      "title": "The 146-case corpus is a test plan, not an executable conformance oracle",
+      "disposition": "partial — typed audit fixtures added",
+      "locations": "audit-regressions-v1.1.json; §8.3",
+      "change": "Exact-source and controlled configuration fixtures are unexecuted; legacy 146-case plan archived, complete native harness/coverage pending.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F22",
+      "title": "The normative organization duplicates too much and obscures authority",
+      "disposition": "integrated",
+      "locations": "Whole revision",
+      "change": "One active contract, separate architecture and non-normative ledger/archive; no verbatim normative Annex A.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F23",
+      "title": "Do not make every logical identity a mandatory hot-path allocation",
+      "disposition": "integrated",
+      "locations": "§3.9; §4.4; architecture §§3,8",
+      "change": "Logical addresses can be activation/slot; no mandatory per-cell object or redundant ID on each hot read.",
+      "native_test_executed": false
+    },
+    {
+      "id": "F24",
+      "title": "The proof roadmap has no fully defined runtime transition relation to refine yet",
+      "disposition": "open — scope made explicit",
+      "locations": "§6.0; §8; architecture §9",
+      "change": "Known transitions fixed; no full runtime relation/proof claimed until OC-* contracts close.",
+      "native_test_executed": false
+    }
+  ]
+}
