@@ -1,0 +1,23 @@
+[
+  {
+    "control": "legacy_import",
+    "rejected": true,
+    "errors": [
+      "legacy semantic import: Macaulean/Verification/Examples/GcdTranslation/Program.lean: Macaulean.Interpreter.Runtime"
+    ]
+  },
+  {
+    "control": "erased_word_identity",
+    "rejected": true,
+    "errors": [
+      "missing design boundary: IR.lean: sourceWord : WordId"
+    ]
+  },
+  {
+    "control": "admitted_obligation",
+    "rejected": true,
+    "errors": [
+      "untrusted/admitted code in Macaulean/Verification/Examples/GcdTranslation/Semantics.lean"
+    ]
+  }
+]
