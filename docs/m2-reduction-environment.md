@@ -29,9 +29,10 @@ and any transition known to preserve the environment. A user-global assignment
 regression ensures the condition does not pin the entire environment. The proofs
 use the existing `checkWritable` behavior; interpreter semantics are unchanged.
 
-These lemmas are prerequisites for the complete source reduction proof. They do
-not establish preservation through every evaluator construct, nor discharge
-`RepresentationStatement` or `IrreducibleStatement`. The correction does not
+These lemmas are prerequisites for the [source reduction representation
+proof](m2-reduction-proof.md), which now discharges `RepresentationStatement`.
+The environment lemmas alone do not establish preservation through every evaluator
+construct or either mathematical reduction target. The correction does not
 approve a contract or install an algorithm-correctness theorem.
 
 Dependency: based on #49 and its existing DSL stack, independent of the row

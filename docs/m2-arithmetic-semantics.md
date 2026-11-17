@@ -68,23 +68,18 @@ theorems and the source/effect examples. Only `propext`, `Classical.choice`, and
 The original milestone supplies denotation theorems over rational assignments.
 The [coefficientwise follow-up](m2-coefficient-contracts.md) now connects the same
 arithmetic to the existing Stage 1 coefficient and finite-convolution views.
-Neither `RuntimeReduction.RepresentationStatement` nor
-`RuntimeReduction.IrreducibleStatement` is discharged by this milestone.
-No parser-correctness, full reduction, termination, or full Buchberger theorem is
-claimed. There are no changes to algorithm execution, approval tokens, proof
-acceptance, or the existing contract definitions.
+The subsequent [source reduction proof](m2-reduction-proof.md) discharges
+`RuntimeReduction.RepresentationStatement`, using the executed row helper's
+dimension and linear-combination laws. The original arithmetic milestone alone
+does not imply that theorem. `RuntimeReduction.IrreducibleStatement`, full
+termination, and full Buchberger correctness remain separate obligations.
+There are no changes to algorithm execution, approval tokens, or proof acceptance.
 
-The next focused increments are:
+Remaining focused work includes leading-term selection and irreducibility, and
+an ideal-membership theorem usable through Macaulean's mathematical interface.
+No parser-correctness theorem is claimed.
 
-1. Prove dimension and representation preservation for the executed
-   `m2gbSubtractRow` helper, including its lexical bindings and recursive calls.
-2. Establish the `m2gbReduce` representation invariant by induction on evaluation
-   fuel, composing the arithmetic and row lemmas through the actual function.
-3. Prove leading-term selection and irreducibility preservation separately.
-4. Connect the completed representation theorem to an ideal-membership theorem
-   usable through Macaulean's existing mathematical interface.
-
-This work starts from PR #39, commit
-`8a7da3a026fbaa5a37482ef229d5664d488879fb`, and therefore depends on its parent
-stack. A future stacked PR should initially target
-`feature/m2-proof-stage2-20260927`, then be retargeted after that stack merges.
+The original arithmetic work starts from PR #39, commit
+`8a7da3a026fbaa5a37482ef229d5664d488879fb`, and depends on that parent stack.
+The reduction follow-up's current dependencies are recorded in its linked proof
+documentation.

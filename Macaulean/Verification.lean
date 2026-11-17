@@ -3,6 +3,7 @@ import Macaulean.Verification.ViewLaws
 import Macaulean.Verification.PolynomialArithmetic
 import Macaulean.Verification.PolynomialRows
 import Macaulean.Verification.RowRepresentation
+import Macaulean.Verification.ReductionRepresentation
 import Macaulean.Verification.Contracts
 import Macaulean.Verification.Snapshot
 import Macaulean.Verification.Intent

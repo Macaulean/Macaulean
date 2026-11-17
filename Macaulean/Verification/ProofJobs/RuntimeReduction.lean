@@ -4,8 +4,9 @@ import Macaulean.Verification.RuntimeEnvironment
 
 /-!
 The exact generic represented-reduction target. It is a proposition definition,
-not an axiom, theorem, proof placeholder or assumed primitive law. This target is
-NOT yet discharged. Protected prelude bindings are an explicit hypothesis: an
+not an axiom, theorem, proof placeholder or assumed primitive law. Representation
+is discharged by `ReductionRepresentation.representation`; irreducibility remains
+a separate open target. Protected prelude bindings are an explicit hypothesis: an
 arbitrary runtime state can otherwise replace a recursive library helper. It prevents an abstract conservation theorem from being
 mistaken for a proof about the source-language implementation.
 -/
