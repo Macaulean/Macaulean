@@ -1,8 +1,10 @@
 # Supported M2 dialect
 
 This is the scope and semantics entry point for the implemented Macaulean DSL.
-It describes the production parser/resolver/runtime on the #49 stack; it is not
-an exhaustive Macaulay2 specification or a claim of native-M2 equivalence.
+It describes the integrated production parser/resolver/runtime and proof interfaces.
+The separate [v1.1 native-language contract](Macaulean-M2-specification-v1.1.md)
+defines the broader compatibility target; this implementation reference does not
+replace that contract or claim native-M2 equivalence.
 The user-facing worksheet guide is [M2 worksheets](m2-dsl.md). Detailed algebra
 and proof interfaces are linked below rather than assigned a single blanket
 “supported” label. Expert review of the dialect choices remains open (roadmap A7).
@@ -126,12 +128,14 @@ method/type errors rather than implicit conversion to unrelated domains.
 | Parser/runtime regressions and native comparisons | Particular examples and implementation boundaries; not general native-M2 equivalence. |
 | Exported `.code` / `.definition` | A persistent representation and its definitional equation; not its mathematical contract. |
 | `#m2_check` | Kernel-replayed equality for a particular source result. |
-| Natural-number contracts and Lean handles | Soundness in their supported verification fragments. Runtime syntax can be broader: handle `wpV` excludes assignment, nested functions, return, and rings. [Verified functions](m2-verified-functions.md) |
+| Natural-number contracts | `#m2_verify` proves contracts and termination in its restricted natural-number fragment. This remains separate from handle proofs. [Verified functions](m2-verified-functions.md) |
+| Lean function handles | `wpLocal` and `m2_unfold` support private local/parameter assignment and early return, including nested returns and modular/recursive calls. Global or captured-cell writes, captured-slot reads, simultaneous assignment, nested closure creation and ring construction remain excluded. The original read-only `wpV` API remains available. [Verified functions](m2-verified-functions.md) |
+| Multivariate reduction | Actual successful source executions preserve polynomial representations and irreducible remainders under the documented initial invariants and protected-prelude bindings. These are not general termination or Buchberger-correctness theorems. [Reduction proofs](m2-reduction-proof.md) |
 | Intent contracts and proof jobs | Naming/approval/export/replay infrastructure. A selected contract or proposition definition is not itself a proved theorem. [Stage 1](m2-intent-stage1.md), [Stage 2](m2-proof-stage2.md) |
 | Polynomial GCD | Separate total-correctness results for the stated univariate QQ domain and runtime assumptions. [GCD](m2-gcd.md) |
 
-Additional mathematical theorems on other feature branches do not silently
-expand the language grammar or these proof tactics. This reference does not
+These mathematical theorems do not expand the language grammar or the supported
+handle-verification fragment. This reference does not
 claim expert sign-off, general parser preservation, whole-language translation
 correctness, or universal Buchberger correctness.
 
