@@ -1,4 +1,4 @@
-import Macaulean.Verification.Handles.Simp
+import Macaulean.Verification.Handles.Collections
 import Macaulean.Verification.Handles.Frontend
 
 /-!
@@ -64,6 +64,11 @@ private def asLean? (v : Expr) : MetaM (Option Expr) := do
       | _ => return some i
     | _ => return some i
   | Value.bool b => return some b
+  | Value.sequence xs =>
+    match_expr xs with
+    | List.map _ _ f l =>
+      if f.isAppOf ``ToM2.toValue then return some (← mkAppM ``Macaulean.M2.Seq.mk #[l]) else return none
+    | _ => return none
   | Value.list xs =>
     match_expr xs with
     | List.map _ _ f l => if f.isAppOf ``ToM2.toValue then return some l else return none
@@ -96,6 +101,8 @@ private def prettify (e : Expr) : MetaM Expr :=
       let f := (← handleFor? f).getD f
       let arg ← match_expr a with
         | Value.sequence vs =>
+          if let some s ← asLean? a then
+            return .done (← mkAppM ``Fn.call #[f, ← mkAppM ``Arg.of #[s]])
           let some (_, vs) := (← instantiateMVars vs).listLit? | return .done e
           match vs.reverse with
           | [] => mkAppM ``Arg.of #[mkConst ``Unit.unit]
