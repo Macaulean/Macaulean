@@ -76,7 +76,7 @@ example : averageQ ((1 : Rat), (2 : Rat)) ⇓ (3 / 2 : Rat) := by m2_eval
 
 -- Errors are checked against the actual operator, including unsupported dispatch.
 example (x : Rat) : evalBinOp .div (.qq x) (.qq 0) = .error .divByZero := by
-  simp [Handles.qq_div]
+  simp [m2_simp]
 example (x : Rat) : evalBinOp .quot (.qq x) (.qq 0) = .ok (.qq 0) := rfl
 example (x : Rat) : evalBinOp .rem (.qq x) (.qq 0) = .ok (.qq x) := rfl
 example : evalBinOp .pow (.qq 0) (.zz (-1)) = .error .divByZero := by decide

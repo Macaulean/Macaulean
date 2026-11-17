@@ -255,6 +255,32 @@ This is what lets theorems compose:
 | `m2_eval` | Evaluates a call on concrete arguments, e.g. `gcdNat (12, 18) ⇓ 6`. |
 | `m2_extends` | Proves by evaluation that a later worksheet state extends an earlier one. `m2_use` calls it. |
 
+### Overloaded arithmetic
+
+M2 parses `+` once, as `BinOp.add`; its meaning depends on the runtime values.
+Handle expansion uses that same dispatch table. For example, one definition
+
+```lean
+addValues = (x,y) -> x+y;
+```
+
+can be proved to return `x+y` for natural, integer, or rational inputs, and the
+appropriate promoted result for mixed inputs. There is no separate handle
+addition rule for every operand pair.
+
+`Handles/Operators.lean` provides a definitional simplification procedure for
+arithmetic, comparisons, and unary signs. Once operand constructors are known,
+it unfolds only the production dispatch definitions, leaving the resulting Lean
+arithmetic symbolic. Unknown call results remain opaque until `m2_use` supplies
+them. Specialized mathematical lemmas still normalize casts and handle bounds.
+
+A new Lean wrapper around an existing runtime representation needs a `ToM2`
+instance and a representation simplification rule; its operators reuse runtime
+dispatch. A genuinely new runtime value type still needs evaluator support and a
+proved mathematical interpretation. In particular, dispatching polynomial `+`
+to the polynomial layer does not automatically identify it with addition in an
+arbitrary Lean ring. Unsupported operand combinations remain runtime errors.
+
 ### Rational arithmetic
 
 Handle statements accept `Rat` arguments and results. For example:
@@ -298,9 +324,11 @@ Files are under `Macaulean/Verification/Handles/`.
 
   The soundness theorem `Fn.Call.Sat.intro` is proved once, by the same induction
   as for `#m2_verify`.
-- **The `m2_simp` simp set** (`Simp.lean`) evaluates operations on represented
-  values: integer and rational arithmetic and comparisons, Booleans, list length
-  and in-range indexing. Tag lemmas `@[m2_simp]` to support new kinds of value.
+- **The `m2_simp` simp set** combines the generic production-operator reducer
+  (`Operators.lean`) with representation and mathematical normalization lemmas
+  (`Simp.lean`, `Rationals.lean`). It supports integer and rational arithmetic and
+  comparisons, Booleans, list length and in-range indexing. Tag representation
+  and mathematical lemmas `@[m2_simp]` to support new kinds of value.
 - **`m2_unfold`** (`Tactic.lean`) works in three steps:
   1. it applies `Sat.intro` and evaluates the global lookups of the reflected
      state with `decide +kernel`;
