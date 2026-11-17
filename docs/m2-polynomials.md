@@ -16,7 +16,8 @@ The polynomial layer supports exact rational coefficients, default grevlex,
 scalar promotion, arithmetic, leading terms/coefficients/monomials, `exponents`,
 `listForm`, `terms`, `size`, `coefficient`, ideals and generator-row inspection.
 `//` and `%` in this layer handle single-term polynomial divisors only.
-General polynomial reduction and Buchberger belong to the next stacked PR.
+General polynomial reduction and Buchberger are provided by the combined
+[source-library interface](m2-groebner.md); their overloads have separate boundaries.
 `/` by a polynomial requires a fraction field and is rejected, even when the
 quotient would simplify to a polynomial. `leadMonomial(0_R)` is an error in the
 native version tested; `leadTerm(0_R)` and `leadCoefficient(0_R)` are zero.

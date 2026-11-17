@@ -35,7 +35,6 @@ The environment lemmas alone do not establish preservation through every evaluat
 construct or either mathematical reduction target. The correction does not
 approve a contract or install an algorithm-correctness theorem.
 
-Dependency: based on #49 and its existing DSL stack, independent of the row
-correctness and representation PRs #52/#53. Validation is part of the ordinary
+Validation is part of the ordinary
 `lake test` driver, including transitive axiom checks on the new lemmas and
 counterexample. Only `propext`, `Classical.choice`, and `Quot.sound` are allowed.

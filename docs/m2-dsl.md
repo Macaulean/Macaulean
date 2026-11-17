@@ -171,9 +171,10 @@ Early return is successful control flow and preserves prior writes.
 Recursion is bounded by an explicit evaluation-depth budget, default 4096.
 `set_option m2.maxDepth 8192` changes it for worksheet elaboration; `runWithFuel`
 and `Session.step` expose it directly. Exhaustion errors and rolls back the input;
-it does not fabricate null or a successful partial result. This is not a bound
-on total work or memory. Large finite ranges, branching recursion, and the current
-append-only heap can consume substantial resources.
+it does not fabricate null or a successful partial result. The worksheet
+polynomial `gcd` entry has a separate proved input-derived budget; see [the execution interfaces](m2-language-reference.md#execution-interfaces).
+This is not a bound on total work or memory. Large finite ranges, branching
+recursion, and the current append-only heap can consume substantial resources.
 
 ## Proofs, tests, and certificates
 
@@ -201,13 +202,12 @@ through `#m2_check`; the external answer is never accepted as an axiom.
 
 ## Current scope
 
-The grammar includes scalar arithmetic, Boolean/null values, immutable
-collections, assignment, blocks, branching, functions, lexical binding, recursion,
-return, and the operators described above. It is not the entire M2 language or
-standard library. Named library functions, method/optional-argument dispatch,
-strings, loops, mutable collections, rings, matrices, and general symbolic
-unassigned globals remain separate fragments. Unassigned globals retain the
-previous interpreter's explicit unbound-name error.
+See the [supported language reference and feature matrix](m2-language-reference.md)
+for the current combined dialect, operator precedence, execution APIs, and proof
+coverage. The implementation includes the restricted QQ polynomial, ideal,
+provenance-matrix and named source-library interfaces described there. General
+native method/options dispatch, package loading, strings, loops, mutable
+collections, and unassigned-global symbolic evaluation remain outside this scope.
 
 Reference sources and detailed function semantics are in
 [the function-extension documentation](m2-functions.md).

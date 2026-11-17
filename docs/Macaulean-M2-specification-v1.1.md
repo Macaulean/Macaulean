@@ -65,38 +65,44 @@ Profile selection must accompany every conformance run. `native` versus `transac
 ### 0.4 Macaulean implementation status — 17 November 2026
 
 This dated addendum describes the implementation separately from the native-language
-contract in §§1–8. The reviewed upstream `main` snapshot is
-[`0964f3c3453d71fb548d9015429a800647923910`](https://github.com/Macaulean/Macaulean/commit/0964f3c3453d71fb548d9015429a800647923910),
-which includes PR #49. Its toolchain is Lean **4.33.1**. The September comparison
-baseline above remains historical provenance; it is no longer the current
-implementation snapshot. Updating this status does not retarget the specification
+contract in §§1–8. The reviewed integration includes upstream main through #63
+and the changes from #52–#59. Its code snapshot before this reference update is
+[`4b43e95608404c2793d8d7e2bd08b37c60193453`](https://github.com/Macaulean/Macaulean/commit/4b43e95608404c2793d8d7e2bd08b37c60193453).
+The toolchain is Lean **4.33.1**. The September comparison baseline above remains
+historical provenance. Updating this status does not retarget the specification
 from M2 1.26.06 or claim equivalence with a newer native release.
 
 The original September text, including its statements about unexecuted audits,
 fixtures and validation, describes that specification revision. It must not be
 read as saying that the current repository has no Lean proofs or native comparison
 tests. Conversely, implementation proofs do not certify the whole contract here.
-This addendum was checked against upstream source, documentation and GitHub PR
-state; no Lean build, native M2 test, benchmark or specification-bundle validator
-was run for this documentation update.
+The integration was checked against upstream source and documentation. The code
+snapshot above passed `lake build`, all 442 `lake test` targets (including native
+M2 comparisons and theorem-dependency audits), and `Examples/Handles.lean`.
+The supported-language reference adds separately checked conformance anchors.
+No benchmark or specification-bundle validator result is claimed here.
 
-**Standalone-file provenance.** This PR imports only this Markdown file. References
+**Standalone-file provenance.** The original import in #63 supplied only this Markdown file. References
 in the original text to `archive/audit.md`, the architecture companion, grammar and
 regression JSON, `SHA256SUMS`, validation scripts and generated reports refer to the
 original specification bundle. Those artifacts are not supplied by this import;
 their references are provenance, not working repository links or reproducible
-validation evidence in this PR. Existing rule anchors and normative text are retained.
+validation evidence from that import. Existing rule anchors and normative text are retained.
 
 #### Merged implementation and verification
 
-| Area | Available at the reviewed `main` snapshot | Scope and evidence |
+| Area | Available in the reviewed integration | Scope and evidence |
 |---|---|---|
 | Pure Lean M2 worksheets | `import Macaulean.Interpreter.DSL` and `open M2`; shared Pratt parser, source-ordered lexical resolution, first-class closures with captured cells, recursion, early return, arithmetic, branching and immutable lists/sequences | [Worksheet guide](m2-dsl.md), [function semantics](m2-functions.md); merged PRs [#31](https://github.com/Macaulean/Macaulean/pull/31)–[#34](https://github.com/Macaulean/Macaulean/pull/34). Bare worksheet execution does not call native M2. |
 | Restricted polynomial and Gröbner execution | QQ polynomial rings with fixed grevlex order; polynomial arithmetic, ideals, limited matrices, source-language reduction and Buchberger, with change-matrix provenance | [Polynomials](m2-polynomials.md), [Gröbner interface](m2-groebner.md); merged [#61](https://github.com/Macaulean/Macaulean/pull/61) and [#62](https://github.com/Macaulean/Macaulean/pull/62). The runtime `GroebnerBasis` class is not a proof-carrying certificate. |
 | Polynomial arithmetic proofs | Denotation and coefficientwise normalization/addition/subtraction/multiplication laws, connected to actual operator and lexical-runtime execution; noncanonical inputs are covered | [Arithmetic semantics](m2-arithmetic-semantics.md), [coefficient contracts](m2-coefficient-contracts.md); merged [#40](https://github.com/Macaulean/Macaulean/pull/40) and [#41](https://github.com/Macaulean/Macaulean/pull/41). These do not alone prove the multivariate reduction loop or Buchberger. |
 | Univariate polynomial GCD | Total correctness of the actual source algorithm for accepted same-ring univariate QQ inputs, monic-or-zero output, automatic degree-derived execution budget, and reusable `#m2_gcd_proof` certificates | [GCD verification](m2-gcd.md); merged [#47](https://github.com/Macaulean/Macaulean/pull/47). `compute_total` covers validated inputs; worksheet automatic calls have the documented standard-library environment and reached-call conditions. This is not general worksheet termination. |
 | Persistent Lean exports | Successful bindings expose immutable, versioned Lean declarations, runtime snapshots, lowered code and definitional equations; `#m2_definition` identifies the current export | [Definition exposure](m2-definition-exposure.md); merged [#48](https://github.com/Macaulean/Macaulean/pull/48). Generated function definitions remain interpreter-backed; export is not universal translation preservation. |
-| Function contracts and handles | Restricted natural-number `#m2_verify` contracts; functions as Lean terms with `m2_unfold`, `m2_use` and `m2_eval`, tied to the production runtime | [Verified functions](m2-verified-functions.md); merged [#49](https://github.com/Macaulean/Macaulean/pull/49). Proof scope is narrower than executable syntax; snapshot/reflection boundaries are documented. Local assignment and early return are not yet covered by the merged handle calculus. |
+| Function contracts and handles | Restricted natural-number `#m2_verify` contracts; functions as Lean terms with `m2_unfold`, `m2_use` and `m2_eval`, tied to the production runtime | [Verified functions](m2-verified-functions.md); merged [#49](https://github.com/Macaulean/Macaulean/pull/49). Proof scope is narrower than executable syntax; snapshot/reflection boundaries are documented. The extension in [#58](https://github.com/Macaulean/Macaulean/pull/58) covers private local/parameter assignment and early return, while preserving caller cells. Global/captured mutation, captured reads, simultaneous assignment and nested closure creation remain outside the handle fragment. |
+| Executed polynomial rows | Dimension and coefficient correctness, followed by preservation of represented linear combinations | [Row proofs](m2-polynomial-rows.md); [#52](https://github.com/Macaulean/Macaulean/pull/52) and [#53](https://github.com/Macaulean/Macaulean/pull/53). Covers same-ring noncanonical inputs and arbitrary row dimensions. |
+| Multivariate reduction proofs | Successful-return representation preservation and remainder irreducibility for the actual source helper | [Reduction proofs](m2-reduction-proof.md); [#54](https://github.com/Macaulean/Macaulean/pull/54), [#55](https://github.com/Macaulean/Macaulean/pull/55), [#59](https://github.com/Macaulean/Macaulean/pull/59). Requires protected prelude bindings and the stated initial invariants; does not establish general termination or full Buchberger correctness. |
+| Polynomial-expression MRDI | Tree-preserving codecs for sums, products, powers and terms, with coefficient-type and variable-count descriptors | [Expression format](mrdi-polynomial-expressions.md); [#56](https://github.com/Macaulean/Macaulean/pull/56). Distinct from sparse polynomial serialization and not a claim of external M2 package support. |
+| Supported-language reference | Feature matrix, precedence, binding/state semantics and explicit proof boundaries with kernel-checked anchors | [Implementation reference](m2-language-reference.md); [#57](https://github.com/Macaulean/Macaulean/pull/57). Describes the implemented subset, not certification of this native contract. |
 | Intent and proof workflow | Explicit frozen contract approval, proof-job export, isolated candidate checking, axiom audits and source replay | [Stage 1](m2-intent-stage1.md), [Stage 2](m2-proof-stage2.md); merged [#38](https://github.com/Macaulean/Macaulean/pull/38) and [#39](https://github.com/Macaulean/Macaulean/pull/39). Approval selects a proposition; it is not a proof. The pilot has no continuous model coordinator. |
 
 The broader scope paragraphs in some older topic guides predate the combined
@@ -104,30 +110,21 @@ implementation. In particular, restricted rings, matrices and named polynomial
 library functions have landed; the polynomial, Gröbner and GCD guides describe
 their actual supported domains. They do not imply general native overload coverage.
 
-#### Open work, not merged capabilities
+#### Remaining work
 
-The following PRs were open when this status was checked. Their descriptions report
-branch-local results; those results are not asserted to exist in the `main` snapshot.
-Stacked PRs must be evaluated with their dependency bases.
-
-| Pending PR | Proposed contribution and remaining boundary |
-|---|---|
-| [#52](https://github.com/Macaulean/Macaulean/pull/52), [#53](https://github.com/Macaulean/Macaulean/pull/53) | Executed coefficient-row dimension/coefficient correctness, then preservation of the represented linear combination. |
-| [#54](https://github.com/Macaulean/Macaulean/pull/54) | Correct the generic reduction targets with protected-prelude environment hypotheses; the unrestricted targets quantify over states that can replace recursive library bindings. |
-| [#55](https://github.com/Macaulean/Macaulean/pull/55), [#59](https://github.com/Macaulean/Macaulean/pull/59) | Generic successful-return representation preservation and irreducibility for actual source multivariate reduction, respectively. These do not establish general reduction termination or full Buchberger correctness. |
-| [#56](https://github.com/Macaulean/Macaulean/pull/56) | Polynomial-expression-tree MRDI serialization; distinct from the existing sparse polynomial format and from external M2 package compatibility. |
-| [#57](https://github.com/Macaulean/Macaulean/pull/57) | Consolidated supported-DSL reference and checked conformance examples. It describes the implemented subset, rather than certifying this full native contract. |
-| [#58](https://github.com/Macaulean/Macaulean/pull/58) | Extend function-handle verification to private local assignment and early return, with explicit unsupported mutation/capture cases. |
-| [#42](https://github.com/Macaulean/Macaulean/pull/42) | Separate design-first byte Word/Symbol architecture and GCD translation-preservation scaffold. The proposed parser/source link and universal preservation proofs remain unfinished; it is not the merged worksheet implementation. |
-
-At the reviewed `main` snapshot, the generic reduction targets in
+The generic targets in
 [`ProofJobs/RuntimeReduction.lean`](../Macaulean/Verification/ProofJobs/RuntimeReduction.lean)
-remain proposition definitions, not established theorems. The pending environment
-correction matters before relying on those targets. The specialized univariate GCD
-proofs above do not discharge these generic multivariate obligations. The older
-open [#35](https://github.com/Macaulean/Macaulean/pull/35) is not evidence that all
-polynomial/Buchberger execution is pending: the split implementation landed through
-#61 and #62.
+are now discharged by `ReductionRepresentation.representation` and
+`ReductionIrreducibility.irreducible`. The protected-prelude hypothesis rules out
+arbitrary states that replace recursive helper bindings. General multivariate
+reduction termination, a DSL-facing ideal-membership corollary and full Buchberger
+correctness remain separate obligations.
+
+The separate design-first byte Word/Symbol and translation-preservation work in
+[#42](https://github.com/Macaulean/Macaulean/pull/42) is not the merged worksheet
+implementation. Likewise, the older [#35](https://github.com/Macaulean/Macaulean/pull/35)
+is not evidence that all polynomial/Buchberger execution is pending: the split
+implementation landed through #61 and #62.
 
 #### Relationship to the native contract
 

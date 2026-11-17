@@ -55,6 +55,7 @@ import MacauleanTest.VerificationNatContracts
 import MacauleanTest.VerificationHandles
 import MacauleanTest.VerificationLocalHandles
 import MacauleanTest.ProofJobKernel
+import MacauleanTest.LanguageReference
 import MacauleanTest.PolynomialExprMRDI
 import MacauleanTest.RuntimeEnvironment
 import MacauleanTest.ReductionFoundations
