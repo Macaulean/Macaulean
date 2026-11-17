@@ -76,4 +76,23 @@ def generateRow (fuel : Nat) (polynomial ideal : Value) (state : Runtime.State) 
   let .list coefficients := result | .error "reduction returned an invalid coefficient row"
   return coefficients
 
+/-- Reduce against the supplied generators, without recomputing a Gröbner basis.
+This preserves the degree bounds of the reduction's coefficient rows. These rows
+remain untrusted until the independent Gröbner checker accepts them. -/
+def generateReductionRow (fuel : Nat) (polynomial ideal : Value) (state : Runtime.State) :
+    Except String (List Value) := do
+  let gens ← (Polynomials.callPrimitive .generatorList ideal).mapError toString
+  let .list generators := gens | .error "expected an ideal generator list"
+  let ring ← (Polynomials.callPrimitive .ring ideal).mapError toString
+  let zero ← (evalBinOp .mul (.zz 0) polynomial).mapError toString
+  let (pairs,state) ← (Runtime.finish (Runtime.call fuel (.algebra (.library "m2gbInitial"))
+    (.sequence [gens,ring,.zz 0]) state)).mapError toString
+  let (result,state) ← (Runtime.finish (Runtime.call fuel (.algebra (.library "m2gbReduce"))
+    (.sequence [polynomial,.list (generators.map fun _ => zero),pairs,zero]) state)).mapError toString
+  let .list [_,row] := result | .error "reduction returned an invalid certificate shape"
+  let (result,_) ← (Runtime.finish (Runtime.call fuel (.algebra (.library "m2gbScaleRow"))
+    (.sequence [.zz (-1),row,.zz 0]) state)).mapError toString
+  let .list coefficients := result | .error "reduction returned an invalid coefficient row"
+  return coefficients
+
 end Macaulean.M2.Verification.CertificateData

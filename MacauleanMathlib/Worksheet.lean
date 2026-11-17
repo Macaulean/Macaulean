@@ -49,6 +49,10 @@ theorem worksheet_mul (p q : Macaulean.Polynomial F.Carrier n) :
   rw [polynomial_normalize] at h
   exact h
 
+theorem worksheet_sub (p q : Macaulean.Polynomial F.Carrier n) :
+    polynomial (Macaulean.M2.KernelPolynomial.sub p q) = polynomial p - polynomial q := by
+  rw [Macaulean.M2.KernelPolynomial.sub, worksheet_add, polynomial_neg, sub_eq_add_neg]
+
 theorem worksheet_generated_mem_span
     {gs : List (Macaulean.Polynomial F.Carrier n)} {p : Macaulean.Polynomial F.Carrier n}
     (hp : Macaulean.Algebra.Generated gs p) :

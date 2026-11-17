@@ -24,6 +24,15 @@ def readRing : Value → Except String PolynomialRing
     else .error "coefficient field failed its inverse-law check"
   | _ => .error "mathematical export: expected a polynomial ring"
 
+def fieldValue : CoefficientField → Value
+  | .rationals => .algebra .rationals
+  | .prime F => Finite.wrap (.field F.offset)
+
+theorem field_roundtrip (F : CoefficientField) : readField (fieldValue F) = .ok F := by
+  cases F with
+  | rationals => rfl
+  | prime F => simp [fieldValue, Finite.wrap, readField, F.valid]
+
 def ringValue (r : PolynomialRing) : Value :=
   match r.coefficients with
   | .rationals => .algebra (.ring ⟨r.id,r.names⟩)

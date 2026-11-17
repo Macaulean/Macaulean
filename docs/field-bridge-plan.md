@@ -90,14 +90,25 @@ The sequence is an implementation order, not a reduction of the acceptance scope
   monomial order proved to match the runtime comparator; the licensed Buchberger
   criterion adapted from WuProver/groebner_proj, with provenance and standard-axiom
   audit; and a finite indexed bounded-representation interface implying the actual
-  leading-term-ideal Gröbner property. This is the mathematical interface, not yet
-  the executable S-pair certificate checker or worksheet command.
+  leading-term-ideal Gröbner property. The executable checker and commands below
+  use this interface.
 
-Still required: executable Gröbner certificate checking and commands, an explicit
-worksheet import command exercising the existing Lean-to-runtime conversions, any regression fixes
-revealed by the final build, completed documentation of certification, and the
-upstream PR. The current native comparisons and successful reduction runs do not
-substitute for a kernel-checked general Gröbner soundness theorem.
+* `GroebnerCertificates`, `GroebnerChecker`, and `GroebnerViews`: executable
+  leading-term, monicity, degree-bound, square S-pair matrix, and representation
+  checks with a kernel-checked theorem that the candidate is a Gröbner basis of
+  the original ideal. The identity-only/non-Gröbner negative example is rejected.
+* `#m2_groebner` publishes that theorem from the actual worksheet snapshot.
+  QQ, F_5 with nonmonic input, F_2, zero/unit ideals, malformed evidence,
+  cross-field rejection, and theorem import persistence are covered.
+* `#m2_import` accepts closed fields/rings/polynomials/finite ideal presentations,
+  kernel-checks the evaluated encoding before publication, reserves ring identities,
+  and rejects conflicting identities/protected names atomically. End-to-end QQ/F_5
+  tests create ideals in Lean, import them, compute/certify their bases, and export
+  the identical presentations back to Lean. `Examples/FieldIdealBridge.lean` is a
+  complete checked user example.
+
+Pending delivery: integrate current upstream, run the final combined regression
+suite and examples, audit the acceptance items above, and open the upstream PR.
 
 Validation at the finite-field worksheet checkpoint: `lake build MacauleanTest`
 passed (394 jobs). This includes the new finite native comparisons and import
@@ -113,7 +124,8 @@ worksheet ideal-equality transport test. The theory tests check actual exported
 QQ/F_5 membership proofs, finite-field ideal-equality transport, grevlex-vs-lex
 ordering, the general well-foundedness instance, empty and unit basis certificates,
 and standard-axiom audits. `MacauleanTest` imports this suite so `lake test` covers it.
-The executable S-pair checker and certification command are still required.
+These mathematical-theory checks are now complemented by the executable checker
+and worksheet command tests listed above.
 
 After the combined import exposed a root-name collision, the existing core
 factorization predicates were moved into `Macaulean.Factorization`; their tactic

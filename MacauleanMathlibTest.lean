@@ -1,4 +1,6 @@
 import MacauleanMathlib.Buchberger
+import MacauleanMathlibTest.GroebnerCommands
+import MacauleanMathlibTest.MathematicalImport
 import MacauleanTest.CertificateCommands
 
 open Macaulean.Verification.Mathlib
@@ -72,3 +74,9 @@ example : (grevlexOrder 2).IsGroebnerBasis
 /-- info: 'Macaulean.Verification.Mathlib.polynomial_mul' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms polynomial_mul
+
+-- Imported worksheet proofs remain usable without their original runtime session.
+example : (grevlexOrder 2).IsGroebnerBasis
+    (Macaulean.M2.Verification.GroebnerViews.basisMeaning RationalGroebnerTest.certified.idealEquality.basis)
+    (Macaulean.M2.Verification.GroebnerViews.idealMeaning RationalGroebnerTest.certified.idealEquality.ideal) :=
+  RationalGroebnerTest.certified
