@@ -10,7 +10,8 @@ permissions:
 
 jobs:
   stage2:
-    runs-on: ubuntu-latest
+    # The sandbox setup uses Ubuntu 24.04's distribution AppArmor profile.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7

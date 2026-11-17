@@ -80,6 +80,12 @@ theorem trans {a b c : Except Signal α} (h : Refines a b) (k : Refines b c) : R
   · exact Or.inl h
   · subst a; exact k
 
+theorem eval_mono (n extra : Nat) (code : Lexical.Code) (frames : Frames) (s : State) :
+    Refines (eval n code frames s) (eval (n+extra) code frames s) := by
+  induction extra with
+  | zero => exact refl _
+  | succ extra ih => exact trans ih ((step (n+extra)).1 code frames s)
+
 theorem call_mono (n extra : Nat) (f a : Value) (s : State) :
     Refines (call n f a s) (call (n+extra) f a s) := by
   induction extra with
