@@ -53,6 +53,7 @@ import MacauleanTest.VerificationWidget
 import MacauleanTest.VerificationGraph
 import MacauleanTest.VerificationNatContracts
 import MacauleanTest.VerificationHandles
+import MacauleanTest.VerificationLocalHandles
 import MacauleanTest.ProofJobKernel
 import MacauleanTest.PolynomialExprMRDI
 import MacauleanTest.RuntimeEnvironment
