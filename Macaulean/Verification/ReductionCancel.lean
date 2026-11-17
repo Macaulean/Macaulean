@@ -57,20 +57,21 @@ private theorem exhausted (s : State) (fs : Frames) :
   simp only [reductionCancel, eval, checkWritable, liftResult, Except.mapError,
     bind, Except.bind]
 
-/-- Every successful source cancellation exposes a strictly smaller recursive
-call with the required representation invariant and protected bindings. -/
-theorem successful (fuel : Nat) (parent s after : State) (result : Value)
-    (generators coefficients : Row r n) (pending remainder : Views.Polynomial r)
+/-- Expose a strictly smaller recursive call and the executed row/arithmetic
+updates, without requiring a representation invariant. -/
+theorem successful_step (fuel : Nat) (parent s after : State) (result : Value)
+    (coefficients : Row r n) (pending remainder : Views.Polynomial r)
     (reducers : List (RepresentedReducer r n)) (j oldTerm oldDivisor oldCoefficient : Value)
     (hf : InFrame parent [pending.value,coefficients.value,
       .list (reducers.map RepresentedReducer.value),remainder.value,j,oldTerm,oldDivisor,oldCoefficient] s)
     (globals : PreludeBindings parent)
-    (input : InputInvariant generators pending remainder coefficients)
-    (represented : ∀ g ∈ reducers, ReducerInvariant generators g)
     (success : catchReturn (eval fuel reductionCancel [frame parent 8] s) = .ok (result,after)) :
-    ∃ (nextPending : Views.Polynomial r) (updated : Row r n) (next : State) (depth : Nat),
+    ∃ (c product nextPending : Views.Polynomial r) (g : RepresentedReducer r n) (updated : Row r n) (next : State) (depth : Nat),
       depth < fuel ∧ PreludeBindings next ∧
-      InputInvariant generators nextPending remainder updated ∧
+      g ∈ reducers ∧
+      PolynomialRows.Subtracts c coefficients.values g.coefficients.values updated.values ∧
+      evalBinOp .mul c.value g.polynomial.value = .ok product.value ∧
+      evalBinOp .sub pending.value product.value = .ok nextPending.value ∧
       call depth (.algebra (.library "m2gbReduce"))
         (.sequence [nextPending.value,updated.value,
           .list (reducers.map RepresentedReducer.value),remainder.value]) next = .ok (result,after) := by
@@ -113,10 +114,34 @@ theorem successful (fuel : Nat) (parent s after : State) (result : Value)
       obtain ⟨next,hw7,hf7⟩ := hf6.write 7 c.value (by simp)
       change writeRef (.slot 0 7) c.value [frame parent 8] selected = .ok next at hw7
       simp only [hc, hw7] at success
-      obtain ⟨np,updated,recursiveState,depth,smaller,bindings,invariant,run⟩ :=
-        ReductionCancelTail.successful (extra+2) parent next after result generators coefficients
+      obtain ⟨product,np,updated,recursiveState,depth,smaller,bindings,rows,hm,hp,run⟩ :=
+        ReductionCancelTail.successful_step (extra+2) parent next after result coefficients
           pending remainder c g (.list (reducers.map RepresentedReducer.value)) j oldTerm
-          hf7 globals input (represented g member) success
-      exact ⟨np,updated,recursiveState,depth,by omega,bindings,invariant,run⟩
+          hf7 globals success
+      exact ⟨c,product,np,g,updated,recursiveState,depth,by omega,bindings,member,rows,hm,hp,run⟩
+
+/-- Every successful source cancellation exposes a strictly smaller recursive
+call with the required representation invariant and protected bindings. -/
+theorem successful (fuel : Nat) (parent s after : State) (result : Value)
+    (generators coefficients : Row r n) (pending remainder : Views.Polynomial r)
+    (reducers : List (RepresentedReducer r n)) (j oldTerm oldDivisor oldCoefficient : Value)
+    (hf : InFrame parent [pending.value,coefficients.value,
+      .list (reducers.map RepresentedReducer.value),remainder.value,j,oldTerm,oldDivisor,oldCoefficient] s)
+    (globals : PreludeBindings parent)
+    (input : InputInvariant generators pending remainder coefficients)
+    (represented : ∀ g ∈ reducers, ReducerInvariant generators g)
+    (success : catchReturn (eval fuel reductionCancel [frame parent 8] s) = .ok (result,after)) :
+    ∃ (nextPending : Views.Polynomial r) (updated : Row r n) (next : State) (depth : Nat),
+      depth < fuel ∧ PreludeBindings next ∧
+      InputInvariant generators nextPending remainder updated ∧
+      call depth (.algebra (.library "m2gbReduce"))
+        (.sequence [nextPending.value,updated.value,
+          .list (reducers.map RepresentedReducer.value),remainder.value]) next = .ok (result,after) := by
+  obtain ⟨c,product,np,g,updated,next,depth,smaller,bindings,member,rows,hm,hp,run⟩ :=
+    successful_step fuel parent s after result coefficients pending remainder reducers
+      j oldTerm oldDivisor oldCoefficient hf globals success
+  exact ⟨np,updated,next,depth,smaller,bindings,
+    ReductionRow.invariant generators coefficients updated pending remainder c product np g
+      input (represented g member) rows hm hp,run⟩
 
 end Macaulean.M2.Verification.ReductionCancel

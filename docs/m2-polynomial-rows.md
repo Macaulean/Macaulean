@@ -37,9 +37,10 @@ finite polynomial sum to the original `linearCoefficient` specification.
 `Subtracts.weighted` and `Subtracts.represents` lift pointwise subtraction to
 whole rows; `execute_represents` then uses the actual source execution theorem.
 
-The full `m2gbReduce` representation invariant, irreducibility, termination,
-and Buchberger correctness remain separate work. This theorem establishes the
-row-update step, not those complete algorithms.
+The subsequent [source reduction proofs](m2-reduction-proof.md) establish the
+full `m2gbReduce` representation invariant and remainder irreducibility. This
+row-update theorem alone does not establish those results. Termination and
+Buchberger correctness remain separate work.
 
 The generic row execution foundation is provided by `RowProgram.execute`.
 

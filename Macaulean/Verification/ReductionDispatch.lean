@@ -71,16 +71,19 @@ private theorem exhausted (pending : Views.Polynomial r) (row gs remainder : Val
 
 /-- A successful nonzero reduction reaches one of the tracked source branches
 in a valid private frame, at strictly smaller fuel. -/
-theorem successful (fuel : Nat) (pending : Views.Polynomial r) (row gs remainder : Value)
+theorem successful_selected (fuel : Nat) (pending : Views.Polynomial r) (row gs remainder : Value)
     (s after : State) (result : Value)
     (globals : PreludeBindings s)
     (zero : evalBinOp .eq pending.value (.zz 0) = .ok (.bool false))
     (success : call fuel (.algebra (.library "m2gbReduce"))
       (.sequence [pending.value,row,gs,remainder]) s = .ok (result,after)) :
-    ∃ (j : Value) (next : State) (negative : Bool) (depth : Nat),
+    ∃ (j : Value) (next : State) (negative : Bool) (depth : Nat) (selected : State) (selectorDepth : Nat),
       depth < fuel ∧ PreludeBindings next ∧
       InFrame s [pending.value,row,gs,remainder,j,.null,.null,.null] next ∧
       evalBinOp .lt j (.zz 0) = .ok (.bool negative) ∧
+      call selectorDepth (.algebra (.library "m2gbReducer"))
+        (.sequence [pending.value,gs,.zz 0])
+        (s.allocate (reductionLocals pending.value row gs remainder)).2 = .ok (j,selected) ∧
       catchReturn (eval depth (if negative then reductionMoveHead else reductionCancel)
         [frame s 8] next) = .ok (result,after) := by
   have global : s.env.lookup "m2gbReducer" = some (.algebra (.library "m2gbReducer")) :=
@@ -129,8 +132,26 @@ theorem successful (fuel : Nat) (pending : Views.Polynomial r) (row gs remainder
       simp only [cmp, liftResult, Except.mapError] at success
       cases v <;> try (simp only [catchReturn] at success; contradiction)
       case bool negative =>
-        refine ⟨j,next,negative,extra+6,by omega,globals.of_env_eq hn.env,?_,cmp,?_⟩
+        refine ⟨j,next,negative,extra+6,selected,extra+5,by omega,globals.of_env_eq hn.env,?_,cmp,hs,?_⟩
         · exact hn
         · cases negative <;> exact success
+
+/-- A successful nonzero reduction reaches one of the tracked source branches
+in a valid private frame, at strictly smaller fuel. -/
+theorem successful (fuel : Nat) (pending : Views.Polynomial r) (row gs remainder : Value)
+    (s after : State) (result : Value)
+    (globals : PreludeBindings s)
+    (zero : evalBinOp .eq pending.value (.zz 0) = .ok (.bool false))
+    (success : call fuel (.algebra (.library "m2gbReduce"))
+      (.sequence [pending.value,row,gs,remainder]) s = .ok (result,after)) :
+    ∃ (j : Value) (next : State) (negative : Bool) (depth : Nat),
+      depth < fuel ∧ PreludeBindings next ∧
+      InFrame s [pending.value,row,gs,remainder,j,.null,.null,.null] next ∧
+      evalBinOp .lt j (.zz 0) = .ok (.bool negative) ∧
+      catchReturn (eval depth (if negative then reductionMoveHead else reductionCancel)
+        [frame s 8] next) = .ok (result,after) := by
+  obtain ⟨j,next,negative,depth,selected,selectorDepth,smaller,bindings,hf,cmp,_,run⟩ :=
+    successful_selected fuel pending row gs remainder s after result globals zero success
+  exact ⟨j,next,negative,depth,smaller,bindings,hf,cmp,run⟩
 
 end Macaulean.M2.Verification.ReductionDispatch

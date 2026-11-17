@@ -1,4 +1,4 @@
-# Source reduction representation correctness
+# Source reduction representation and irreducibility
 
 `ReductionRepresentation.representation` proves the exact
 `RuntimeReduction.RepresentationStatement` for the tracked four-argument
@@ -17,11 +17,16 @@ fuel. Source-body identities, evaluator arithmetic, indexing, private assignment
 and helper calls are checked; no alternative reduction algorithm is assumed.
 Each recursive branch exposes a call at a strictly smaller original budget.
 
-This is successful-return correctness. It does not prove that every input
-terminates successfully, that the remainder is irreducible, or that Buchberger
-is correct. A zero reducer can still cause a runtime error. The separate
-`RuntimeReduction.IrreducibleStatement` remains open. No intent approval or
-proof-acceptance policy is changed.
+`ReductionIrreducibility.irreducible` also proves the exact
+`RuntimeReduction.IrreducibleStatement`: when the initial remainder is
+irreducible with respect to the supplied reducers, every successful call returns
+an irreducible remainder. This theorem does not require the representation
+invariant or any relationship between the input row and the pending polynomial.
+It is also exported by `Macaulean.Verification`.
+
+Both results concern successful returns. They do not prove successful termination
+on every input or full Buchberger correctness. A zero reducer can still cause a
+runtime error. No intent approval or proof-acceptance policy is changed.
 
 Dependencies: this branch combines #53 (row linear-combination preservation,
 which depends on #52) and #54 (protected-binding condition), on the #49 DSL
@@ -95,5 +100,41 @@ a term, then moves a term into the remainder from a noncanonical input. It also
 checks the zero-reducer error boundary and audits all theorem dependencies.
 The complete validation commands are `lake test` and `lake build`.
 
-Next mathematical work: leading-term irreducibility, a DSL-facing ideal-membership
-corollary, and full termination as separate obligations.
+## Ordered selector and irreducibility
+
+`ReducerSelection.condition_execute` and `step` expose the actual source
+selector and its primitive calls, including errors. `negative` proves that a
+negative selector result certifies rejection of every candidate in the searched
+suffix. Its induction is on the remaining list length, so it does not assume
+termination of the outer reduction. It preserves the supplied order and does not
+replace the selector with a separate search algorithm.
+
+`ReducerSelection.test_false` connects the production leading-monomial and
+monomial-divisibility calls to the exponent vectors in `Views.Irreducible`.
+Normalization and dimensions are checked; raw sparse inputs may contain duplicate
+or zero terms. `negative_leading_term` then proves that a head moved into the
+remainder is irreducible. `IrreducibleArithmetic.add` proves that adding it cannot
+introduce a reducible monomial, even when coefficients cancel.
+
+`ReductionDispatch.successful_selected` retains the selector's actual call
+result. The `successful_step` lemmas in the move, row, cancellation-tail and
+cancellation modules expose execution facts without representation premises.
+The original representation-preserving lemmas remain wrappers around these
+facts. The final irreducibility proof follows the same decreasing runtime fuel:
+zero returns the current remainder, cancellation preserves it, and movement adds
+an irreducible head.
+
+`lake build MacauleanTest.ReductionIrreducibility` checks the exact universal
+target, six concrete regressions, and nine transitive axiom audits. Regressions
+cover multiple selector rejections, a later divisor, noncanonical inputs,
+nonzero initial remainders with unrelated input rows, empty reducer lists and
+zero-reducer errors. No `sorryAx` or native-evaluation axiom is permitted.
+
+This extension is stacked on the source representation proof (#55), which
+carries the row and protected-environment dependencies described above. It does
+not depend on the separate local-state handle extension (#58).
+
+Next mathematical work: a DSL-facing ideal-membership corollary and full
+termination as separate obligations. The representation equation alone does not
+establish arbitrary `f - remainder` ideal membership from an unrelated initial
+row; that needs an offset invariant or another explicit argument.
