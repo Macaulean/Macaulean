@@ -66,10 +66,25 @@ def writeMany : List Ref → List Value → Frames → State → Except Error St
     writeMany rs vs frames (← writeRef r v frames s)
   | rs, vs, _, _ => .error (.assignmentArity rs.length vs.length)
 
+/-- Publish a finite-field polynomial ring after validating its coefficient field. -/
+def State.finitePolynomialRing (s : State) (offset : Nat) (names : List String) : Except Error (Value × State) := do
+  let _ ← Finite.liftError (Algebra.PrimeField.check (offset+2))
+  if names.eraseDups.length != names.length then
+    .error (.algebra "duplicate polynomial names require the indexed-variable extension")
+  else
+    names.forM fun x => checkWritable (.global x)
+    let r : Finite.RingInfo := ⟨s.heap.nextRing, offset, names⟩
+    let vars := (names.zip (List.range names.length)).map fun (x,i) =>
+      (x, Finite.wrap (.poly r (Finite.generator r i)))
+    let env := vars.foldl (fun env (x,v) => (x,v) :: env) s.env
+    let heap := { s.heap with nextRing := s.heap.nextRing + 1 }
+    return (Finite.wrap (.ring r), { env := env, heap := heap })
+
 /-- Validate all names before publishing anything or advancing ring identity. -/
 def State.polynomialRing (s : State) (base : Value) (names : List String) : Except Error (Value × State) := do
+  if let .algebra (.finite (.field p)) := base then return ← s.finitePolynomialRing p names
   unless base = .algebra .rationals do
-    .error (.algebra "only polynomial rings over QQ are supported")
+    .error (.algebra "only polynomial rings over QQ and checked prime fields are supported")
   if names.eraseDups.length != names.length then
     .error (.algebra "duplicate polynomial names require the indexed-variable extension")
   else
@@ -101,6 +116,20 @@ def State.ringSpecifications (s : State) (specs : List (String × Ref))
       | some .null => return ([] : List String)
       | some (.algebra (.poly r p)) =>
         let p ← Polynomials.liftError (Polynomials.normalized r.names.length p)
+        match p with
+        | [(c,ns)] =>
+          if c == 1 && ns.sum == 1 then
+            let some i := ns.findIdx? (· == 1)
+              | .error (.algebra "expected an indeterminate in polynomial-ring brackets")
+            let some name := r.names[i]?
+              | .error (.algebra "invalid indeterminate dimension")
+            if name.toList.contains '_' then
+              .error (.algebra "indexed generator rebinding requires the indexed-variable extension")
+            else return [name]
+          else .error (.algebra "expected an indeterminate in polynomial-ring brackets")
+        | _ => .error (.algebra "expected an indeterminate in polynomial-ring brackets")
+      | some (.algebra (.finite (.poly r p))) =>
+        let p ← Finite.normalized r p
         match p with
         | [(c,ns)] =>
           if c == 1 && ns.sum == 1 then
@@ -180,7 +209,7 @@ def eval (depth : Nat) (code : Code) (frames : Frames) (s : State)
         else return (← liftResult (evalBinOp op va vb), s)
       | .compose, .closure _, .algebra (.builtin _)
       | .compose, .closure _, .algebra (.library _) => return s.function (.composition va vb)
-      | .rem, _, .algebra (.basis ..) =>
+      | .rem, _, .algebra (.basis ..) | .rem, _, .algebra (.finite (.basis ..)) =>
         call fuel (.algebra (.library "normalForm")) (.sequence [va,vb]) s handler
       | _, _, _ => return (← liftResult (evalBinOp op va vb), s)
     | .logic op a b =>

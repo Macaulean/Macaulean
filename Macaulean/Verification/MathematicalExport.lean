@@ -1,9 +1,11 @@
 import Macaulean.Interpreter.DSL
-import Macaulean.Verification.IdealView
+import Macaulean.Verification.MathematicalViews
 
-/-! Explicit mathematical exports of immutable worksheet snapshots. -/
+/-! Explicit mathematical exports of immutable worksheet snapshots, over both
+QQ and checked prime fields. Each exported object has a kernel-checked equation
+connecting it to the actual runtime value. -/
 namespace Macaulean.M2.Verification.MathematicalExport
-open Lean Elab Command Meta Views
+open Lean Elab Command Meta MathematicalViews
 
 private def define (name : Name) (value : Expr) : CommandElabM Unit :=
   liftTermElabM do
@@ -12,16 +14,14 @@ private def define (name : Name) (value : Expr) : CommandElabM Unit :=
     addAndCompile (.defnDecl {
       name, levelParams := [], type, value, hints := .regular 0, safety := .safe })
 
-private def polynomialExpr (r : Polynomials.RingInfo) (p : Views.Polynomial r) : Expr :=
-  letI : ToExpr Rat := ⟨algebraRatExpr, mkConst ``Rat⟩
-  mkApp2 (mkConst ``Views.Polynomial.mk) (algebraRingExpr r) (toExpr p.data)
+private def checkResult (result : Except String α) : CommandElabM Unit :=
+  match result with | .ok _ => pure () | .error e => throwError e
 
-private def idealExpr (r : Polynomials.RingInfo) (I : IdealPresentation r) : Expr :=
-  let type := mkApp (mkConst ``Views.Polynomial) (algebraRingExpr r)
-  let values := I.generators.foldr
-    (fun p rest => mkApp3 (mkConst ``List.cons [0]) type (polynomialExpr r p) rest)
-    (mkApp (mkConst ``List.nil [0]) type)
-  mkApp2 (mkConst ``IdealPresentation.mk) (algebraRingExpr r) values
+private def ringDecoder (rv value : Value) (ideal : Bool) : CommandElabM Expr := do
+  let r ← match readRing rv with | .ok r => pure r | .error e => throwError e
+  if ideal then checkResult (readIdeal r value) else checkResult (readPolynomial r value)
+  let ringExpr ← liftTermElabM <| mkAppM ``extract #[mkApp (mkConst ``readRing) (valueExpr rv)]
+  return mkApp (mkConst (if ideal then ``readIdeal else ``readPolynomial)) ringExpr
 
 syntax (name := exportCommand) "#m2_export " str " as " ident : command
 
@@ -33,20 +33,24 @@ def elabExport : CommandElab := fun stx => do
   let some source ← DefinitionExposure.latest binding
     | throwErrorAt stx "no worksheet binding exported for {binding}"
   let name := (← getCurrNamespace) ++ stx[3].getId
+  for reserved in [name,name ++ `source,name ++ `source_eq] do
+    if (← getEnv).contains reserved then throwErrorAt stx "declaration already exists: {reserved}"
   let sourceValue := mkConst (source ++ `value)
   let some value := (← DSL.getSession).lookup binding
     | throwErrorAt stx "worksheet binding is no longer available: {binding}"
-  let (body, decoder) ← match value with
-    | .algebra (.poly r _) =>
-      match readPolynomial r value with
-      | .error e => throwErrorAt stx e
-      | .ok p => pure (polynomialExpr r p,
-          mkApp (mkConst ``readPolynomial) (algebraRingExpr r))
-    | .algebra (.ideal r _) =>
-      match readIdeal r value with
-      | .error e => throwErrorAt stx e
-      | .ok I => pure (idealExpr r I, mkApp (mkConst ``readIdeal) (algebraRingExpr r))
-    | _ => throwErrorAt stx "mathematical export currently expects a polynomial or ideal"
+  let decoder ← match value with
+    | .algebra .rationals | .algebra (.finite (.field _)) =>
+      checkResult (readField value)
+      pure (mkConst ``readField)
+    | .algebra (.ring _) | .algebra (.finite (.ring _)) =>
+      checkResult (readRing value)
+      pure (mkConst ``readRing)
+    | .algebra (.poly r _) => ringDecoder (.algebra (.ring r)) value false
+    | .algebra (.ideal r _) => ringDecoder (.algebra (.ring r)) value true
+    | .algebra (.finite (.poly r _)) => ringDecoder (Finite.wrap (.ring r)) value false
+    | .algebra (.finite (.ideal r _)) => ringDecoder (Finite.wrap (.ring r)) value true
+    | _ => throwErrorAt stx "mathematical export expects a coefficient field, polynomial ring, polynomial, or ideal"
+  let body ← liftTermElabM <| mkAppM ``extract #[mkApp decoder sourceValue]
   define name body
   define (name ++ `source) sourceValue
   liftTermElabM do

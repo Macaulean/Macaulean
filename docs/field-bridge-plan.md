@@ -48,9 +48,10 @@ The sequence is an implementation order, not a reduction of the acceptance scope
 
 ## Implemented checkpoints
 
-* `IdealView` and `MathematicalExport`: QQ polynomial/ideal presentation exports,
-  exact snapshot decoding theorems, stable names after reassignment, and
-  round-trip/foreign-ring/malformed-dimension tests.
+* `MathematicalViews` and `MathematicalExport`: shared field/ring/polynomial/ideal
+  exports over QQ and checked prime fields, exact snapshot decoding theorems,
+  stable names after reassignment, and round-trip/foreign-ring/malformed-dimension
+  tests. These supersede the initial QQ-only `IdealView` checkpoint.
 * `Algebra.PrimeField`: canonical modular residues with a standard
   `Lean.Grind.Field` instance derived from an exhaustive inverse-law check.
   Small prime characteristics pass; composite characteristics fail. This first
@@ -66,8 +67,25 @@ The sequence is an implementation order, not a reduction of the acceptance scope
   proves decode/encode and arithmetic bridge identities.
 * `PrimeFieldAlgebra` proves the requested membership example over F_5 at the
   mathematical layer and distinguishes x^5-x from zero as a formal polynomial.
+* `FiniteObjects` and `FiniteOps` connect GF(p), modular scalar and polynomial
+  arithmetic, ideals, matrices, and basis containers to the ordinary worksheet
+  runtime. The existing M2 reduction/Buchberger source runs over these fields.
+* `MathematicalExport` tests now prove the membership example from actual
+  worksheet exports over QQ and F_5. The exported ideals use the common generated
+  ideal semantics, and field exports provide standard Lean field instances.
+* `FiniteFieldWorksheet` checks execution, provenance, characteristic rejection,
+  ring separation, and rational promotion. `FiniteFieldsM2` compares exact
+  coefficients against native M2 for nine bases and nine remainders.
 
-Still required: finite-field worksheet values and primitive dispatch, ring and
-field exports, integration of the mathematical ideal semantics with exports,
-Gröbner certificate soundness and commands, worksheet membership demonstrations
-over both fields, remaining regressions/documentation, and the upstream PR.
+Still required: Gröbner certificate soundness and commands, any regression fixes
+revealed by the final build, completed documentation of certification, and the
+upstream PR. The current native comparisons and successful reduction runs do not
+substitute for a kernel-checked general Gröbner soundness theorem.
+
+Validation at the finite-field worksheet checkpoint: `lake build MacauleanTest`
+passed (394 jobs). This includes the new finite native comparisons and import
+tests, the existing rational interpreter/kernel corpus, existing native M2
+polynomial and Gröbner comparisons, and function-contract/handle regressions.
+The exported equality and membership theorem axiom checks contain only standard
+Lean axioms. Existing repository warnings and intentional negative-control
+`sorry` tests remain unchanged.

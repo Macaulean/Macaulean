@@ -1,4 +1,5 @@
 import Macaulean.Interpreter.KernelPolynomial
+import Macaulean.Interpreter.FiniteObjects
 
 /-!
 # Sparse QQ polynomial data for the interpreter
@@ -90,7 +91,7 @@ inductive Primitive where
   | ring | coefficientRing | generators | entries | numgens | ideal | promote | coefficient
   | monomialDivides | monomialQuotient | monomialLCM | monomialCompare | fromExponents
   | asIdeal | generatorList | makeBasis | normalFormData | changeMatrix | numRows | numColumns
-  | gcdInputs
+  | gcdInputs | primeField
   deriving Repr, DecidableEq, Inhabited
 
 def Primitive.name : Primitive → String
@@ -106,18 +107,19 @@ def Primitive.name : Primitive → String
   | .asIdeal => "m2AsIdeal" | .generatorList => "m2GeneratorList"
   | .makeBasis => "m2MakeBasis" | .normalFormData => "m2NormalFormData"
   | .changeMatrix => "getChangeMatrix" | .numRows => "numRows" | .numColumns => "numColumns"
-  | .gcdInputs => "m2GCDInputs"
+  | .gcdInputs => "m2GCDInputs" | .primeField => "GF"
 def primitives : List Primitive := [
   .leadCoefficient,.leadMonomial,.leadTerm,.exponents,.terms,.listForm,.size,
   .ring,.coefficientRing,.generators,.entries,.numgens,.ideal,.promote,.coefficient,
   .monomialDivides,.monomialQuotient,.monomialLCM,.monomialCompare,.fromExponents,
   .asIdeal,.generatorList,.makeBasis,.normalFormData,.changeMatrix,.numRows,.numColumns,
-  .gcdInputs]
+  .gcdInputs,.primeField]
 
 /-- First-order immutable result containers. `basis` stores one representation row
 per output generator. `matrix` retains its column count even with zero rows.
 Constructors alone are data, not a theorem that a value is a Groebner basis. -/
 inductive Object where
+  | finite (object : Finite.Object)
   | rationals
   | ring (info : RingInfo)
   | poly (info : RingInfo) (terms : Raw)
@@ -133,6 +135,7 @@ def Object.ring? : Object → Option RingInfo
   | .ring r | .poly r _ | .ideal r _ | .row r _ | .matrix r .. | .basis r .. => some r
   | _ => none
 def Object.className : Object → String
+  | .finite a => a.className
   | .rationals => "Type" | .ring _ => "PolynomialRing" | .poly r _ => r.display
   | .ideal .. => "Ideal" | .row .. | .matrix .. => "Matrix" | .basis .. => "GroebnerBasis"
   | .builtin _ | .library _ => "FunctionClosure"
@@ -151,6 +154,7 @@ def polynomialText (r : RingInfo) : Raw → String
       if t.1 < 0 then s ++ " - " ++ termText r (-t.1,t.2)
       else s ++ " + " ++ termText r t) (termText r t)
 def Object.toM2String : Object → String
+  | .finite a => a.toM2String
   | .rationals => "QQ" | .ring r => r.display | .poly r ts => polynomialText r ts
   | .ideal r ps => "ideal(" ++ ", ".intercalate (ps.map (polynomialText r)) ++ ")"
   | .row r ps => "matrix{{" ++ ", ".intercalate (ps.map (polynomialText r)) ++ "}}"

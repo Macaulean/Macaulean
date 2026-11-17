@@ -1,5 +1,6 @@
 import Macaulean.Interpreter.Syntax
 import Macaulean.Interpreter.Value
+import Macaulean.Interpreter.FiniteOps
 
 /-! # Pure polynomial operations
 
@@ -73,6 +74,7 @@ def multiplyMatrices (a b : Value) : Except Error Value := do
     return matrixValue r resultCols result
 
 def equal (a b : Value) : Except Error Bool := do
+  if Finite.contains a || Finite.contains b then return ← Finite.equal a b
   match matrixView? a, matrixView? b with
   | some _, some _ =>
     let (r,c,p) ← asMatrix a
@@ -106,6 +108,7 @@ def arithmetic (op : BinOp) (n : Nat) (p q : Raw) : Except Error Raw :=
   | _ => .error (.algebra "unsupported polynomial operator")
 
 def evalBinary (op : BinOp) (a b : Value) : Except Error Value := do
+  if Finite.contains a || Finite.contains b then return ← Finite.evalBinary op a b
   match op with
   | .eq => return .bool (← equal a b)
   | .ne => return .bool (!(← equal a b))
@@ -138,6 +141,7 @@ def evalBinary (op : BinOp) (a b : Value) : Except Error Value := do
   | _ => .error (.noMethod op.symbol [a.className,b.className])
 
 def evalUnary (op : UnOp) (a : Value) : Except Error Value := do
+  if Finite.contains a then return ← Finite.evalUnary op a
   let (r, p) ← asPolynomial a
   match op with
   | .neg => return .algebra (.poly r (← liftError (neg r.names.length p)))
@@ -237,6 +241,7 @@ def changeMatrix (arg : Value) : Except Error Value := do
     return matrixValue r gs.length data
 
 def callPrimitive (primitive : Primitive) (arg : Value) : Except Error Value := do
+  if primitive = .primeField || Finite.contains arg then return ← Finite.callPrimitive primitive arg
   match primitive with
   | .gcdInputs =>
     let (r,p,q) ← gcdInputs arg
