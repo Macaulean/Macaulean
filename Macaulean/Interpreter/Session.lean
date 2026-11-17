@@ -1,4 +1,4 @@
-import Macaulean.Interpreter.Runtime
+import Macaulean.Interpreter.GCD.Automatic
 
 /-! # Pure worksheet sessions, including persistent lexical cells and closures -/
 namespace Macaulean.M2
@@ -21,7 +21,7 @@ structure Session.Result where
   warnings : List String := []
 
 def Session.evaluate (s : Session) (term : Term) (fuel : Nat := Runtime.defaultFuel) :=
-  Runtime.evaluate term ⟨s.env, s.heap⟩ s.scope s.fileFrame fuel
+  Runtime.evaluate term ⟨s.env, s.heap⟩ s.scope s.fileFrame fuel GCD.handler
 
 /-- Inspect visible file-local bindings before the global environment. -/
 def Session.lookup (s : Session) (name : String) : Option Value :=

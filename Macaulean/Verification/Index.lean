@@ -93,7 +93,8 @@ def ensure (name : String) (session : Session) : CommandElabM Entry := do
   let some value := session.lookup name | throwError "unknown M2 binding {name}"
   let (origin,text,code) := match value with
     | .algebra (.library libraryName) =>
-      ("Macaulean/Interpreter/Buchberger.m2",Library.source,
+      let (origin,text) := (Library.sourceFor libraryName).getD ("<missing library>","")
+      (origin,text,
         (Library.lookup libraryName).map (fun c => Snapshot.exprKey (LibraryCompiler.codeExpr c))
           |>.getD "missing-library-code")
     | _ => ("<runtime binding>","",Snapshot.exprKey (Macaulean.M2.valueExpr value))

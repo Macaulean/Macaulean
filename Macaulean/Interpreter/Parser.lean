@@ -3,9 +3,27 @@ import Macaulean.Interpreter.Lexer
 
 /-! # Shared concrete-tree Pratt grammar
 
-Application is right-associative (46), below powers/indexing (50). Polynomial-ring
-brackets are postfix constructors (55) with identifier lists evaluated by the runtime. All frontends
-use this grammar, including the string runtime and structured Lean syntax category.
+One fuel-recursive Pratt grammar serves both `run` and the scoped Lean DSL.
+`Tree` retains parentheses and token indices for the editor; `Tree.toTerm`
+erases only that presentation information. No Lean parser is imported here.
+
+Binding powers (highest first): `^` 50, `* / // %` 40, prefix signs 35,
+`+ -` 30, comparisons 20, assignment 10. Powers and arithmetic associate
+left, comparisons and assignment right. A prefix operand is read at
+`max minBP 35`, as required for `-7//3` versus `2 * -7 // 2`.
+
+Newlines end a statement, except directly after an operator or inside
+parentheses. Like the lexer, the parser recurses on fuel, so it is total and
+the kernel can run.
+Commas (5) bind below assignment/branches (10), and above block semicolons.
+They associate left, but parentheses prevent syntactic comma-chain flattening.
+Ranges (25) bind below addition; prefix length (45) binds below powers/indexing.
+The string interface and the native Lean `m2` category use this same grammar.
+Application is right-associative (46), below powers/indexing (50) and composition
+(48), above multiplication (40). Arrow and assignments share precedence 10.
+Parameter delimiters are retained until arity is determined, never erased early.
+Polynomial-ring brackets are postfix constructors (55) with identifier lists
+evaluated by the runtime.
 -/
 namespace Macaulean.M2
 namespace Parser

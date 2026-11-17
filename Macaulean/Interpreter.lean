@@ -13,3 +13,4 @@ import Macaulean.Interpreter.Functions
 import Macaulean.Interpreter.Polynomials
 import Macaulean.Interpreter.Library
 import Macaulean.Interpreter.Groebner
+import Macaulean.Interpreter.GCD

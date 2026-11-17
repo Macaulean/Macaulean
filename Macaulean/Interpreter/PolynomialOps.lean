@@ -80,14 +80,13 @@ def equal (a b : Value) : Except Error Bool := do
     return r == s && c == d && p == q
   | some _, none | none, some _ => .error (.noMethod "==" [a.className,b.className])
   | none, none =>
-    match a, b with
-    | .algebra .rationals, _ | _, .algebra .rationals
-    | .algebra (.ring _), _ | _, .algebra (.ring _) =>
-      .error (.noMethod "==" [a.className,b.className])
-    | _, _ =>
-      let (_, p, q) ← common a b
-      return p = q
-
+  match a, b with
+  | .algebra .rationals, _ | _, .algebra .rationals
+  | .algebra (.ring _), _ | _, .algebra (.ring _) =>
+    .error (.noMethod "==" [a.className,b.className])
+  | _, _ =>
+    let (_, p, q) ← common a b
+    return p = q
 def constantValue? (p : Raw) : Option Rat :=
   match p with
   | [] => some 0
@@ -156,6 +155,18 @@ def unaryArg (arg : Value) : Except Error Value :=
 def binaryArgs (arg : Value) : Except Error (Value × Value) :=
   match unpack arg with
   | [a,b] => .ok (a,b) | xs => .error (.arity 2 xs.length)
+
+/-- GCD's initial scope is two polynomials in the same one-variable QQ ring.
+Normalize before measuring degree or entering the source-language loop. -/
+def gcdInputs (arg : Value) : Except Error (RingInfo × Raw × Raw) := do
+  let (a,b) ← binaryArgs arg
+  let (r,p) ← asPolynomial a
+  let (s,q) ← asPolynomial b
+  if r != s then .error (.algebra "gcd polynomials belong to different rings")
+  else if r.names.length != 1 then
+    .error (.algebra "gcd requires a univariate polynomial ring over QQ")
+  else return (r,p,q)
+
 def makeIdeal (arg : Value) : Except Error Value := do
   if let .algebra (.ideal r ps) := arg then return .algebra (.ideal r ps)
   if let .algebra (.row r ps) := arg then return .algebra (.ideal r ps)
@@ -227,6 +238,9 @@ def changeMatrix (arg : Value) : Except Error Value := do
 
 def callPrimitive (primitive : Primitive) (arg : Value) : Except Error Value := do
   match primitive with
+  | .gcdInputs =>
+    let (r,p,q) ← gcdInputs arg
+    return .list [.algebra (.poly r p), .algebra (.poly r q)]
   | .ideal | .asIdeal => makeIdeal arg
   | .generatorList => return .list (← generatorValues (← unaryArg arg))
   | .makeBasis =>

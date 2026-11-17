@@ -60,3 +60,9 @@ new immutable revisions so existing Lean proofs keep their meaning.
 See [the executable example](Examples/DefinitionExposure.lean) and
 [definition exposure](docs/m2-definition-exposure.md) for naming, imports,
 polynomial views, examples of proofs, and the current interpreter-backed boundary.
+
+## Verified polynomial GCD
+
+For the univariate GCD implementation, proved input-derived execution budget,
+total correctness, and reusable worksheet certificates, see
+[GCD verification](docs/m2-gcd.md).

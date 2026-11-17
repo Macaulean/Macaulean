@@ -34,6 +34,9 @@ import MacauleanTest.InterpreterPolynomialsDSL
 import MacauleanTest.InterpreterPolynomialsImport
 import MacauleanTest.PolynomialCIReference
 import MacauleanTest.GroebnerSmoke
+import MacauleanTest.GCD
+import MacauleanTest.GCDM2
+import MacauleanTest.GCDCertificates
 import MacauleanTest.InterpreterGroebnerM2
 import MacauleanTest.InterpreterGroebner
 import MacauleanTest.InterpreterGroebnerDSL
