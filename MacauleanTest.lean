@@ -62,6 +62,7 @@ import MacauleanTest.VerificationNatContracts
 import MacauleanTest.VerificationHandles
 import MacauleanTest.VerificationLocalHandles
 import MacauleanTest.ProofJobKernel
+import MacauleanTest.LanguageReference
 
 -- Standard polynomial semantics and the mathematical Gröbner certificate interface.
 import MacauleanMathlibTest

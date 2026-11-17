@@ -28,10 +28,9 @@ Both results concern successful returns. They do not prove successful terminatio
 on every input or full Buchberger correctness. A zero reducer can still cause a
 runtime error. No intent approval or proof-acceptance policy is changed.
 
-Dependencies: this branch combines #53 (row linear-combination preservation,
-which depends on #52) and #54 (protected-binding condition), on the #49 DSL
-stack. `stack/dsl-row-and-environment` is their integration/review base, not a
-separate feature to merge. #33/#34 are assumed as upstream prerequisites.
+The proof uses the executed row theorems from `PolynomialRows` and
+`RowRepresentation`, together with the protected-binding invariant from
+`RuntimeEnvironment`. These foundations are part of the integrated library.
 
 The checked foundations currently cover:
 
@@ -130,9 +129,9 @@ cover multiple selector rejections, a later divisor, noncanonical inputs,
 nonzero initial remainders with unrelated input rows, empty reducer lists and
 zero-reducer errors. No `sorryAx` or native-evaluation axiom is permitted.
 
-This extension is stacked on the source representation proof (#55), which
-carries the row and protected-environment dependencies described above. It does
-not depend on the separate local-state handle extension (#58).
+The irreducibility proof reuses the source representation proof's execution
+lemmas and the row and protected-environment foundations described above. It
+does not depend on the local-state handle calculus.
 
 Next mathematical work: a DSL-facing ideal-membership corollary and full
 termination as separate obligations. The representation equation alone does not

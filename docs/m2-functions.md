@@ -238,9 +238,11 @@ semantics, and it does not certify extensional equality of functions.
 
 This fragment includes arrow functions, application, fixed and variable arity,
 lexical `:=` and `local`, multiple assignment, captured updates, recursion,
-return, composition, and predicate combinations. Named standard-library functions,
-method/optional-argument dispatch, general symbolic unassigned globals, loops,
-strings, mutable collection objects, rings, and matrices remain separate fragments.
+return, composition, and predicate combinations. General native method/optional-
+argument dispatch, symbolic unassigned globals, loops,
+strings, and mutable collection objects remain outside this fragment. Restricted
+QQ rings, provenance matrices, and tracked source-library functions are available in the combined DSL; consult
+the [language feature matrix](m2-language-reference.md) for their scope.
 Only the implemented prelude's global names are protected by this interpreter;
 it does not pretend to preload the native M2 standard library.
 
