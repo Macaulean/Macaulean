@@ -3,6 +3,8 @@ import Macaulean.Macaulay2
 
 open Lean Grind Elab Tactic Meta
 
+namespace Macaulean.Factorization
+
 --based on mathlib
 
 --instead of what mathlib does which is setting up the class of all units and asking if the element belongs to it
@@ -16,6 +18,10 @@ structure Irreducible [CommSemiring R] (p : R) : Prop where
   not_isUnit : ¬IsUnit p
   /-- If an irreducible element factors, then one factor is a unit. -/
   isUnit_or_isUnit ⦃a b : R⦄ : p = a * b → IsUnit a ∨ IsUnit b
+
+end Macaulean.Factorization
+
+open Macaulean.Factorization
 
 theorem factorizationImpliesReducible {a b : R} [CommSemiring R] : ¬ (IsUnit a ∨ IsUnit b) → ¬ Irreducible (a * b) := by
   intro p

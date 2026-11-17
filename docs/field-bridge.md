@@ -61,8 +61,9 @@ list ordering, duplicate terms, and zero terms. It is not equality of polynomial
 functions. For example, x^5-x is nonzero as a formal polynomial over F_5.
 The polynomial arithmetic and basis interface currently use fixed grevlex order.
 
-The project uses its own polynomial representation and Lean's core algebra
-classes; it does not currently depend on Mathlib. Ideal predicates are closed
+The executable layer uses its own polynomial representation and Lean's core
+algebra classes. The separate mathematical certification layer uses Mathlib.
+Ideal predicates are closed
 under coefficientwise equivalence, addition, and multiplication by arbitrary
 polynomials. The generated ideal has the proved least-ideal property.
 
@@ -116,4 +117,26 @@ not implemented as a comparison of generator lists.
 Gröbner certification remains under construction. A runtime `GroebnerBasis`
 container and the native comparisons do not establish a general Lean theorem
 that its leading terms generate the ideal's leading-term ideal. The final bridge
-still needs its certificate soundness theorem and worksheet proof commands.
+still needs the executable certificate checker connected to the general
+soundness theorem, and worksheet proof commands.
+
+## Mathematical Gröbner theory
+
+The proof-only `MacauleanMathlib` library pins Mathlib v4.33.1 and interprets sparse
+polynomial presentations as `MvPolynomial`. Its grevlex order is proved well founded
+and agrees with the interpreter's exponent-list comparator, including the variable
+order. `BoundedRepresentation` records a polynomial identity together with the
+required degree bounds. `BuchbergerCertificate.isGroebnerBasis` proves the actual
+leading-term-ideal property from monicity and such representations for every S-pair.
+
+The underlying Buchberger proof is adapted from Junyu Guo and Hao Shen's
+[groebner_proj](https://github.com/WuProver/groebner_proj); see
+[provenance and local changes](../MacauleanMathlib/GroebnerTheory/README.md).
+This mathematical interface does not yet expose a worksheet Gröbner-certification
+command. The executable checker and command remain pending; `#m2_ideal_equality`
+continues to certify only equality of generated ideals.
+
+Import compatibility: the preexisting core-ring factorization predicates are now
+`Macaulean.Factorization.IsUnit` and `Macaulean.Factorization.Irreducible`, avoiding
+collisions with Mathlib's root declarations. Existing factorization examples can
+add `open Macaulean.Factorization`; the tactic behavior is unchanged.

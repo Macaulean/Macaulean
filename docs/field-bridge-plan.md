@@ -26,7 +26,9 @@ it is not a declaration that the features below are implemented.
 
 ## Repository constraints discovered
 
-Upstream baseline: 0964f3c. Lean: 4.33.1. There is no Mathlib dependency.
+Upstream baseline: 0964f3c. Lean: 4.33.1. The baseline had no Mathlib dependency.
+The proof-only `MacauleanMathlib` library now pins Mathlib v4.33.1; the interpreter
+and existing executable certificate modules do not import it.
 The current runtime and arithmetic proofs use Rat coefficients. Existing
 `Verification.Views` supplies ring-indexed polynomials, coefficientwise
 equivalence, and representation rows. Definition exposure already produces
@@ -83,7 +85,16 @@ The sequence is an implementation order, not a reduction of the acceptance scope
   Tests cover QQ/F_5 examples, F_3 zero/unit ideals, import persistence, malformed
   rows, insufficient one-way containment, and incompatible coefficient fields.
 
-Still required: Gröbner certificate soundness and commands, any regression fixes
+* `MacauleanMathlib`: standard multivariate-polynomial interpretation with
+  coefficient preservation and arithmetic soundness; a well-founded grevlex
+  monomial order proved to match the runtime comparator; the licensed Buchberger
+  criterion adapted from WuProver/groebner_proj, with provenance and standard-axiom
+  audit; and a finite indexed bounded-representation interface implying the actual
+  leading-term-ideal Gröbner property. This is the mathematical interface, not yet
+  the executable S-pair certificate checker or worksheet command.
+
+Still required: executable Gröbner certificate checking and commands, an explicit
+worksheet import command exercising the existing Lean-to-runtime conversions, any regression fixes
 revealed by the final build, completed documentation of certification, and the
 upstream PR. The current native comparisons and successful reduction runs do not
 substitute for a kernel-checked general Gröbner soundness theorem.
@@ -95,3 +106,16 @@ polynomial and Gröbner comparisons, and function-contract/handle regressions.
 The exported equality and membership theorem axiom checks contain only standard
 Lean axioms. Existing repository warnings and intentional negative-control
 `sorry` tests remain unchanged.
+
+Validation at the mathematical-theory checkpoint: the combined existing suite
+and `MacauleanMathlibTest` passed (9127 jobs), followed by the additional
+worksheet ideal-equality transport test. The theory tests check actual exported
+QQ/F_5 membership proofs, finite-field ideal-equality transport, grevlex-vs-lex
+ordering, the general well-foundedness instance, empty and unit basis certificates,
+and standard-axiom audits. `MacauleanTest` imports this suite so `lake test` covers it.
+The executable S-pair checker and certification command are still required.
+
+After the combined import exposed a root-name collision, the existing core
+factorization predicates were moved into `Macaulean.Factorization`; their tactic
+and negative-control tests pass. A fresh `lake test` then passed all 9125 targets,
+including the native polynomial comparisons and the root importing both libraries.

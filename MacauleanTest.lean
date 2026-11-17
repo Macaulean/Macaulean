@@ -59,3 +59,6 @@ import MacauleanTest.VerificationGraph
 import MacauleanTest.VerificationNatContracts
 import MacauleanTest.VerificationHandles
 import MacauleanTest.ProofJobKernel
+
+-- Standard polynomial semantics and the mathematical Gröbner certificate interface.
+import MacauleanMathlibTest
