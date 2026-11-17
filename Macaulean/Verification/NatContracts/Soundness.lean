@@ -63,7 +63,7 @@ theorem bin_quot : evalBinOp .quot (natV x) (natV y) = .ok (natV (x / y)) := by
 theorem bin_rem : evalBinOp .rem (natV x) (natV y) = .ok (natV (x % y)) := by
   simp [evalBinOp, natV]
 theorem bin_pow : evalBinOp .pow (natV x) (natV y) = .ok (natV (x ^ y)) := by
-  simp [evalBinOp, natV]
+  simp [evalBinOp, intZPow, natV]
 theorem cmp_eq : evalBinOp .eq (natV x) (natV y) = .ok (.bool (decide (x = y))) := by
   simp [evalBinOp, natV, Value.toRat?, Rat.intCast_inj, Int.natCast_inj]
 theorem cmp_ne : evalBinOp .ne (natV x) (natV y) = .ok (.bool (decide (x ≠ y))) := by
