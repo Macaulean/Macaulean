@@ -174,7 +174,48 @@ STATUS = '#m2_status "toyIdentity" polynomialIdentity'
 URI = (ROOT / "IntentRpcFixture.lean").as_uri()
 
 
+def definition_exposure():
+    """Generated declarations participate in ordinary Lean editor requests."""
+    client = Client("definitions")
+    uri = (ROOT / "DefinitionEditorFixture.lean").as_uri()
+    source = '''import Macaulean.Interpreter.DSL
+namespace EditorExposure
+open M2
+answer = 42;
+square = x -> x*x;
+example : M2Generated.answer = (42 : Int) := rfl
+example : (M2Generated.square 32 (.zz 5)).map Prod.fst = .ok (.zz 25) := by decide
+answer = 43;
+example : M2Generated.answer.v2 = (43 : Int) := rfl
+end EditorExposure
+'''
+    try:
+        client.open(uri, source)
+        position = {"line": 5, "character": 26}
+        params = {"textDocument": {"uri": uri}, "position": position}
+        hover = client.request("textDocument/hover", params)
+        assert hover and "M2Generated.answer" in json.dumps(hover), hover
+        locations = client.request("textDocument/definition", params)
+        assert locations, "generated declaration has no definition location"
+        if isinstance(locations, dict):
+            locations = [locations]
+        assert any(
+            loc.get("targetUri", loc.get("uri")) == uri
+            and loc.get("targetSelectionRange", loc.get("range"))["start"]["line"] == 3
+            for loc in locations
+        ), locations
+        # Re-elaboration replaces the edited document's declarations without
+        # retaining stale snapshots or advancing revision numbers spuriously.
+        changed = source.replace("42", "44")
+        client.change(uri, changed, 2)
+        client.change(uri, source, 3)
+        print("DEFINITION_LSP_COMPLETE: generated hover, definition navigation, callable proofs and edit replay", flush=True)
+    finally:
+        client.close()
+
+
 def main():
+    definition_exposure()
     client = Client("edit")
     try:
         source = BASE + STATUS
