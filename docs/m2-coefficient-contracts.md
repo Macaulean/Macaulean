@@ -86,3 +86,8 @@ proof exposed to DSL users. This change does not discharge
 `RuntimeReduction.RepresentationStatement` or `IrreducibleStatement`, prove
 termination, or certify Buchberger. It adds no new intent approvals or proof
 acceptance rules.
+
+The pending generic reduction targets require the production bindings for
+protected prelude names. See [the environment condition and its checked
+counterexample](m2-reduction-environment.md); arbitrary runtime environments
+make the unrestricted target false.

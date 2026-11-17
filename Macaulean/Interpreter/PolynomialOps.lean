@@ -80,14 +80,13 @@ def equal (a b : Value) : Except Error Bool := do
     return r == s && c == d && p == q
   | some _, none | none, some _ => .error (.noMethod "==" [a.className,b.className])
   | none, none =>
-    match a, b with
-    | .algebra .rationals, _ | _, .algebra .rationals
-    | .algebra (.ring _), _ | _, .algebra (.ring _) =>
-      .error (.noMethod "==" [a.className,b.className])
-    | _, _ =>
-      let (_, p, q) ← common a b
-      return p = q
-
+  match a, b with
+  | .algebra .rationals, _ | _, .algebra .rationals
+  | .algebra (.ring _), _ | _, .algebra (.ring _) =>
+    .error (.noMethod "==" [a.className,b.className])
+  | _, _ =>
+    let (_, p, q) ← common a b
+    return p = q
 def constantValue? (p : Raw) : Option Rat :=
   match p with
   | [] => some 0
