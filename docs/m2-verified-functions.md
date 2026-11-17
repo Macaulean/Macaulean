@@ -255,6 +255,35 @@ This is what lets theorems compose:
 | `m2_eval` | Evaluates a call on concrete arguments, e.g. `gcdNat (12, 18) ⇓ 6`. |
 | `m2_extends` | Proves by evaluation that a later worksheet state extends an earlier one. `m2_use` calls it. |
 
+### Rational arithmetic
+
+Handle statements accept `Rat` arguments and results. For example:
+
+```lean
+averageQ = (x,y) -> (x + y) / 2;
+
+theorem averageQ_spec (x y : Rat) : averageQ (x, y) ⇓ (x + y) / 2 := by
+  m2_unfold
+```
+
+`m2_unfold` supports rational addition, subtraction, multiplication, negation,
+unary `+`, equality and order comparisons, including mixed integer/rational
+operands. `/` returns a rational even for two integer operands and requires a
+nonzero denominator. A denominator known nonzero from the context or a branch
+can discharge that obligation; otherwise it remains a goal.
+
+The rational `//` and `%` operators follow the runtime's separate conventions:
+with a zero divisor they return zero and the dividend respectively. Their
+supported operand pairs are `QQ/QQ` and `QQ/ZZ`; `ZZ/QQ` is not supported for these
+two operators. Rational powers with integer exponents require a nonzero base
+when the exponent is negative. Rational-exponent automation is not included.
+These facts concern the embedded DSL's production evaluator.
+
+Rational calls can be composed with `m2_use` just like integer calls. See
+`MacauleanTest/VerificationHandlesRationals.lean` for symbolic examples and error
+cases. Polynomial automation, mutable locals, builtin-call contracts, and
+partial correctness without termination remain separate extensions.
+
 ### How it works
 
 Files are under `Macaulean/Verification/Handles/`.
@@ -270,8 +299,8 @@ Files are under `Macaulean/Verification/Handles/`.
   The soundness theorem `Fn.Call.Sat.intro` is proved once, by the same induction
   as for `#m2_verify`.
 - **The `m2_simp` simp set** (`Simp.lean`) evaluates operations on represented
-  values: integer arithmetic and comparisons, Booleans, list length and in-range
-  indexing. Tag lemmas `@[m2_simp]` to support new kinds of value.
+  values: integer and rational arithmetic and comparisons, Booleans, list length
+  and in-range indexing. Tag lemmas `@[m2_simp]` to support new kinds of value.
 - **`m2_unfold`** (`Tactic.lean`) works in three steps:
   1. it applies `Sat.intro` and evaluates the global lookups of the reflected
      state with `decide +kernel`;
