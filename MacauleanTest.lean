@@ -10,6 +10,8 @@ import MacauleanTest.InterpreterDSL
 import MacauleanTest.DefinitionExposure
 import MacauleanTest.MathematicalExport
 import MacauleanTest.MathematicalExportImport
+import MacauleanTest.CertificateCommands
+import MacauleanTest.CertificateCommandsImport
 import MacauleanTest.PrimeFieldAlgebra
 import MacauleanTest.FiniteFieldWorksheet
 import MacauleanTest.FiniteFieldsM2

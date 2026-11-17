@@ -76,6 +76,12 @@ The sequence is an implementation order, not a reduction of the acceptance scope
 * `FiniteFieldWorksheet` checks execution, provenance, characteristic rejection,
   ring separation, and rational promotion. `FiniteFieldsM2` compares exact
   coefficients against native M2 for nine bases and nine remainders.
+* `Algebra.Certificates` proves soundness of dimension-checked polynomial
+  representation rows and two-way ideal-equality certificates over every supported
+  coefficient ring. `CertificateCommands` uses source-language basis/reduction
+  code only to propose data, then emits kernel-checked membership/equality theorems.
+  Tests cover QQ/F_5 examples, F_3 zero/unit ideals, import persistence, malformed
+  rows, insufficient one-way containment, and incompatible coefficient fields.
 
 Still required: Gröbner certificate soundness and commands, any regression fixes
 revealed by the final build, completed documentation of certification, and the

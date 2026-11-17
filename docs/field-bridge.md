@@ -1,10 +1,10 @@
 # Mathematical exports over QQ and prime fields
 
-Import `Macaulean.Verification.MathematicalExport` to write M2 worksheets and
-export their values as ring-indexed mathematical objects:
+Import `Macaulean.Verification.CertificateCommands` to write M2 worksheets,
+export mathematical objects, and check membership and ideal-equality certificates:
 
 ```lean
-import Macaulean.Verification.MathematicalExport
+import Macaulean.Verification.CertificateCommands
 open M2
 
 K = GF(5);
@@ -17,12 +17,14 @@ G = gb I;
 #m2_export "R" as R_math
 #m2_export "I" as I_math
 #m2_export "f" as f_math
+#m2_membership "f" in "I" as f_in_I
+#m2_ideal_equality "G" for "I" as same_ideal
 
 example : Lean.Grind.Field K_math.Carrier := inferInstance
 example : K_math.characteristic = 5 := rfl
 
 -- This is a mathematical proposition about the worksheet's actual objects:
-#check I_math.Member f_math
+example : I_math.Member f_math := f_in_I
 
 -- Execution currently computes this remainder. A computation message alone is
 -- not a theorem that G is a Groebner basis.
@@ -66,9 +68,25 @@ polynomials. The generated ideal has the proved least-ideal property.
 
 ## Proofs and reverse conversion
 
+`#m2_membership "f" in "I" as proof` asks the existing source-language algebra
+code to find a coefficient row, then checks the polynomial identity in Lean's
+kernel. The resulting theorem proves membership in the exported ideal. Its
+`.polynomial`, `.ideal`, and `.coefficients` declarations retain the inputs and
+witness; `.checked` records the Boolean check's proved result. A failed command
+does not establish nonmembership.
+
+`#m2_ideal_equality "G" for "I" as proof` checks the candidate's stored
+basis-to-input rows and independently generated input-to-basis rows. Its theorem
+states equality of the mathematical ideals. It retains the candidate snapshot,
+its decoding theorem, and both directions of the representation evidence. It
+does not assert the Gröbner property. In particular, one containment or a runtime
+basis tag is insufficient to pass this checker.
+
 `MacauleanTest/MathematicalExport.lean` contains full proofs of
 x^3-1 in (x^2-y, x*y-1) over both QQ and F_5, directly using exported worksheet
 objects. They use the explicit identity x*(x^2-y)+(x*y-1)=x^3-1.
+`MacauleanTest/CertificateCommands.lean` demonstrates automatic proof-producing
+commands for those examples, unit and zero ideals, and rejected invalid rows.
 
 `MathematicalViews.polynomialValue`, `idealValue`, and `ringValue` convert the
 mathematical presentations back to runtime values. The corresponding
