@@ -59,6 +59,11 @@ passing result.
 
 ## Remaining Stage 2 work
 
+The [polynomial arithmetic milestone](m2-arithmetic-semantics.md) supplies general
+denotation laws for the production arithmetic and its lexical-runtime use,
+including the arithmetic balances in the two reduction branches. These are
+building blocks for the remaining correspondence proof, not its completion.
+
 The actual `m2gbReduce` representation and irreducibility statements are explicit
 unproved proposition definitions in `ProofJobs.RuntimeReduction`. Abstract
 conservation does not discharge their interpreter/algebra correspondence. This
