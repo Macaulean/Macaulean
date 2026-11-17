@@ -51,6 +51,8 @@ import MacauleanTest.InterpreterGroebnerImport
 import MacauleanTest.VerificationViews
 import MacauleanTest.PolynomialArithmetic
 import MacauleanTest.CoefficientArithmetic
+import MacauleanTest.PolynomialRows
+import MacauleanTest.RowRepresentation
 import MacauleanTest.VerificationIntent
 import MacauleanTest.VerificationDSL
 import MacauleanTest.VerificationImport
@@ -62,3 +64,5 @@ import MacauleanTest.ProofJobKernel
 
 -- Standard polynomial semantics and the mathematical Gröbner certificate interface.
 import MacauleanMathlibTest
+import MacauleanTest.PolynomialExprMRDI
+import MacauleanTest.RuntimeEnvironment

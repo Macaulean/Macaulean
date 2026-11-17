@@ -79,10 +79,17 @@ Transitive axiom audits cover the public weighted-sum, view, operator, runtime,
 and balance laws, plus the generic examples. Only `propext`, `Classical.choice`,
 and `Quot.sound` are allowed. No proof hole or native-evaluation axiom is allowed.
 
-The next milestone is dimension and representation preservation for the executed
-`m2gbSubtractRow` helper. Then come the actual reduction loop's representation
+The polynomial-row specialization now proves dimension preservation, sufficient
+depth, and pointwise coefficient correctness for the executed `m2gbSubtractRow`
+helper; see [polynomial rows](m2-polynomial-rows.md). The representation follow-up
+now proves preservation of its linear combination as well. Next come the actual reduction loop's representation
 invariant, leading-term selection and irreducibility, and an ideal-membership
 proof exposed to DSL users. This change does not discharge
 `RuntimeReduction.RepresentationStatement` or `IrreducibleStatement`, prove
 termination, or certify Buchberger. It adds no new intent approvals or proof
 acceptance rules.
+
+The pending generic reduction targets require the production bindings for
+protected prelude names. See [the environment condition and its checked
+counterexample](m2-reduction-environment.md); arbitrary runtime environments
+make the unrestricted target false.
