@@ -54,12 +54,6 @@ as `R = QQ[x,y];` and `(x+y)^2`. Polynomial execution uses pure Lean, not the
 external M2 server. See [the polynomial interface and verification boundary](docs/m2-polynomials.md)
 and [the checked worksheet](MacauleanTest/InterpreterPolynomialsDSL.lean).
 
-## Verified polynomial GCD
-
-For the univariate GCD implementation, proved input-derived execution budget,
-total correctness, and reusable worksheet certificates, see
-[GCD verification](docs/m2-gcd.md).
-
 ## Lean definitions from M2 worksheets
 
 Bindings written under `open M2` automatically get persistent Lean declarations.
@@ -72,3 +66,9 @@ new immutable revisions so existing Lean proofs keep their meaning.
 See [the executable example](Examples/DefinitionExposure.lean) and
 [definition exposure](docs/m2-definition-exposure.md) for naming, imports,
 polynomial views, examples of proofs, and the current interpreter-backed boundary.
+
+## Verified polynomial GCD
+
+For the univariate GCD implementation, proved input-derived execution budget,
+total correctness, and reusable worksheet certificates, see
+[GCD verification](docs/m2-gcd.md).

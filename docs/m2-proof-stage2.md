@@ -68,10 +68,10 @@ arithmetic laws in the existing Stage 1 coefficient views and connects them to
 actual operator and runtime execution.
 
 The actual `m2gbReduce` representation and irreducibility statements are explicit
-unproved proposition definitions in `ProofJobs.RuntimeReduction`. Abstract
-conservation does not discharge their interpreter/algebra correspondence. This
-pilot does not claim those theorems, general termination, automatic verified
-lifting or full Gröbner algorithm correctness.
+proposition definitions in `ProofJobs.RuntimeReduction`. The subsequent
+[source reduction proofs](m2-reduction-proof.md) discharge both; abstract
+conservation and this pilot alone do not. General termination, automatic verified
+lifting and full Gröbner algorithm correctness remain outside this pilot.
 
 There is no continuous background model coordinator or provider integration.
 Your chosen coding agent invokes the runner explicitly. The combined InfoView

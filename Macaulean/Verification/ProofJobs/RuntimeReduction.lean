@@ -1,11 +1,13 @@
 import Macaulean.Verification.ViewLaws
 import Macaulean.Verification.ProofJobs.Conservation
-import Macaulean.Interpreter.Runtime
+import Macaulean.Verification.RuntimeEnvironment
 
 /-!
 The exact generic represented-reduction target. It is a proposition definition,
-not an axiom, theorem, proof placeholder or assumed primitive law. This target is
-NOT yet discharged. It prevents an abstract conservation theorem from being
+not an axiom, theorem, proof placeholder or assumed primitive law. Representation
+is discharged by `ReductionRepresentation.representation`; irreducibility by
+`ReductionIrreducibility.irreducible`. Protected prelude bindings are an explicit hypothesis: an
+arbitrary runtime state can otherwise replace a recursive library helper. It prevents an abstract conservation theorem from being
 mistaken for a proof about the source-language implementation.
 -/
 namespace Macaulean.M2.Verification.ProofJobs.RuntimeReduction
@@ -35,6 +37,7 @@ def RepresentationStatement : Prop :=
     InputInvariant generators pending remainder coefficients →
     (∀ g ∈ reducers, ReducerInvariant generators g) →
     ∀ (s : Runtime.State) (fuel : Nat) (result : Value) (after : Runtime.State),
+      Runtime.PreludeBindings s →
       Runtime.call fuel (.algebra (.library "m2gbReduce"))
         (.sequence [pending.value, coefficients.value,
           .list (reducers.map RepresentedReducer.value), remainder.value]) s = .ok (result,after) →
@@ -48,6 +51,7 @@ def IrreducibleStatement : Prop :=
     (coefficients : Row r n) (reducers : List (RepresentedReducer r n)),
     Irreducible remainder (reducers.map RepresentedReducer.polynomial) →
     ∀ (s : Runtime.State) (fuel : Nat) (result : Value) (after : Runtime.State),
+      Runtime.PreludeBindings s →
       Runtime.call fuel (.algebra (.library "m2gbReduce"))
         (.sequence [pending.value, coefficients.value,
           .list (reducers.map RepresentedReducer.value), remainder.value]) s = .ok (result,after) →

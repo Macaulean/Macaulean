@@ -44,6 +44,8 @@ import MacauleanTest.InterpreterGroebnerImport
 import MacauleanTest.VerificationViews
 import MacauleanTest.PolynomialArithmetic
 import MacauleanTest.CoefficientArithmetic
+import MacauleanTest.PolynomialRows
+import MacauleanTest.RowRepresentation
 import MacauleanTest.VerificationIntent
 import MacauleanTest.VerificationDSL
 import MacauleanTest.VerificationImport
@@ -51,5 +53,11 @@ import MacauleanTest.VerificationWidget
 import MacauleanTest.VerificationGraph
 import MacauleanTest.VerificationNatContracts
 import MacauleanTest.VerificationHandles
+import MacauleanTest.VerificationLocalHandles
 import MacauleanTest.ProofJobKernel
 import MacauleanTest.LanguageReference
+import MacauleanTest.PolynomialExprMRDI
+import MacauleanTest.RuntimeEnvironment
+import MacauleanTest.ReductionFoundations
+import MacauleanTest.ReductionRepresentation
+import MacauleanTest.ReductionIrreducibility
