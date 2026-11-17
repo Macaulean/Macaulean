@@ -66,3 +66,12 @@ polynomial views, examples of proofs, and the current interpreter-backed boundar
 For the univariate GCD implementation, proved input-derived execution budget,
 total correctness, and reusable worksheet certificates, see
 [GCD verification](docs/m2-gcd.md).
+
+## QQ and prime-field ideal certificates
+
+`import MacauleanMathlib` adds mathematical exports and imports, ideal-membership
+proofs, and checked Gröbner bases over `QQ` and `GF(p)`. Use `#m2_groebner "G" for
+"I" as proof` to certify a worksheet candidate against its original ideal.
+See [the field/ideal bridge](docs/field-bridge.md) and the
+[complete example](Examples/FieldIdealBridge.lean) for both directions, guarantees,
+and the initial small-prime/fixed-grevlex scope.

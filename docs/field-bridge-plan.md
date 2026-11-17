@@ -2,8 +2,7 @@
 
 The acceptance scope is rational and prime-field polynomial worksheets with
 stable mathematical exports, certified Gröbner bases, and usable membership
-proofs. Extension fields are a documented follow-up. This file tracks work;
-it is not a declaration that the features below are implemented.
+proofs. Extension fields are a documented follow-up. This file records the acceptance requirements and their implementation evidence.
 
 ## Required end-to-end behavior
 
@@ -24,110 +23,60 @@ it is not a declaration that the features below are implemented.
 * Document syntax, guarantees, limitations, and examples; run the relevant
   existing regressions and new positive/negative checks; open an upstream PR.
 
-## Repository constraints discovered
+## Implementation evidence
 
-Upstream baseline: 0964f3c. Lean: 4.33.1. The baseline had no Mathlib dependency.
-The proof-only `MacauleanMathlib` library now pins Mathlib v4.33.1; the interpreter
-and existing executable certificate modules do not import it.
-The current runtime and arithmetic proofs use Rat coefficients. Existing
-`Verification.Views` supplies ring-indexed polynomials, coefficientwise
-equivalence, and representation rows. Definition exposure already produces
-immutable runtime snapshots, so mathematical export should reuse those snapshots.
-The separate reduction-correctness worktree has additional ideal-membership
-proofs; avoid modifying it or silently depending on unmerged declarations.
+| Requirement | Implementation | Regression evidence |
+| --- | --- | --- |
+| QQ and prime-field worksheets | `PrimeField`, `CoefficientField`, `FiniteOps`, shared `Runtime` | `PrimeFieldAlgebra`, `FiniteFieldWorksheet`, `FiniteFieldsM2` |
+| Immutable mathematical exports | `MathematicalViews`, `MathematicalExport` | `MathematicalExport`, `MathematicalExportImport` |
+| Coefficientwise polynomial/ideal meaning | `Algebra.Polynomial`, `MacauleanMathlib.Polynomial`, `Worksheet` | finite-field x^5-x counterexample; transported worksheet proofs |
+| Two-way ideal equality and membership | `Algebra.Certificates`, `CertificateCommands` | `CertificateCommands`, `CertificateCommandsImport` |
+| Actual Gröbner property of the original ideal | `GroebnerChecker.checkBasis_sound`, `GroebnerViews.checkGroebner_sound` | `MacauleanMathlibTest/GroebnerCommands.lean`; standard-axiom audits |
+| Matching well-founded grevlex order | `Grevlex.grevlexOrder`, `grevlexOrder_lt_iff` | grevlex-vs-lex example and general well-foundedness instance |
+| Explicit reverse imports and round trips | `MathematicalImport`, decoder/encoder round-trip theorems | `MacauleanMathlibTest/MathematicalImport.lean` over QQ and F_5 |
+| Rejection controls | dimensions, ring/field matching, inverse-law and degree-bound checks | malformed matrices, identity-only S-pair, cross-field, duplicate names, protected bindings, identity collisions |
+| Usable documentation | `docs/field-bridge.md`, README link | `Examples/FieldIdealBridge.lean` |
 
-## Implementation sequence
+The executable Gröbner checker validates leading terms, monicity, both dimensions
+of the S-pair matrix, coefficient-row identities, and degree bounds. A correct
+identity whose summands exceed the S-polynomial's degree is rejected. The root
+certificate theorem identifies the original input ideal, not only the candidate's
+own generated ideal. Successful worksheet executions and native comparisons are
+additional regression checks, not the logical basis of certification.
 
-1. Typed ideal views, exact decoding/encoding proofs, and worksheet exports.
-2. Coefficient-field representation and executable prime-field arithmetic,
-   including evidence that accepted characteristics define fields.
-3. Field-generic polynomial semantics and arithmetic soundness.
-4. Ideal and Gröbner certificate semantics, checking, and soundness.
-5. Worksheet certification commands, bidirectional examples, regressions,
-   documentation, and upstream PR.
+The kernel checks imported runtime data against the encoding of the supplied
+closed Lean term before any session mutation is published. Fresh ring identities
+are reserved; conflicting identities and protected bindings fail atomically.
+The reverse-direction tests create ideals from Lean data, import them, compute and
+certify their Gröbner bases, and export the identical presentations back to Lean.
 
-The sequence is an implementation order, not a reduction of the acceptance scope.
+## Dependencies and compatibility
 
-## Implemented checkpoints
+Lean remains at 4.33.1. The separate, non-precompiled `MacauleanMathlib` library pins
+Mathlib v4.33.1. The core interpreter and membership/equality/import commands do
+not import Mathlib. The licensed Buchberger proof and its dependency closure are
+vendored with pinned provenance in `MacauleanMathlib/GroebnerTheory/README.md` and
+an Apache 2.0 LICENSE. Axiom audits of the resulting certificates contain only
+Lean's standard axioms.
 
-* `MathematicalViews` and `MathematicalExport`: shared field/ring/polynomial/ideal
-  exports over QQ and checked prime fields, exact snapshot decoding theorems,
-  stable names after reassignment, and round-trip/foreign-ring/malformed-dimension
-  tests. These supersede the initial QQ-only `IdealView` checkpoint.
-* `Algebra.PrimeField`: canonical modular residues with a standard
-  `Lean.Grind.Field` instance derived from an exhaustive inverse-law check.
-  Small prime characteristics pass; composite characteristics fail. This first
-  checker is intentionally for small primes and is not a fast primality test.
-* `KernelPolynomial` and its weighted-observation proofs are generalized from
-  Rat to commutative coefficient rings. Existing QQ coefficient/runtime proofs
-  still build.
-* `Algebra.Polynomial`: coefficientwise meanings, generic arithmetic soundness,
-  ideals closed under equivalence/addition/multiplication, and their generated
-  ideals with the least-ideal theorem.
-* `Algebra.CoefficientField` packages QQ and checked prime fields.
-  `FinitePolynomialData` validates canonical residue/exponent encodings and
-  proves decode/encode and arithmetic bridge identities.
-* `PrimeFieldAlgebra` proves the requested membership example over F_5 at the
-  mathematical layer and distinguishes x^5-x from zero as a formal polynomial.
-* `FiniteObjects` and `FiniteOps` connect GF(p), modular scalar and polynomial
-  arithmetic, ideals, matrices, and basis containers to the ordinary worksheet
-  runtime. The existing M2 reduction/Buchberger source runs over these fields.
-* `MathematicalExport` tests now prove the membership example from actual
-  worksheet exports over QQ and F_5. The exported ideals use the common generated
-  ideal semantics, and field exports provide standard Lean field instances.
-* `FiniteFieldWorksheet` checks execution, provenance, characteristic rejection,
-  ring separation, and rational promotion. `FiniteFieldsM2` compares exact
-  coefficients against native M2 for nine bases and nine remainders.
-* `Algebra.Certificates` proves soundness of dimension-checked polynomial
-  representation rows and two-way ideal-equality certificates over every supported
-  coefficient ring. `CertificateCommands` uses source-language basis/reduction
-  code only to propose data, then emits kernel-checked membership/equality theorems.
-  Tests cover QQ/F_5 examples, F_3 zero/unit ideals, import persistence, malformed
-  rows, insufficient one-way containment, and incompatible coefficient fields.
+The existing factorization predicates moved into `Macaulean.Factorization` to
+avoid collisions with Mathlib's root names. Their positive and negative tactic
+tests are preserved. The incoming row-proof, runtime-environment, and MRDI changes
+from upstream through `b7ea4fe` are integrated; the combined test root retains both
+upstream and bridge suites.
 
-* `MacauleanMathlib`: standard multivariate-polynomial interpretation with
-  coefficient preservation and arithmetic soundness; a well-founded grevlex
-  monomial order proved to match the runtime comparator; the licensed Buchberger
-  criterion adapted from WuProver/groebner_proj, with provenance and standard-axiom
-  audit; and a finite indexed bounded-representation interface implying the actual
-  leading-term-ideal Gröbner property. The executable checker and commands below
-  use this interface.
+## Validation and delivery
 
-* `GroebnerCertificates`, `GroebnerChecker`, and `GroebnerViews`: executable
-  leading-term, monicity, degree-bound, square S-pair matrix, and representation
-  checks with a kernel-checked theorem that the candidate is a Gröbner basis of
-  the original ideal. The identity-only/non-Gröbner negative example is rejected.
-* `#m2_groebner` publishes that theorem from the actual worksheet snapshot.
-  QQ, F_5 with nonmonic input, F_2, zero/unit ideals, malformed evidence,
-  cross-field rejection, and theorem import persistence are covered.
-* `#m2_import` accepts closed fields/rings/polynomials/finite ideal presentations,
-  kernel-checks the evaluated encoding before publication, reserves ring identities,
-  and rejects conflicting identities/protected names atomically. End-to-end QQ/F_5
-  tests create ideals in Lean, import them, compute/certify their bases, and export
-  the identical presentations back to Lean. `Examples/FieldIdealBridge.lean` is a
-  complete checked user example.
+Validation after integrating upstream `b7ea4fe`:
 
-Pending delivery: integrate current upstream, run the final combined regression
-suite and examples, audit the acceptance items above, and open the upstream PR.
+* `lake test`: passed all 9,148 targets, including the upstream row/MRDI/environment
+  tests, native M2 comparisons, and the complete mathematical bridge suite.
+* `lake build`: passed (281 jobs), including the default executable.
+* `lake env lean Examples/FieldIdealBridge.lean`: passed with default options.
+* Generated QQ/F_5 Gröbner theorem axiom guards: only `propext`, `Classical.choice`,
+  and `Quot.sound`. Negative certificate and import controls also passed.
+* `git diff --check`: clean.
 
-Validation at the finite-field worksheet checkpoint: `lake build MacauleanTest`
-passed (394 jobs). This includes the new finite native comparisons and import
-tests, the existing rational interpreter/kernel corpus, existing native M2
-polynomial and Gröbner comparisons, and function-contract/handle regressions.
-The exported equality and membership theorem axiom checks contain only standard
-Lean axioms. Existing repository warnings and intentional negative-control
-`sorry` tests remain unchanged.
-
-Validation at the mathematical-theory checkpoint: the combined existing suite
-and `MacauleanMathlibTest` passed (9127 jobs), followed by the additional
-worksheet ideal-equality transport test. The theory tests check actual exported
-QQ/F_5 membership proofs, finite-field ideal-equality transport, grevlex-vs-lex
-ordering, the general well-foundedness instance, empty and unit basis certificates,
-and standard-axiom audits. `MacauleanTest` imports this suite so `lake test` covers it.
-These mathematical-theory checks are now complemented by the executable checker
-and worksheet command tests listed above.
-
-After the combined import exposed a root-name collision, the existing core
-factorization predicates were moved into `Macaulean.Factorization`; their tactic
-and negative-control tests pass. A fresh `lake test` then passed all 9125 targets,
-including the native polynomial comparisons and the root importing both libraries.
+The complete deliverable includes an upstream PR containing this implementation,
+documentation, and validation evidence. Extension fields remain a follow-up;
+this first bridge covers QQ and prime fields with the fixed grevlex order.
