@@ -1,0 +1,14 @@
+{
+  "status": "PASS — specification data and integrity only",
+  "supplied_reference_sha256": "624cf55004f11afd9b728e8ad73df707ce1f190b4fa8089368729b6600065fca",
+  "registered_source_words": 155,
+  "named_profiles": 57,
+  "augmented_words": 34,
+  "internal_tokens": 3,
+  "native_table_words_compared": 121,
+  "conformance_cases": 146,
+  "conformance_cases_executed": 0,
+  "lean_compilation_performed": false,
+  "native_M2_execution_performed": false,
+  "reference_text_preserved": true
+}

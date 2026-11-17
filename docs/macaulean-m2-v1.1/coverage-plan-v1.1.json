@@ -1,0 +1,42 @@
+{
+  "schema": "macaulean.coverage-plan.v1.1",
+  "status": "Planning metadata, not achieved coverage",
+  "delivered_fixtures": 68,
+  "source_fixtures": 13,
+  "configuration_fixtures": 55,
+  "native_executions": 0,
+  "lean_executions": 0,
+  "legacy_cases": 146,
+  "legacy_plan_status": "archived unchanged; not adopted as independently verified oracle",
+  "required_generation": [
+    {
+      "family": "every registered word leading/trailing positive/negative",
+      "status": "not generated in this revision"
+    },
+    {
+      "family": "all operator-pair binding-power boundaries",
+      "status": "not generated in this revision"
+    },
+    {
+      "family": "all lexical punctuation prefixes and raw-byte failures",
+      "status": "not generated in this revision"
+    },
+    {
+      "family": "all native primitive/bootstrap contracts",
+      "status": "not generated in this revision"
+    },
+    {
+      "family": "all error/recovery/host/reflection/alias histories",
+      "status": "not generated in this revision"
+    }
+  ],
+  "required_native_runner": [
+    "version/build/source pin",
+    "fresh or fully specified initial state",
+    "exact source bytes or executable fixture setup",
+    "entry API and compatibility profile",
+    "phase/completion/value/class/state projection",
+    "stdout/stderr/exit status",
+    "transport,resource,unsupported distinguished from M2 errors"
+  ]
+}

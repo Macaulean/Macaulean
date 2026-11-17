@@ -1,0 +1,177 @@
+{
+  "schema": "macaulean.open-contracts.v1.1",
+  "status": "OPEN obligations; no arbitrary fallback semantics permitted",
+  "items": [
+    {
+      "id": "OC-BOOTSTRAP",
+      "audit_findings": [
+        "F01",
+        "F17"
+      ],
+      "severity": "High",
+      "topic": "All native exports and initial bindings",
+      "closure_requirement": "Inventory every required D registration and specify binding/protection, calling convention, argument/result/effect/error behavior. The identified register is not exhaustive.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-ACTOR",
+      "audit_findings": [
+        "F17",
+        "F24"
+      ],
+      "severity": "High",
+      "topic": "Complete per-actor transitions",
+      "closure_requirement": "Close every runtime actor and primitive case; define default actors, bootstrap attachments and fallback, rather than treating an ActorId name as a transition rule.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-NUMERIC",
+      "audit_findings": [
+        "F17",
+        "F24"
+      ],
+      "severity": "High",
+      "topic": "Numeric and platform parameters",
+      "closure_requirement": "Pin precision, rounding, cross-representation dispatch, intervals, NaNs/infinities, machine-size bounds and backend-error behavior for each required numerical primitive.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-HOST",
+      "audit_findings": [
+        "F01",
+        "F16",
+        "F17"
+      ],
+      "severity": "High",
+      "topic": "External interface inventory",
+      "closure_requirement": "Enumerate typed host/engine requests, accepted arguments, results, errors, trace and state effects. External implementation may be excluded, interface semantics may not.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-BIND",
+      "audit_findings": [
+        "F07",
+        "F24"
+      ],
+      "severity": "High",
+      "topic": "Remaining binding-error edges and accounting",
+      "closure_requirement": "Complete all low-level lookup/parameter/creation failures, lookup counters and continuation edges beyond the audited assignment schedules; no generic fail-fast default.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-WORD-VALID",
+      "audit_findings": [
+        "F17",
+        "F19"
+      ],
+      "severity": "Medium",
+      "topic": "Native name validity and malformed byte tails",
+      "closure_requirement": "State the full predicate controlling self-valued creation and edge byte-scanning behavior, including malformed UTF-8/math-operator tails, before certifying those inputs.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-FRAME",
+      "audit_findings": [
+        "F14",
+        "F23"
+      ],
+      "severity": "High",
+      "topic": "Reflection beyond established shared slots",
+      "closure_requirement": "Specify backing-array replacement/stale views, size/capacity/extension, empty-frame observation and all invalid-input/debugger variants. Existing-slot sharing and global hiding are already required.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-DICT",
+      "audit_findings": [
+        "F15",
+        "F18"
+      ],
+      "severity": "Medium",
+      "topic": "Erase, rehash and entry observations",
+      "closure_requirement": "Finish canonical-name/alias erase behavior and entry-order/rehash/keys policies. Preserve shadowed entries and counts; do not substitute a deduplicated name map.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-UNIT",
+      "audit_findings": [
+        "F16",
+        "F24"
+      ],
+      "severity": "High",
+      "topic": "Remaining source-unit failure transitions",
+      "closure_requirement": "Finish complete driver-flag/kind/phase table, lexical recovery and exact diagnostics beyond the audited hook, transfer, exit-hook and close schedules.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-DEBUG",
+      "audit_findings": [
+        "F05",
+        "F06",
+        "F16"
+      ],
+      "severity": "High",
+      "topic": "Debugger and interruption",
+      "closure_requirement": "Specify suppression changes, raw-transfer/error metadata, resumption, interrupt delivery and source-position behavior. The audited step/finish catchability is already fixed.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-INSTALL",
+      "audit_findings": [
+        "F17",
+        "F18"
+      ],
+      "severity": "Medium",
+      "topic": "Method installation error side effects",
+      "closure_requirement": "Resolve ignored recursive-installation results in Option wrappers and exact typicalValues state after each failure; full reflected entry/arity contracts remain required.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-ITERATOR",
+      "audit_findings": [
+        "F04",
+        "F17"
+      ],
+      "severity": "High",
+      "topic": "Iterator acquisition and next failures",
+      "closure_requirement": "Contract next/acquisition outcomes and loop-frame restoration before entering ordinary For clauses; do not infer this from the body completion matrix.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-EQUALITY",
+      "audit_findings": [
+        "F10",
+        "F17"
+      ],
+      "severity": "Medium",
+      "topic": "Error/external equality boundaries",
+      "closure_requirement": "Resolve Error values inside composites and backend equality errors; the corrected CacheTable branch does not establish universal equality totality.",
+      "status": "open",
+      "native_execution_evidence": false
+    },
+    {
+      "id": "OC-AUGMENT",
+      "audit_findings": [
+        "F11",
+        "F12",
+        "F13"
+      ],
+      "severity": "Medium",
+      "topic": "Remaining augmented edge cases",
+      "closure_requirement": "Complete coalescing, parallel, alias-created and failure/cleanup branches beyond the audited evaluation schedule and canonical-name Default predicate.",
+      "status": "open",
+      "native_execution_evidence": false
+    }
+  ]
+}

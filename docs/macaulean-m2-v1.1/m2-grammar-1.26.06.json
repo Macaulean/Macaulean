@@ -1,0 +1,1301 @@
+{
+  "schema": "macaulean.m2.grammar.v1.1",
+  "version": "1.26.06",
+  "source_commit": "1a37f6fe95badb1e5f99707a485503d213fd9d49",
+  "default_profile": "generic",
+  "interning_policy": "first-registration-wins",
+  "profiles": {
+    "right_delimiter": {
+      "lbp": 6,
+      "rbp": null,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "error"
+    },
+    "semicolon": {
+      "lbp": 8,
+      "rbp": 7,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "nbinary"
+    },
+    "comma": {
+      "lbp": 10,
+      "rbp": 10,
+      "ubp": 10,
+      "leading": "nnunary",
+      "trailing": "nbinary"
+    },
+    "wide_clause": {
+      "lbp": 12,
+      "rbp": null,
+      "ubp": 12,
+      "leading": "error",
+      "trailing": "error"
+    },
+    "assignment": {
+      "lbp": 14,
+      "rbp": 13,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "arrow": {
+      "lbp": 14,
+      "rbp": 13,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "arrow"
+    },
+    "narrow_clause": {
+      "lbp": 16,
+      "rbp": null,
+      "ubp": 16,
+      "leading": "error",
+      "trailing": "error"
+    },
+    "shift_left": {
+      "lbp": 18,
+      "rbp": 18,
+      "ubp": 18,
+      "leading": "unary",
+      "trailing": "binary"
+    },
+    "deduction": {
+      "lbp": 20,
+      "rbp": 19,
+      "ubp": 20,
+      "leading": "unary",
+      "trailing": "binary"
+    },
+    "long_right": {
+      "lbp": 22,
+      "rbp": 21,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "long_left": {
+      "lbp": 22,
+      "rbp": 21,
+      "ubp": 22,
+      "leading": "unary",
+      "trailing": "binary"
+    },
+    "long_both": {
+      "lbp": 24,
+      "rbp": 23,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "right_arrow_op": {
+      "lbp": 26,
+      "rbp": 25,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "left_arrow_op": {
+      "lbp": 26,
+      "rbp": 25,
+      "ubp": 26,
+      "leading": "unary",
+      "trailing": "binary"
+    },
+    "or": {
+      "lbp": 28,
+      "rbp": 27,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "coalesce": {
+      "lbp": 28,
+      "rbp": 27,
+      "ubp": 28,
+      "leading": "unary",
+      "trailing": "binary"
+    },
+    "xor": {
+      "lbp": 30,
+      "rbp": 29,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "and": {
+      "lbp": 32,
+      "rbp": 31,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "not": {
+      "lbp": 34,
+      "rbp": null,
+      "ubp": 34,
+      "leading": "unary",
+      "trailing": "default"
+    },
+    "comparisons": {
+      "lbp": 36,
+      "rbp": 35,
+      "ubp": 36,
+      "leading": "unary",
+      "trailing": "binary"
+    },
+    "equalities": {
+      "lbp": 36,
+      "rbp": 35,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "double_bar": {
+      "lbp": 38,
+      "rbp": 38,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "colon": {
+      "lbp": 40,
+      "rbp": 39,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "bar": {
+      "lbp": 42,
+      "rbp": 42,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "double_hat": {
+      "lbp": 44,
+      "rbp": 44,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "ampersand": {
+      "lbp": 46,
+      "rbp": 46,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "ranges": {
+      "lbp": 48,
+      "rbp": 48,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "sign": {
+      "lbp": 50,
+      "rbp": 50,
+      "ubp": 50,
+      "leading": "unary",
+      "trailing": "binary"
+    },
+    "double_plus": {
+      "lbp": 50,
+      "rbp": 50,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "interpunct": {
+      "lbp": 52,
+      "rbp": 52,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "tensor": {
+      "lbp": 54,
+      "rbp": 54,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "low_brackets": {
+      "lbp": 56,
+      "rbp": null,
+      "ubp": 6,
+      "leading": "paren",
+      "trailing": "default"
+    },
+    "star": {
+      "lbp": 58,
+      "rbp": 58,
+      "ubp": 58,
+      "leading": "unary",
+      "trailing": "binary"
+    },
+    "division": {
+      "lbp": 58,
+      "rbp": 58,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "backslashes": {
+      "lbp": 58,
+      "rbp": 57,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "at": {
+      "lbp": 60,
+      "rbp": 59,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "generic": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": null,
+      "leading": "default",
+      "trailing": "default"
+    },
+    "high_brackets": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 6,
+      "leading": "paren",
+      "trailing": "default"
+    },
+    "space": {
+      "lbp": 62,
+      "rbp": 61,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "special_unary": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 12,
+      "leading": "unary",
+      "trailing": "default"
+    },
+    "control": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 12,
+      "leading": "nunary",
+      "trailing": "default"
+    },
+    "new": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 16,
+      "leading": "new",
+      "trailing": "default"
+    },
+    "for": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 16,
+      "leading": "for",
+      "trailing": "default"
+    },
+    "while": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 12,
+      "leading": "while",
+      "trailing": "default"
+    },
+    "if": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 12,
+      "leading": "if",
+      "trailing": "default"
+    },
+    "try": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 12,
+      "leading": "try",
+      "trailing": "default"
+    },
+    "catch": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 12,
+      "leading": "catch",
+      "trailing": "default"
+    },
+    "quote_symbol": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 74,
+      "leading": "quote",
+      "trailing": "default",
+      "quote_policy": "ordinary"
+    },
+    "quote_global": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 74,
+      "leading": "quote",
+      "trailing": "default",
+      "quote_policy": "global"
+    },
+    "quote_threadLocal": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 74,
+      "leading": "quote",
+      "trailing": "default",
+      "quote_policy": "threadGlobal"
+    },
+    "quote_local": {
+      "lbp": 62,
+      "rbp": null,
+      "ubp": 74,
+      "leading": "quote",
+      "trailing": "default",
+      "quote_policy": "currentLocal"
+    },
+    "paren_star": {
+      "lbp": 64,
+      "rbp": null,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "postfix"
+    },
+    "composition": {
+      "lbp": 66,
+      "rbp": 66,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "postfix68": {
+      "lbp": 68,
+      "rbp": null,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "postfix"
+    },
+    "index_power": {
+      "lbp": 70,
+      "rbp": 70,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "binary"
+    },
+    "sharp": {
+      "lbp": 70,
+      "rbp": 70,
+      "ubp": 61,
+      "leading": "unary",
+      "trailing": "binary"
+    },
+    "postfix72": {
+      "lbp": 72,
+      "rbp": null,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "postfix"
+    }
+  },
+  "internal_tokens": {
+    "EOF": {
+      "lbp": 2,
+      "rbp": 2,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "nbinary"
+    },
+    "EOC": {
+      "lbp": 4,
+      "rbp": 4,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "nbinary"
+    },
+    "NEWLINE": {
+      "lbp": 8,
+      "rbp": 8,
+      "ubp": null,
+      "leading": "error",
+      "trailing": "nbinary"
+    }
+  },
+  "delimiter_pairs": {
+    "(": ")",
+    "[": "]",
+    "{": "}",
+    "<|": "|>"
+  },
+  "words": [
+    {
+      "spelling": ")",
+      "profile": "right_delimiter",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "]",
+      "profile": "right_delimiter",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "|>",
+      "profile": "right_delimiter",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "}",
+      "profile": "right_delimiter",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ";",
+      "profile": "semicolon",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ",",
+      "profile": "comma",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "do",
+      "profile": "wide_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "else",
+      "profile": "wide_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "except",
+      "profile": "wide_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "list",
+      "profile": "wide_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "then",
+      "profile": "wide_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "%=",
+      "profile": "assignment",
+      "augmented_base": "%",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "&=",
+      "profile": "assignment",
+      "augmented_base": "&",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "**=",
+      "profile": "assignment",
+      "augmented_base": "**",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "*=",
+      "profile": "assignment",
+      "augmented_base": "*",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "++=",
+      "profile": "assignment",
+      "augmented_base": "++",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "+=",
+      "profile": "assignment",
+      "augmented_base": "+",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "-=",
+      "profile": "assignment",
+      "augmented_base": "-",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "->",
+      "profile": "arrow",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "..<=",
+      "profile": "assignment",
+      "augmented_base": "..<",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "..=",
+      "profile": "assignment",
+      "augmented_base": "..",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "//=",
+      "profile": "assignment",
+      "augmented_base": "//",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "/=",
+      "profile": "assignment",
+      "augmented_base": "/",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ":=",
+      "profile": "assignment",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "<-",
+      "profile": "assignment",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "<<=",
+      "profile": "assignment",
+      "augmented_base": "<<",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "<==>=",
+      "profile": "assignment",
+      "augmented_base": "<==>",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "=",
+      "profile": "assignment",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "===>=",
+      "profile": "assignment",
+      "augmented_base": "===>",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "==>=",
+      "profile": "assignment",
+      "augmented_base": "==>",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "=>",
+      "profile": "assignment",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ">>",
+      "profile": "assignment",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ">>=",
+      "profile": "assignment",
+      "augmented_base": ">>",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "??=",
+      "profile": "assignment",
+      "augmented_base": "??",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "@=",
+      "profile": "assignment",
+      "augmented_base": "@",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "@@=",
+      "profile": "assignment",
+      "augmented_base": "@@",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "@@?=",
+      "profile": "assignment",
+      "augmented_base": "@@?",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "\\=",
+      "profile": "assignment",
+      "augmented_base": "\\",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "\\\\=",
+      "profile": "assignment",
+      "augmented_base": "\\\\",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^**=",
+      "profile": "assignment",
+      "augmented_base": "^**",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^=",
+      "profile": "assignment",
+      "augmented_base": "^",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^^=",
+      "profile": "assignment",
+      "augmented_base": "^^",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "_=",
+      "profile": "assignment",
+      "augmented_base": "_",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "|-=",
+      "profile": "assignment",
+      "augmented_base": "|-",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "|=",
+      "profile": "assignment",
+      "augmented_base": "|",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "|_=",
+      "profile": "assignment",
+      "augmented_base": "|_",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "||=",
+      "profile": "assignment",
+      "augmented_base": "||",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "~=",
+      "profile": "assignment",
+      "augmented_base": "~",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "·=",
+      "profile": "assignment",
+      "augmented_base": "·",
+      "lexical_route": "math_operator"
+    },
+    {
+      "spelling": "⊠=",
+      "profile": "assignment",
+      "augmented_base": "⊠",
+      "lexical_route": "math_operator"
+    },
+    {
+      "spelling": "⧢=",
+      "profile": "assignment",
+      "augmented_base": "⧢",
+      "lexical_route": "math_operator"
+    },
+    {
+      "spelling": "from",
+      "profile": "narrow_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "in",
+      "profile": "narrow_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "of",
+      "profile": "narrow_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "to",
+      "profile": "narrow_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "when",
+      "profile": "narrow_clause",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "<<",
+      "profile": "shift_left",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "|-",
+      "profile": "deduction",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "<===",
+      "profile": "long_left",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "===>",
+      "profile": "long_right",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "<==>",
+      "profile": "long_both",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "<==",
+      "profile": "left_arrow_op",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "==>",
+      "profile": "right_arrow_op",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "??",
+      "profile": "coalesce",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "or",
+      "profile": "or",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "xor",
+      "profile": "xor",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "and",
+      "profile": "and",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "not",
+      "profile": "not",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "!=",
+      "profile": "equalities",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "<",
+      "profile": "comparisons",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "<=",
+      "profile": "comparisons",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "=!=",
+      "profile": "equalities",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "==",
+      "profile": "equalities",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "===",
+      "profile": "equalities",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ">",
+      "profile": "comparisons",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ">=",
+      "profile": "comparisons",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "?",
+      "profile": "comparisons",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "~",
+      "profile": "comparisons",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "||",
+      "profile": "double_bar",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ":",
+      "profile": "colon",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "|",
+      "profile": "bar",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^^",
+      "profile": "double_hat",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "&",
+      "profile": "ampersand",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "..",
+      "profile": "ranges",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "..<",
+      "profile": "ranges",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "+",
+      "profile": "sign",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "++",
+      "profile": "double_plus",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "-",
+      "profile": "sign",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "·",
+      "profile": "interpunct",
+      "lexical_route": "math_operator"
+    },
+    {
+      "spelling": "**",
+      "profile": "tensor",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "⊠",
+      "profile": "tensor",
+      "lexical_route": "math_operator"
+    },
+    {
+      "spelling": "⧢",
+      "profile": "tensor",
+      "lexical_route": "math_operator"
+    },
+    {
+      "spelling": "<|",
+      "profile": "low_brackets",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "[",
+      "profile": "low_brackets",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "%",
+      "profile": "division",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "*",
+      "profile": "star",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "/",
+      "profile": "division",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "//",
+      "profile": "division",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "\\",
+      "profile": "backslashes",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "\\\\",
+      "profile": "backslashes",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "@",
+      "profile": "at",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "(",
+      "profile": "high_brackets",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "SPACE",
+      "profile": "space",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "TEST",
+      "profile": "special_unary",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "break",
+      "profile": "control",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "breakpoint",
+      "profile": "special_unary",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "catch",
+      "profile": "catch",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "continue",
+      "profile": "control",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "elapsedTime",
+      "profile": "special_unary",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "elapsedTiming",
+      "profile": "special_unary",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "finish",
+      "profile": "control",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "for",
+      "profile": "for",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "global",
+      "profile": "quote_global",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "if",
+      "profile": "if",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "local",
+      "profile": "quote_local",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "new",
+      "profile": "new",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "profile",
+      "profile": "special_unary",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "return",
+      "profile": "control",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "shield",
+      "profile": "special_unary",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "step",
+      "profile": "control",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "symbol",
+      "profile": "quote_symbol",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "threadLocal",
+      "profile": "quote_threadLocal",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "throw",
+      "profile": "control",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "time",
+      "profile": "special_unary",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "timing",
+      "profile": "special_unary",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "trap",
+      "profile": "special_unary",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "try",
+      "profile": "try",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "while",
+      "profile": "while",
+      "lexical_route": "identifier"
+    },
+    {
+      "spelling": "{",
+      "profile": "high_brackets",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "(*)",
+      "profile": "paren_star",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "@@",
+      "profile": "composition",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "@@?",
+      "profile": "composition",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^*",
+      "profile": "postfix68",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^~",
+      "profile": "postfix68",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "_*",
+      "profile": "postfix68",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "_~",
+      "profile": "postfix68",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "#",
+      "profile": "sharp",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "#?",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ".",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": ".?",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^**",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^<",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^<=",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^>",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^>=",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "_",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "_<",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "_<=",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "_>",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "_>=",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "|_",
+      "profile": "index_power",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "!",
+      "profile": "postfix72",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "^!",
+      "profile": "postfix72",
+      "lexical_route": "punctuation_trie"
+    },
+    {
+      "spelling": "_!",
+      "profile": "postfix72",
+      "lexical_route": "punctuation_trie"
+    }
+  ],
+  "augmented_bases": [
+    "<<",
+    ">>",
+    "||",
+    "<==>",
+    "|-",
+    "??",
+    "==>",
+    "===>",
+    "|",
+    "^^",
+    "&",
+    "..",
+    "..<",
+    "-",
+    "+",
+    "++",
+    "**",
+    "*",
+    "\\\\",
+    "/",
+    "\\",
+    "%",
+    "//",
+    "@",
+    "@@",
+    "@@?",
+    "~",
+    "|_",
+    "^",
+    "_",
+    "^**",
+    "·",
+    "⊠",
+    "⧢"
+  ],
+  "special_form_recognition": "canonical source-word identity, except where the specification explicitly uses resolved SymbolId",
+  "status": "Transcribed design data; no native execution or independent native-source extraction in this revision",
+  "normative_document": "Macaulean-M2-specification-v1.1.md",
+  "source_unit_skip_tokens": [
+    "NEWLINE",
+    "EOC"
+  ],
+  "source_unit_terminators": [
+    ";",
+    "NEWLINE",
+    "EOC",
+    "EOF"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "status": "PASS — document/data/structure/integrity only",
+  "registered_source_words": 155,
+  "named_profiles": 57,
+  "augmented_words": 34,
+  "supplied_reference_table_words_compared": 121,
+  "independent_native_source_extraction_performed": false,
+  "active_table_manifest_agreement": true,
+  "exact_quotation_policy_checks": true,
+  "lexical_route_checks": true,
+  "html_editions_verified": 3,
+  "checksum_entries_verified": 29,
+  "audit_findings_accounted_for": 24,
+  "open_contracts": 14,
+  "typed_fixtures": 68,
+  "fixtures_executed": 0,
+  "behavioral_expectations_validated": false,
+  "native_M2_execution_performed": false,
+  "lean_compilation_performed": false,
+  "formal_proof_performed": false
+}

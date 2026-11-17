@@ -1,0 +1,295 @@
+{
+  "schema": "macaulean.bootstrap-register.v1.1",
+  "source_commit": "1a37f6fe95badb1e5f99707a485503d213fd9d49",
+  "inventory_exhaustive": false,
+  "null_field_meaning": "Not established by supplied audit; must be contracted, not guessed.",
+  "interfaces": [
+    {
+      "id": "ABI-APPLY",
+      "export_or_interface": "apply",
+      "native_role": "native registered function",
+      "source_anchor": "actors3.d:setupfun(\"apply\",map)",
+      "contract_section": "§5.8",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-BOOTSTRAP"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Callback/arity, result-class and completion branches are not fully specified by the audit.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-SCAN",
+      "export_or_interface": "scan",
+      "native_role": "native registered function",
+      "source_anchor": "actors3.d:setupfun(\"scan\",scan)",
+      "contract_section": "§5.8",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-BOOTSTRAP"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Callback/arity and completion/error behavior remain to contract.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-OVERRIDE",
+      "export_or_interface": "override",
+      "native_role": "native implementation",
+      "source_anchor": "actors3.d:override",
+      "contract_section": "§5.8",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-BOOTSTRAP"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Complete argument/options collision and output rules remain to contract.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-ISMUTABLE",
+      "export_or_interface": "isMutable",
+      "native_role": "native registered function",
+      "source_anchor": "hashtables.dd:mutablefun",
+      "contract_section": "§5.3",
+      "status": "audited-predicate-defined",
+      "open_contracts": [],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "The representation predicate is integrated; no newly executed evidence.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-FRAME",
+      "export_or_interface": "frame",
+      "native_role": "native registered function",
+      "source_anchor": "actors5.d:frame/listFrame",
+      "contract_section": "§5.7",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-FRAME"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Existing-slot aliasing and global hiding specified; resize/capacity and full shape errors open.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-FRAMES",
+      "export_or_interface": "frames",
+      "native_role": "native registered function",
+      "source_anchor": "actors5.d:frames/listFrames",
+      "contract_section": "§5.7",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-FRAME"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Outer-chain views specified; all native empty-frame and backing replacement cases open.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-LOCALDICTIONARIES",
+      "export_or_interface": "localDictionaries",
+      "native_role": "native registered function",
+      "source_anchor": "actors5.d:localDictionaries",
+      "contract_section": "§5.7",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-FRAME"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Dictionary/frame closures rather than value maps; full reflection boundary open.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-SYMBOLBODY",
+      "export_or_interface": "symbolBody",
+      "native_role": "native interface identified by audit",
+      "source_anchor": "tokens.d / actors5.d:symbolBody",
+      "contract_section": "§5.4; §5.8",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-BOOTSTRAP"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Declaration-only identity is established; complete export/invalid-input contract open.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-VALUE",
+      "export_or_interface": "value'",
+      "native_role": "native registered function",
+      "source_anchor": "interp.dd:value / setupfun(\"value'\",value)",
+      "contract_section": "§7.5",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-BOOTSTRAP"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Known symbol, pseudocode, string and wrapper paths integrated; full bootstrap/wrapper inventory open.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-INSTALLMETHOD",
+      "export_or_interface": "installMethod",
+      "native_role": "native interface identified by audit",
+      "source_anchor": "hashtables.dd:installMethod / installIt",
+      "contract_section": "§6.5",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-INSTALL"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Arity-specific entry placement, reflected store and Option/error details require full catalog.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-LOOKUP",
+      "export_or_interface": "lookup",
+      "native_role": "native interface family",
+      "source_anchor": "hashtables.dd:lookup and method lookup routines",
+      "contract_section": "§6.5",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-BOOTSTRAP"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Do not infer the entire user export/overload signature from an internal helper name.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-DICTIONARYPATH",
+      "export_or_interface": "dictionaryPath",
+      "native_role": "native binding and hook-backed path interface",
+      "source_anchor": "actors5.d:dictionaryPath",
+      "contract_section": "§3.3; §3.8",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-DICT"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Ordered path/writable member specified; all query/error contracts open.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-GETGLOBALSYMBOL",
+      "export_or_interface": "getGlobalSymbol",
+      "native_role": "native interface identified by prior source review",
+      "source_anchor": "actors5.d:global-symbol operations",
+      "contract_section": "§3.3; §5.8",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-BOOTSTRAP"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Path/dictionary-dependent lookup and creation; exact overload inventory still required.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-ISGLOBALSYMBOL",
+      "export_or_interface": "isGlobalSymbol",
+      "native_role": "native interface identified by audit probe",
+      "source_anchor": "actors5.d:global-symbol operations",
+      "contract_section": "§3.7",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-BOOTSTRAP"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Used for post-binding-failure observation; full argument/errors must be inventoried.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-ERASE",
+      "export_or_interface": "erase",
+      "native_role": "native registered function",
+      "source_anchor": "actors5.d:erase",
+      "contract_section": "§3.8",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-DICT"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Visibility removal must not invalidate old references; full canonical/alias/history removal contract open.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-NULLARYMETHODS",
+      "export_or_interface": "nullaryMethods",
+      "native_role": "native visible table",
+      "source_anchor": "hashtables.dd:NullaryMethods",
+      "contract_section": "§6.5.5",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-INSTALL"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Table is authoritative; complete initialization/protection and failure paths need inventory.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    },
+    {
+      "id": "ABI-TYPICALVALUES",
+      "export_or_interface": "typicalValues",
+      "native_role": "native visible table/interface",
+      "source_anchor": "hashtables.dd:installIt",
+      "contract_section": "§6.5.5",
+      "status": "partial-contract",
+      "open_contracts": [
+        "OC-INSTALL"
+      ],
+      "calling_convention": null,
+      "initial_binding_and_protection": null,
+      "accepted_arguments": null,
+      "result_and_effect_contract": "Do not make a second hidden store; failed Option-install side effects remain open.",
+      "error_contract": null,
+      "native_execution_evidence": false
+    }
+  ]
+}

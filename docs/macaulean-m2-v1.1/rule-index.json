@@ -1,0 +1,302 @@
+{
+  "schema": "macaulean.rule-index.v1.1",
+  "document": "Macaulean-M2-specification-v1.1.md",
+  "rules": [
+    {
+      "id": "LEX-BYTES",
+      "section": "1.1",
+      "anchor": "rule-lex-bytes",
+      "audit_findings": [],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "WORD-FIRST",
+      "section": "1.4",
+      "anchor": "rule-word-first",
+      "audit_findings": [],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "GRAMMAR-TABLE",
+      "section": "2.3",
+      "anchor": "rule-grammar-table",
+      "audit_findings": [
+        "F20"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "PRATT-CORE",
+      "section": "2.4",
+      "anchor": "rule-pratt-core",
+      "audit_findings": [],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "PARAMETERS",
+      "section": "2.5.6",
+      "anchor": "rule-parameters",
+      "audit_findings": [],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "UNIT-SYNTAX",
+      "section": "2.6",
+      "anchor": "rule-unit-syntax",
+      "audit_findings": [
+        "F03"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "BIND-FAILURE",
+      "section": "3.7",
+      "anchor": "rule-bind-failure",
+      "audit_findings": [
+        "F07"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "DICT-HISTORY",
+      "section": "3.8",
+      "anchor": "rule-dict-history",
+      "audit_findings": [
+        "F15"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "ADDRESS-IDENTITY",
+      "section": "3.9",
+      "anchor": "rule-address-identity",
+      "audit_findings": [
+        "F23"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "LOWER-IDENTITY",
+      "section": "4.4",
+      "anchor": "rule-lower-identity",
+      "audit_findings": [
+        "F23"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "MUTABILITY",
+      "section": "5.3",
+      "anchor": "rule-mutability",
+      "audit_findings": [
+        "F09"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "CACHE-EQUALITY",
+      "section": "5.5",
+      "anchor": "rule-cache-equality",
+      "audit_findings": [
+        "F10"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "FRAME-VIEW",
+      "section": "5.7",
+      "anchor": "rule-frame-view",
+      "audit_findings": [
+        "F14"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "BOOTSTRAP-BOUNDARY",
+      "section": "5.8",
+      "anchor": "rule-bootstrap-boundary",
+      "audit_findings": [
+        "F01",
+        "F17"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "RUNTIME-CONFIG",
+      "section": "6.0",
+      "anchor": "rule-runtime-config",
+      "audit_findings": [
+        "F24"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "METHOD-AUTHORITY",
+      "section": "6.5.5",
+      "anchor": "rule-method-authority",
+      "audit_findings": [
+        "F18"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "ASSIGN-RESULT",
+      "section": "6.6",
+      "anchor": "rule-assign-result",
+      "audit_findings": [
+        "F13"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "ASSIGN-HOOK-SCHEDULE",
+      "section": "6.6.1",
+      "anchor": "rule-assign-hook-schedule",
+      "audit_findings": [
+        "F08"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "PARALLEL-RESULT",
+      "section": "6.6.2",
+      "anchor": "rule-parallel-result",
+      "audit_findings": [
+        "F13"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "AUGMENT-SCHEDULE",
+      "section": "6.7",
+      "anchor": "rule-augment-schedule",
+      "audit_findings": [
+        "F11",
+        "F12"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "LOOP-CLAUSE",
+      "section": "6.9.1",
+      "anchor": "rule-loop-clause",
+      "audit_findings": [
+        "F04"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "TRY-CATCHABILITY",
+      "section": "6.9.2",
+      "anchor": "rule-try-catchability",
+      "audit_findings": [
+        "F05"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "COMPARE-SECOND",
+      "section": "6.10.1",
+      "anchor": "rule-compare-second",
+      "audit_findings": [
+        "F06"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "UNIT-STEP",
+      "section": "7.1",
+      "anchor": "rule-unit-step",
+      "audit_findings": [
+        "F03"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "UNIT-FAILURE",
+      "section": "7.2",
+      "anchor": "rule-unit-failure",
+      "audit_findings": [
+        "F16"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "HOOK-KEYS",
+      "section": "7.4",
+      "anchor": "rule-hook-keys",
+      "audit_findings": [
+        "F02"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "FILE-EXIT",
+      "section": "7.5",
+      "anchor": "rule-file-exit",
+      "audit_findings": [
+        "F16"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "OPEN-CONTRACTS",
+      "section": "8.1",
+      "anchor": "rule-open-contracts",
+      "audit_findings": [
+        "F01",
+        "F17",
+        "F24"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "CONFORMANCE-RECORDS",
+      "section": "8.3",
+      "anchor": "rule-conformance-records",
+      "audit_findings": [
+        "F21"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    },
+    {
+      "id": "STRUCTURAL-CHECKS",
+      "section": "8.4",
+      "anchor": "rule-structural-checks",
+      "audit_findings": [
+        "F20"
+      ],
+      "native_execution_in_revision": false,
+      "formal_proof_in_revision": false
+    }
+  ]
+}

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="source-file" content="Macaulean-M2-architecture-v1.1.md"><meta name="source-sha256" content="7079cd975c0833abda12d89793d1d7e0f770203319e199c20b1b223b5ff31c1b">
+<title>Macaulean implementation and refinement architecture</title><style>:root{--ink:#192a38;--muted:#546574;--accent:#146671;--line:#d9e1e7;--paper:#fff;--back:#f2f5f7}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;color:var(--ink);background:var(--back);font:16px/1.63 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{background:#142b3b;color:#fff;padding:22px 34px;display:flex;gap:20px;align-items:center;justify-content:space-between}header span{font-size:12px;letter-spacing:.12em}header strong{font-size:15px;font-weight:500}
+.layout{max-width:1480px;margin:auto;display:grid;grid-template-columns:270px minmax(0,1fr);gap:30px;padding:30px 26px}
+nav{position:sticky;top:20px;align-self:start;max-height:94vh;overflow:auto;padding:10px 14px 24px 0;font-size:12px;line-height:1.4}nav h2{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0 0 16px}nav a{display:block;text-decoration:none;color:var(--muted);padding:5px 0}nav a.h2{font-weight:650;color:var(--ink);padding-top:12px}nav a.h3{padding-left:12px}
+main{background:var(--paper);min-width:0;padding:34px 42px 42px;border:1px solid var(--line);border-radius:5px}.edition-note{font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:30px}
+h1{font-size:35px;line-height:1.16;margin:0 0 26px;letter-spacing:-.025em}h2{font-size:25px;line-height:1.25;margin:46px 0 18px;border-bottom:1px solid var(--line);padding-bottom:11px}h3{font-size:19px;line-height:1.35;margin:32px 0 13px}h4{font-size:17px;margin:26px 0 10px}p{margin:13px 0}a{color:var(--accent)}a[id]{scroll-margin-top:24px}code{font: .88em/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;background:#edf3f6;border-radius:3px;padding:2px 4px}pre{background:#f3f6f8;padding:16px 18px;border:1px solid var(--line);overflow:auto;border-radius:4px}pre code{background:none;padding:0;font-size:13px;white-space:pre}
+.table-wrap{overflow:auto;margin:20px 0}table{width:100%;border-collapse:collapse;font-size:13px;line-height:1.5}th,td{text-align:left;padding:10px 12px;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f5;font-weight:650}tbody tr:nth-child(even){background:#fafcfd}td code{white-space:pre-wrap;overflow-wrap:anywhere}blockquote{border-left:3px solid var(--accent);margin:20px 0;padding:1px 20px;color:var(--muted)}ul,ol{padding-left:24px}li{margin:6px 0}hr{border:0;border-top:1px solid var(--line);margin:32px 0}footer{margin-top:45px;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+@media(max-width:950px){.layout{display:block;padding:15px}nav{position:static;max-height:240px;margin-bottom:20px;border-bottom:1px solid var(--line)}main{padding:25px}h1{font-size:29px}header{padding:18px;display:block}header strong{display:block;margin-top:6px}}
+@media print{header,nav,.edition-note,footer{display:none}.layout{display:block;padding:0}main{padding:0;border:0}body{background:#fff;font-size:10pt}h1{font-size:23pt}h2{font-size:17pt;break-after:avoid}h3,h4{break-after:avoid}table{font-size:8pt}.table-wrap{overflow:visible}pre{white-space:pre-wrap}pre code{white-space:pre-wrap}a{color:inherit;text-decoration:none}}
+</style></head>
+<body><header><span>MACAULEAN · M2 1.26.06</span><strong>Audit-integrated revision 1.1</strong></header>
+<div class="layout"><nav aria-label="Contents"><h2>Contents</h2><a class="h2" href="#1-decision-and-comparison-with-native-d">1. Decision and comparison with native D</a>
+<a class="h2" href="#2-one-semantics-not-two-interpreters-with-similar-behavior">2. One semantics, not two interpreters with similar behavior</a>
+<a class="h2" href="#3-storage-and-observable-identity">3. Storage and observable identity</a>
+<a class="h2" href="#4-one-authoritative-object-store">4. One authoritative object store</a>
+<a class="h2" href="#5-front-end-and-binding">5. Front end and binding</a>
+<a class="h2" href="#6-runtime-continuation-design">6. Runtime continuation design</a>
+<a class="h2" href="#7-lean-worksheet-module-and-transaction-boundary">7. Lean worksheet, module and transaction boundary</a>
+<a class="h2" href="#8-performance-requirements">8. Performance requirements</a>
+<a class="h2" href="#9-refinement-and-trusted-boundary">9. Refinement and trusted boundary</a>
+<a class="h2" href="#10-module-organization-and-migration">10. Module organization and migration</a></nav><main>
+<div class="edition-note">Reading edition of <code>Macaulean-M2-architecture-v1.1.md</code>. The Markdown is the active text; companion and archive links resolve inside the bundle.</div>
+<article><h1 id="macaulean-implementation-and-refinement-architecture">Macaulean implementation and refinement architecture</h1>
+<p><strong>Version 1.1 · 29 September 2026</strong><br />
+<strong>Role:</strong> Implementation design, not an additional language specification. The active contract is
+<code>Macaulean-M2-specification-v1.1.md</code>; <code>archive/</code> contains evidence and superseded drafts.</p>
+<h2 id="1-decision-and-comparison-with-native-d">1. Decision and comparison with native D</h2>
+<p>Keep separate the exact spelling/profile relation, dictionary entries, declaration identity,
+and live storage. Retain native's cheap grammar lookup and direct resolved references,
+without making its entire interconnected Word/Symbol/Frame object layout mandatory.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Native D</th>
+<th>Macaulean semantic requirement</th>
+<th>Machine freedom</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lexical identity</td>
+<td>Interned Word with name/type/parse fields</td>
+<td>Exact byte spelling; first-registration-wins profile history</td>
+<td>WordId and shared immutable profile table</td>
+</tr>
+<tr>
+<td>Grammar</td>
+<td>Function-valued parse handlers</td>
+<td>Finite leading/trailing action algebra; exact native strengths/cursor</td>
+<td>Generated enum dispatch or equivalent table</td>
+</tr>
+<tr>
+<td>Occurrence</td>
+<td>Token with word, source position, binding fields</td>
+<td>Frozen lexical identity plus byte position/newline state</td>
+<td>Source slices and compact tokens</td>
+</tr>
+<tr>
+<td>Namespaces</td>
+<td>Symbol hash tables/chains</td>
+<td>Ordered lookup and retained entry history/counts</td>
+<td>Map index over an authoritative entry store</td>
+</tr>
+<tr>
+<td>Declaration</td>
+<td>Symbol object</td>
+<td>Stable canonical identity, protection and metadata</td>
+<td>SymbolId/metadata arena</td>
+</tr>
+<tr>
+<td>Local storage</td>
+<td>Frame.values</td>
+<td>Shared captured locations and reflective backing views</td>
+<td>Inline slots, <code>(activation,slot)</code>, flattened cell IDs</td>
+</tr>
+<tr>
+<td>Ordinary reference</td>
+<td>Local depth/slot or global symbol frame index</td>
+<td>Already resolved location</td>
+<td>No mandatory redundant SymbolId in each hot instruction</td>
+</tr>
+<tr>
+<td>First-class symbol</td>
+<td>SymbolClosure(Symbol,Frame)</td>
+<td>Declaration plus activation/cell identity</td>
+<td>Reify from location and validated metadata</td>
+</tr>
+<tr>
+<td>Methods</td>
+<td>Visible class-table entries</td>
+<td>One authoritative object/table state</td>
+<td>Derived indexes and invalidated caches</td>
+</tr>
+<tr>
+<td>Operator execution</td>
+<td>Actors receive Code, then primitive/fallback paths</td>
+<td>Actor-specific operand/control schedule</td>
+<td>Specialize only under a proved case or sound guard</td>
+</tr>
+<tr>
+<td>Errors/transfers</td>
+<td>Error records and message tests</td>
+<td>Reached effects and exact clause/catchability rules</td>
+<td>Typed completions with sufficient native metadata</td>
+</tr>
+<tr>
+<td>Source units</td>
+<td>Parse–bind–convert–execute incrementally</td>
+<td>Changes affect subsequent input, not earlier code</td>
+<td>Lazy cursor and session snapshots</td>
+</tr>
+</tbody>
+</table></div>
+<p>The old <code>Sym</code> can become a generated BuiltinWord enum; it must not conflate the word <code>+</code>
+with the SymbolId of <code>+</code> or a machine integer-add instruction. A copied parse profile is
+not semantic operator aliasing by itself, and a dictionary alias is not arbitrary grammar
+extension. First-wins registration includes ordinary previously seen spellings.</p>
+<h2 id="2-one-semantics-not-two-interpreters-with-similar-behavior">2. One semantics, not two interpreters with similar behavior</h2>
+<p>A transparent reference runner and an optimized machine must implement the same active
+contract. Simple finite maps and lists can present a small kernel-reducible semantics.
+Production arrays/maps and explicit continuations refine it. Neither implementation is
+allowed to fill an open contract with a convenient default and then call its agreement
+with the other implementation a proof of M2 fidelity.</p>
+<p>The contract now explicitly marks unresolved primitive/actor/host cases. Until they are
+closed, prove results for a named closed subset. A grammar table, enum of ActorIds, or
+opaque <code>step</code> function is not a completed transition relation. The audit's corrected
+loop-clause, try, comparison, hook and binder-error rules are fixed inputs to that relation.</p>
+<h2 id="3-storage-and-observable-identity">3. Storage and observable identity</h2>
+<p>Use distinct logical identifier types at abstraction boundaries. Do not turn this into a
+requirement that every ID has a separately allocated runtime record. A cell may simply be
+a frame/slot address; the fast representation may flatten it or keep inline frame slots.
+Ordinary reads can omit declaration metadata when a validator and side table recover it
+for reification, errors and reflective APIs.</p>
+<p>The relevant graph includes reachable functions, objects, dictionary entries, backing
+frame sequences and live views. A symbol-only reference keeps its cell reachable.
+Snapshot forks need explicit lineage/relocation rules for handles; they may not import
+raw session-relative integers as another session's live objects.</p>
+<p>Frame reflection is more restrictive than closure capture alone: an existing-slot write
+through a MutableList wrapper can change the sequence shared with the frame. Returning
+copies is not equivalent. Conversely, treating a wrapper as an eternal abstract frame
+proxy may not match native backing-array replacement. OC-FRAME must be closed before
+using either assumption to justify frame compaction or stale-view handling.</p>
+<p>Dictionary lookup can have a derived index, but the retained entry store remains
+responsible for <code>#</code>, keys/values/pairs and shadowing history. Keeping old SymbolInfo alone
+is insufficient. Exact erase/rehash observations are OC-DICT, not permission to silently
+deduplicate entries.</p>
+<h2 id="4-one-authoritative-object-store">4. One authoritative object store</h2>
+<p>Class-table methods, nullary methods and typical-value tables are user-visible objects.
+Method installation and direct M2 table writes modify those objects. A method registry,
+lookup index or inline cache is derived and may be discarded. Do not create two mutable
+semantic authorities that require an unimplemented synchronization invariant.</p>
+<p>Caches must cover all mutable dependencies, including class/parent changes and reflected
+table writes. A global dispatch epoch is a simple conservative strategy, not a requirement
+to add a user-visible epoch object. Byte/profile lookup does not need invalidation after
+first registration; visibility lookup and method dispatch do.</p>
+<h2 id="5-front-end-and-binding">5. Front end and binding</h2>
+<p>Use the standalone byte parser as the language source of truth. Tokenize lazily with one
+lookahead entry and exact obeylines/followsNewline semantics. Don't reclassify a buffered
+token when a request changes mode. Register newly encountered generic words, not just
+special aliases. Do not eagerly parse/resolve a whole file before previous statements can
+change grammar, path or precision.</p>
+<p>The binder is an ordered effectful traversal with an aggregate error flag. A generic
+short-circuit Except traversal is inappropriate unless it explicitly reproduces native
+continuation edges. In particular, invalid operator-method capability is checked after
+binding RHS, while invalid literal/other target branches can return earlier. Correctness
+includes the state after binding failure, not only which expressions eventually run.</p>
+<p>Lowering retains source-word and selected-symbol identities until their distinct native
+checks are complete. It normalizes separators, decodes reals at current lowering precision,
+computes direct locations, and creates immutable function templates. It must not perform
+future type/method selection based only on the surface operator spelling.</p>
+<h2 id="6-runtime-continuation-design">6. Runtime continuation design</h2>
+<p>Use separate continuations for strict operands, each loop form and clause, try suppression,
+assignment-hook capture/calls, comparison second evaluation, and source-unit stages.
+These can share implementation helpers without sharing incorrect semantic catch boundaries.</p>
+<p>Typed completions remain desirable. Their representation must not determine catchability
+by convention: pinned try can catch step/finish; some loop clauses propagate continue;
+the second left evaluation of &lt;=/&gt;= has no native Error check. Pending host requests and
+budget suspensions are not delivered language values to be swallowed by such a branch.</p>
+<p>For global assignment, capture the old release method before symbol hooks, call it later,
+then look up the new assignment method. For augmented HashTable indexing, evaluate
+container, RHS, key, then lookup. Preserve the canonical-name Default fallback predicate.
+These rules are data/control dependencies, not optimizations that may be reordered.</p>
+<h2 id="7-lean-worksheet-module-and-transaction-boundary">7. Lean worksheet, module and transaction boundary</h2>
+<p>Host parsing/backtracking must not execute M2. A selected M2 parse result carries its
+source range, word-registration delta and entry environment version. Commit the delta
+only for the chosen command and matching session; reparse original bytes if the relevant
+environment changed. The parser result should be carried into elaboration rather than
+printed and reparsed through another grammar.</p>
+<p>Native core mode retains reached effects on failure. A transactional worksheet is a
+separate wrapper with explicit state, output and irreversible-host-effect rules. It cannot
+claim pinned-native error behavior merely because successful examples agree.</p>
+<p>Module artifacts contain declared external requirements and validated relocations. Linking
+resolves names in an explicit environment and allocates identities; do not serialize a
+build-session CellId as a live imported cell. Source parsing, binding and linked code are
+different artifact stages.</p>
+<h2 id="8-performance-requirements">8. Performance requirements</h2>
+<p>These are acceptance targets, not measured results in this revision.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Required direction</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Lexer</td>
+<td>Linear byte scanning apart from bounded lookahead and spelling hashing/comparison; no repeated remaining-suffix conversion</td>
+</tr>
+<tr>
+<td>Pratt parser</td>
+<td>Cached profile access; linear-size trees/builders; no repeated prefix append on wide sequences</td>
+</tr>
+<tr>
+<td>Namespace</td>
+<td>Expected constant lookup or logarithmic key comparisons, plus byte cost; retained history stored separately from its lookup index</td>
+</tr>
+<tr>
+<td>Ordinary local read</td>
+<td>Direct indexed slot/address after at most lexical-depth traversal; no string lookup</td>
+</tr>
+<tr>
+<td>Global read</td>
+<td>Direct resolved location; actual persistent-store indexing complexity stated honestly</td>
+</tr>
+<tr>
+<td>Cell update</td>
+<td>No O(total historical cells) linked-list update; no whole-heap copying on each snapshot write</td>
+</tr>
+<tr>
+<td>Closure call</td>
+<td>Allocate callee-local storage, not copies of all captured values</td>
+</tr>
+<tr>
+<td>Dispatch</td>
+<td>Sound cache invalidation; native primitive-before-fallback behavior preserved</td>
+</tr>
+<tr>
+<td>Control</td>
+<td>Explicit stack/trampoline where necessary; preserve language-visible recursion policy</td>
+</tr>
+</tbody>
+</table></div>
+<p>Benchmark lex, parse, bind, lower, execute, render and proof/replay separately. Include
+large dictionaries with shadow history, wide comma lists, deep arrows, long strings,
+hot closure updates, For capture, frame views, evolving sessions/snapshots and existing
+polynomial workloads. Record allocation and retained memory, toolchain and repeated runs.
+No performance gate is satisfied by choosing a container with a promising name.</p>
+<h2 id="9-refinement-and-trusted-boundary">9. Refinement and trusted boundary</h2>
+<p>An abstraction relation maps machine word IDs to byte keys/profiles, machine declarations
+to logical declarations, and storage/views to logical activations and observable object
+relations. Preserve symbol equality, canonical spelling, current cells, visibility history,
+class/method entries, hook order, completion kind and relevant host/diagnostic traces.</p>
+<p>Prove both: (a) a successful finite machine result is a matching specification result;
+(b) a finite specified execution is obtainable by the machine with sufficient resources.
+Do not accept a one-way theorem that a machine rejecting all inputs satisfies vacuously.
+Resource-bounded runners return a distinct exhaustion/suspension; divergence is not null.</p>
+<p>The proof sequence is: data/word history, cursor, parser including remaining input,
+binding with error state, layout/reification, completed primitive/reflection contracts,
+lowering, then optimized storage/execution. Grammar generation must be proved correct or
+its output checked by a trusted small checker. Source-derived expected values and native
+execution logs are testing evidence, not axioms.</p>
+<p>The full relation is still blocked by the active OC-* register. A proof must name its
+closed rule set, source/code, initial environment, compatibility profile and host/resource
+assumptions. No Lean compilation or theorem was run while editing these documents.</p>
+<h2 id="10-module-organization-and-migration">10. Module organization and migration</h2>
+<p>Prefer five responsibility groups initially: <strong>front end</strong>, <strong>binding/layout</strong>, <strong>runtime/
+objects</strong>, <strong>source-unit/host adapter</strong>, and <strong>verification/conformance</strong>. Additional file
+splits are engineering decisions, not separate language abstractions.</p>
+<p>Migrate the shared grammar/cursor first, then source-order binding, direct references and
+lowering. Apply the audited runtime/effect corrections before using old arithmetic tests
+as the sole oracle. Inventory bootstrap primitives and reflection before declaring Core
+compatible. Optimize storage once its observations are fixed, not by filling gaps with
+physical assumptions.</p>
+<p><code>CHANGELOG-v1.1.md</code> records which findings changed the contract and which remain open.
+The archived supplied text is retained for traceability only. The language contract is
+one active document; this architecture explains how to implement it, not a second set of
+semantics to reconcile with it.</p>
+</article><footer>Revision 1.1 · 29 September 2026 · No native M2 execution, Lean compilation or proof verification is claimed.</footer>
+</main></div></body></html>
