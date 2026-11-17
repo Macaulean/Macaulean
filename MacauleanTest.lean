@@ -34,3 +34,9 @@ import MacauleanTest.InterpreterGroebnerM2
 import MacauleanTest.InterpreterGroebner
 import MacauleanTest.InterpreterGroebnerDSL
 import MacauleanTest.InterpreterGroebnerImport
+import MacauleanTest.VerificationViews
+import MacauleanTest.VerificationIntent
+import MacauleanTest.VerificationDSL
+import MacauleanTest.VerificationImport
+import MacauleanTest.VerificationWidget
+import MacauleanTest.VerificationGraph

@@ -8,15 +8,25 @@ name = "buchbergerSource"
 path = "Macaulean/Interpreter/Buchberger.m2"
 text = true
 
+[[input_file]]
+name = "intentWidgetTest"
+path = "scripts/intent-widget.test.mjs"
+text = true
+
 [[lean_lib]]
 name = "Macaulean"
+roots = ["Macaulean", "Macaulean.Verification"]
 needs = ["buchbergerSource"]
+precompileModules = true
 
 [[lean_lib]]
 name = "MRDI"
+roots = ["MRDI", "MRDI.Poly", "MRDI.Uuid"]
+precompileModules = true
 
 [[lean_lib]]
 name = "MacauleanTest"
+needs = ["intentWidgetTest"]
 
 [[lean_exe]]
 name = "macaulean"
