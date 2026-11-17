@@ -212,6 +212,45 @@ theorem twice_spec (a b : Nat) : twice (a, b) ⇓ 2 * Nat.gcd a b := by
   rw [Nat.gcd_comm b a]; omega   -- ⊢ a.gcd b + b.gcd a = 2 * a.gcd b
 ```
 
+### Lists and sequences
+
+A Lean `List α` represents an M2 list. `Macaulean.M2.Seq α` wraps a `List α`
+in its `values` field and represents an M2 sequence, including empty and
+singleton sequences. Both work with any element type having a `ToM2` instance.
+
+```lean
+joinCollections = (a,b) -> a | b;
+
+theorem joinSequences_spec (xs ys : Macaulean.M2.Seq Nat) :
+    joinCollections (xs, ys) ⇓ Macaulean.M2.Seq.mk (xs.values ++ ys.values) := by
+  m2_unfold
+```
+
+A variadic function `s -> ...` receives a whole sequence; a fixed parameter list
+`(a,b) -> ...` unpacks it. Tuples retain their existing argument behavior. To pass
+a sequence as one of several arguments, use a tuple such as `(s, i)`.
+
+`Handles/Collections.lean` supplies `m2_simp` lemmas for these operations.
+`m2_unfold` supports length, concatenation, indexing, and index-existence checks
+for both collection types. Natural indices require `i < xs.length`. Signed
+indices count from the end when negative: the effective index is
+`if i < 0 then i + xs.length else i`, and must be between zero (inclusive) and
+length (exclusive). Conditions from a guarding `if` can discharge these bounds.
+An invalid access cannot establish a successful-return theorem.
+
+Ranges `a..b` and `a..<b` return sequences with lengths `(b-a+1).toNat` and
+`(b-a).toNat` respectively; descending ranges are empty. Repetition `n:x`
+returns a sequence represented by `List.replicate n.toNat x`, so a negative count
+produces an empty sequence. Concatenation requires matching collection kinds.
+Collection equality automation is not included in this operation set.
+
+`Examples/CollectionHandles.lean` is a short worksheet demonstrating sequence
+results, modular reuse, and negative indexing.
+`MacauleanTest/VerificationHandlesCollections.lean` proves these operations on
+symbolic inputs, composes collection-valued calls with `m2_use`, and proves a
+recursive sequence sum by induction on `s.values.length - i`. The same measure
+already appears in the recursive list example in `VerificationHandles.lean`.
+
 ### Statements
 
 | Statement | Meaning |
@@ -334,10 +373,12 @@ through the handle interface.
   takes the callees' `correct` theorems as hypotheses. This gives modular
   verification, and the same mechanism gives library functions (`normalForm`, …)
   prebuilt contracts. Mutual recursion needs a shared measure.
-- **Lists and sequences** *(done for handles: length and in-range indexing)*.
-  These are immutable in the DSL, so they fit the
-  current state-free design. The domain is `List τ`, indexing gets an in-bounds
-  obligation, and recursion over lists can use `length` as the measure.
+- **Lists and sequences** *(done for handles: immutable construction, length,
+  concatenation, signed indexing, index checks, ranges, repetition, and recursive
+  traversal proofs)*. The domains are `List τ` and `Seq τ`; indexing requires
+  bounds, and recursion can use a length-based measure. See the collection
+  section above for the supported operation set. Typed collection contracts for
+  `#m2_verify` remain a separate extension.
 - **Polynomials.** The domain is `Views.Polynomial r` with its denotation. Much
   of step 4 already exists:
   - `PolynomialArithmetic.eval_add`/`eval_sub`/`eval_mul` give the

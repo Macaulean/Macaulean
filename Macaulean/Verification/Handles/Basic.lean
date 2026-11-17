@@ -120,6 +120,16 @@ instance : ToM2 Rat := ⟨.qq⟩
 instance : ToM2 Bool := ⟨.bool⟩
 instance [ToM2 α] : ToM2 (List α) := ⟨fun l => .list (l.map ToM2.toValue)⟩
 
+/-- A homogeneous M2 sequence. Unlike `List α`, this embeds as `.sequence`.
+A sequence passed to a fixed-parameter function is unpacked by the runtime;
+a variadic (`s -> ...`) function receives the whole sequence. -/
+structure Seq (α : Type) where
+  values : List α
+  deriving Repr, DecidableEq
+
+instance [ToM2 α] : ToM2 (Seq α) :=
+  ⟨fun s => .sequence (s.values.map ToM2.toValue)⟩
+
 /-- The components of a tuple. -/
 class ToM2Seq (α : Type) where
   toSeq : α → List Value
