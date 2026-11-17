@@ -1,5 +1,6 @@
 import Macaulean.Verification.Handles.Simp
 import Macaulean.Verification.Handles.Frontend
+import Macaulean.Verification.Handles.Rationals
 
 /-!
 # `m2_unfold`: one step of a worksheet function, as ordinary mathematics
@@ -63,6 +64,7 @@ private def asLean? (v : Expr) : MetaM (Option Expr) := do
       | .lit (.natVal k) => return some (mkNatLit k)
       | _ => return some i
     | _ => return some i
+  | Value.qq q => return some q
   | Value.bool b => return some b
   | Value.list xs =>
     match_expr xs with

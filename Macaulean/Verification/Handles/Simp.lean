@@ -1,12 +1,14 @@
 import Macaulean.Verification.Handles.Intro
 import Macaulean.Verification.Handles.Attr
+import Macaulean.Verification.Handles.Operators
 
 /-!
 # Production operations on represented values
 
-These `m2_simp` lemmas evaluate the interpreter's own `evalBinOp`/`evalUnOp` on
-integers (naturals are integers `.zz ↑n`) and Booleans, and discharge the side
-conditions of `wpV`. They are all proved from the production definitions.
+The operator reducer handles production dispatch. These `m2_simp` lemmas supply
+value representations, mathematical normal forms (such as integer comparisons
+without rational casts), and side conditions for `wpV`. Naturals are integers
+`.zz ↑n`. The laws are proved from the production definitions.
 -/
 namespace Macaulean.M2.Handles
 open Lexical Macaulean.M2.Runtime
@@ -25,11 +27,6 @@ variable (x y : Int)
 @[m2_simp] theorem toValue_list {α : Type} [ToM2 α] (l : List α) :
     ToM2.toValue l = Value.list (l.map ToM2.toValue) := rfl
 
-@[m2_simp] theorem zz_add : evalBinOp .add (.zz x) (.zz y) = .ok (.zz (x + y)) := rfl
-@[m2_simp] theorem zz_sub : evalBinOp .sub (.zz x) (.zz y) = .ok (.zz (x - y)) := rfl
-@[m2_simp] theorem zz_mul : evalBinOp .mul (.zz x) (.zz y) = .ok (.zz (x * y)) := rfl
-@[m2_simp] theorem zz_quot : evalBinOp .quot (.zz x) (.zz y) = .ok (.zz (x / y)) := rfl
-@[m2_simp] theorem zz_rem : evalBinOp .rem (.zz x) (.zz y) = .ok (.zz (x % y)) := rfl
 @[m2_simp] theorem zz_pow (n : Nat) : evalBinOp .pow (.zz x) (.zz n) = .ok (.zz (x ^ n)) := by
   simp [evalBinOp, intZPow]
 @[m2_simp] theorem zz_eq : evalBinOp .eq (.zz x) (.zz y) = .ok (.bool (decide (x = y))) := by
@@ -44,7 +41,6 @@ variable (x y : Int)
   simp [evalBinOp, Value.toRat?, Rat.intCast_lt_intCast]
 @[m2_simp] theorem zz_ge : evalBinOp .ge (.zz x) (.zz y) = .ok (.bool (decide (y ≤ x))) := by
   simp [evalBinOp, Value.toRat?, Rat.intCast_le_intCast]
-@[m2_simp] theorem zz_neg : evalUnOp .neg (.zz x) = .ok (.zz (-x)) := rfl
 @[m2_simp] theorem bool_not (b : Bool) : evalUnOp .notOp (.bool b) = .ok (.bool !b) := rfl
 @[m2_simp] theorem bool_eq (a b : Bool) :
     evalBinOp .eq (.bool a) (.bool b) = .ok (.bool (a == b)) := rfl
