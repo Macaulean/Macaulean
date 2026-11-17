@@ -31,7 +31,7 @@ variable (x y : Int)
 @[m2_simp] theorem zz_quot : evalBinOp .quot (.zz x) (.zz y) = .ok (.zz (x / y)) := rfl
 @[m2_simp] theorem zz_rem : evalBinOp .rem (.zz x) (.zz y) = .ok (.zz (x % y)) := rfl
 @[m2_simp] theorem zz_pow (n : Nat) : evalBinOp .pow (.zz x) (.zz n) = .ok (.zz (x ^ n)) := by
-  simp [evalBinOp]
+  simp [evalBinOp, intZPow]
 @[m2_simp] theorem zz_eq : evalBinOp .eq (.zz x) (.zz y) = .ok (.bool (decide (x = y))) := by
   simp [evalBinOp, Value.toRat?, Rat.intCast_inj]
 @[m2_simp] theorem zz_ne : evalBinOp .ne (.zz x) (.zz y) = .ok (.bool (decide (x ≠ y))) := by
