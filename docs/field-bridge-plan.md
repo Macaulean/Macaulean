@@ -61,17 +61,17 @@ Lean's standard axioms.
 
 The existing factorization predicates moved into `Macaulean.Factorization` to
 avoid collisions with Mathlib's root names. Their positive and negative tactic
-tests are preserved. The incoming row-proof, runtime-environment, and MRDI changes
-from upstream through `b7ea4fe` are integrated; the combined test root retains both
+tests are preserved. The incoming row-proof, runtime-environment, MRDI, reduction-proof, and stateful-handle changes
+from upstream through `2d56259` are integrated; the combined test root retains both
 upstream and bridge suites.
 
 ## Validation and delivery
 
-Validation after integrating upstream `b7ea4fe`:
+Validation after integrating upstream `2d56259`:
 
-* `lake test`: passed all 9,148 targets, including the upstream row/MRDI/environment
+* `lake test`: passed all 9,211 targets, including the upstream row/MRDI/environment/reduction/handle
   tests, native M2 comparisons, and the complete mathematical bridge suite.
-* `lake build`: passed (281 jobs), including the default executable.
+* `lake build`: passed (338 jobs), including the default executable.
 * `lake env lean Examples/FieldIdealBridge.lean`: passed with default options.
 * Generated QQ/F_5 Gröbner theorem axiom guards: only `propext`, `Classical.choice`,
   and `Quot.sound`. Negative certificate and import controls also passed.

@@ -81,7 +81,8 @@ theorem lead_coefficient (p : Views.Polynomial r) :
 theorem lead_monomial (p : Views.Polynomial r) (v : Value)
     (success : callPrimitive .leadMonomial p.value = .ok v) :
     ∃ out : Views.Polynomial r, v = out.value := by
-  simp only [callPrimitive, unaryArg, unpack, asPolynomial, normalize_bridge, liftError,
+  have notPrime : decide (Primitive.leadMonomial = Primitive.primeField) = false := rfl
+  simp only [callPrimitive, notPrime, Finite.contains, Bool.or_false, Bool.false_eq_true, if_false, unaryArg, unpack, asPolynomial, normalize_bridge, liftError,
     Except.mapError, Views.Polynomial.value, Views.Polynomial.raw,
     bind, Except.bind, pure, Except.pure] at success
   cases ht : (encode (KernelPolynomial.normalize p.data)).head? with
@@ -147,8 +148,17 @@ private theorem index_value_member (xs : List Value) (i : Int) (v : Value)
 /-- Successful indexing selects an existing element, including negative indices. -/
 theorem index_member (xs : List Value) (i v : Value)
     (success : evalBinOp .index (.list xs) i = .ok v) : v ∈ xs := by
-  cases i <;> try (simp [evalBinOp, evalBinary] at success)
-  case zz i => exact index_value_member xs i v success
+  cases i with
+  | algebra object =>
+    cases object <;> try (simp [evalBinOp, evalBinary, Finite.evalBinary,
+      Finite.polyRing?, Finite.scalarOffset?, Finite.cast, Finite.scalar,
+      bind, Except.bind, pure, Except.pure] at success)
+    case finite object =>
+      cases object <;> simp [evalBinOp, evalBinary, Finite.evalBinary,
+        Finite.polyRing?, Finite.scalarOffset?, Finite.cast, Finite.scalar,
+        bind, Except.bind, pure, Except.pure] at success
+  | zz i => exact index_value_member xs i v success
+  | _ => simp [evalBinOp, evalBinary] at success
 
 open ProofJobs.RuntimeReduction in
 /-- Cancellation can only select one of the supplied represented reducers. -/
