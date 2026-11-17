@@ -36,6 +36,7 @@ import MacauleanTest.InterpreterGroebnerDSL
 import MacauleanTest.InterpreterGroebnerImport
 import MacauleanTest.VerificationViews
 import MacauleanTest.PolynomialArithmetic
+import MacauleanTest.CoefficientArithmetic
 import MacauleanTest.VerificationIntent
 import MacauleanTest.VerificationDSL
 import MacauleanTest.VerificationImport

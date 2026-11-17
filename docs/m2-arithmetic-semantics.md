@@ -65,9 +65,10 @@ theorems and the source/effect examples. Only `propext`, `Classical.choice`, and
 
 ## Boundaries and next mathematical steps
 
-These are denotation theorems over rational assignments. They do not yet prove
-the coefficientwise `Views.Equivalent` or finite-convolution contracts used by
-Stage 1. In particular, neither `RuntimeReduction.RepresentationStatement` nor
+The original milestone supplies denotation theorems over rational assignments.
+The [coefficientwise follow-up](m2-coefficient-contracts.md) now connects the same
+arithmetic to the existing Stage 1 coefficient and finite-convolution views.
+Neither `RuntimeReduction.RepresentationStatement` nor
 `RuntimeReduction.IrreducibleStatement` is discharged by this milestone.
 No parser-correctness, full reduction, termination, or full Buchberger theorem is
 claimed. There are no changes to algorithm execution, approval tokens, proof
@@ -75,14 +76,12 @@ acceptance, or the existing contract definitions.
 
 The next focused increments are:
 
-1. Prove coefficientwise arithmetic laws compatible with `Views.coefficient`
-   and `Views.productCoefficient`, and connect them to the same runtime operators.
-2. Prove dimension and representation preservation for the executed
+1. Prove dimension and representation preservation for the executed
    `m2gbSubtractRow` helper, including its lexical bindings and recursive calls.
-3. Establish the `m2gbReduce` representation invariant by induction on evaluation
+2. Establish the `m2gbReduce` representation invariant by induction on evaluation
    fuel, composing the arithmetic and row lemmas through the actual function.
-4. Prove leading-term selection and irreducibility preservation separately.
-5. Connect the completed representation theorem to an ideal-membership theorem
+3. Prove leading-term selection and irreducibility preservation separately.
+4. Connect the completed representation theorem to an ideal-membership theorem
    usable through Macaulean's existing mathematical interface.
 
 This work starts from PR #39, commit
