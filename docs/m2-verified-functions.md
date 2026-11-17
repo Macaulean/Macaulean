@@ -350,9 +350,9 @@ Each new feature follows the same five-step recipe:
    of the work.
 5. **Extend the fragment checker and the command's binder types.**
 
-For the handle interface, steps 2 and 3 are already done for most of the
-language, because `wpV` works on arbitrary values. A new kind of value usually
-needs only step 4: `@[m2_simp]` lemmas, plus a `ToM2` instance so it can appear
+For the handle interface, steps 2 and 3 are already done for the supported
+`wpLocal` fragment described above, which works on arbitrary runtime values.
+A new kind of value within that fragment usually needs only step 4: `@[m2_simp]` lemmas, plus a `ToM2` instance so it can appear
 in statements.
 
 Suggested next steps, roughly in order of effort. Some of them are now available
@@ -374,7 +374,7 @@ through the handle interface.
   prebuilt contracts. Mutual recursion needs a shared measure.
 - **Lists and sequences** *(done for handles: length and in-range indexing)*.
   These are immutable in the DSL, so they fit the
-  current state-free design. The domain is `List τ`, indexing gets an in-bounds
+  caller-preserving handle contract. The domain is `List τ`, indexing gets an in-bounds
   obligation, and recursion over lists can use `length` as the measure.
 - **Polynomials.** The domain is `Views.Polynomial r` with its denotation. Much
   of step 4 already exists:
@@ -385,9 +385,10 @@ through the handle interface.
 
   VCs become ring identities, which `grind`'s commutative-ring solver can often
   close. A contract has to fix the ring, which is part of the runtime state.
-- **Local variables and `;`.** This is the most invasive extension. Slots become
-  mutable, so `wp` must thread a store, and `AllocatesOnly` must be weakened to
-  "writes only this frame's cells".
+- **Local variables, `;`, and early return** *(done for handles)*. `wpLocal`
+  threads private slot values, and `LocalFrame` permits writes to newly allocated
+  cells while retaining the existing caller-preservation contract. Global or
+  captured-cell mutation and simultaneous assignment remain unsupported.
 - **Smaller items.**
   - a partial-correctness mode without a measure, by induction on fuel;
   - lexicographic measures;
