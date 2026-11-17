@@ -1,5 +1,7 @@
 import Macaulean.Factorization
 
+open Macaulean.Factorization
+
 def twelve : Nat := 12
 def factor12 : Nat := by
   m2factor twelve

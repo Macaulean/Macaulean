@@ -29,6 +29,7 @@ def rawMatrixExpr : List (List Polynomials.Raw) → Expr
       (mkApp (mkConst ``List [0]) (mkConst ``Polynomials.Raw))
       (rawPolynomialsExpr p) (rawMatrixExpr ps)
 def algebraObjectExpr : Polynomials.Object → Expr
+  | .finite a => mkApp (mkConst ``Polynomials.Object.finite) (toExpr a)
   | .rationals => mkConst ``Polynomials.Object.rationals
   | .ring r => mkApp (mkConst ``Polynomials.Object.ring) (algebraRingExpr r)
   | .poly r p => mkApp2 (mkConst ``Polynomials.Object.poly) (algebraRingExpr r) (rawPolynomialExpr p)

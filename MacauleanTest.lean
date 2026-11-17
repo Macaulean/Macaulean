@@ -8,6 +8,13 @@ import MacauleanTest.Interpreter
 import MacauleanTest.InterpreterM2
 import MacauleanTest.InterpreterDSL
 import MacauleanTest.DefinitionExposure
+import MacauleanTest.MathematicalExport
+import MacauleanTest.MathematicalExportImport
+import MacauleanTest.CertificateCommands
+import MacauleanTest.CertificateCommandsImport
+import MacauleanTest.PrimeFieldAlgebra
+import MacauleanTest.FiniteFieldWorksheet
+import MacauleanTest.FiniteFieldsM2
 import MacauleanTest.DefinitionExposureImport
 import MacauleanTest.DefinitionExposureLarge
 import MacauleanTest.DefinitionExposureVerification
@@ -56,6 +63,9 @@ import MacauleanTest.VerificationHandles
 import MacauleanTest.VerificationLocalHandles
 import MacauleanTest.ProofJobKernel
 import MacauleanTest.LanguageReference
+
+-- Standard polynomial semantics and the mathematical Gröbner certificate interface.
+import MacauleanMathlibTest
 import MacauleanTest.PolynomialExprMRDI
 import MacauleanTest.RuntimeEnvironment
 import MacauleanTest.ReductionFoundations

@@ -19,7 +19,7 @@ open Verification.RowProgram (AllocatesOnly)
 open Verification.NatContracts (logicBool eval_mono evalMany_mono call_mono)
 
 def isBasis : Value → Bool
-  | .algebra (.basis ..) => true
+  | .algebra (.basis ..) | .algebra (.finite (.basis ..)) => true
   | _ => false
 
 /-- `op` neither builds a function nor calls `normalForm` on these operands. -/
