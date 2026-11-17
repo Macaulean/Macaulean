@@ -5,7 +5,7 @@ import Macaulean.Verification.Handles.Frontend
 # `m2_unfold`: one step of a worksheet function, as ordinary mathematics
 
 On a goal `f a ⇓ r`, `f a ↓` or `Fn.Call.Sat (f a) Q`, where `f` is a closure,
-`m2_unfold` replaces the call by its body (`Fn.Call.Sat.intro`), evaluates the
+`m2_unfold` replaces the call by its body (`Fn.Call.Sat.introLocalWp`), evaluates the
 production operations with `m2_simp`, and presents what is left in Lean terms:
 naturals instead of casts, and calls `g (x, y) ⇓ s` instead of runtime values.
 -/
@@ -139,9 +139,9 @@ elab "m2_unfold_raw" : tactic => withMainContext do
   evalTactic (← `(tactic| try unfold Fn.Call.Terminates))
   evalTactic (← `(tactic|
     first
-    | (apply Fn.Call.Sat.intro (by rfl) (by rfl) (by rfl))
+    | (apply Fn.Call.Sat.introLocalWp (by rfl) (by rfl))
     | fail "m2_unfold: the goal is not a call of an M2 closure"))
-  evalTactic (← `(tactic| simp only [wpV, wpArgs]))
+  evalTactic (← `(tactic| simp only [wpLocal, wpLocalArgs]))
   let goal ← getMainTarget
   let facts ← lookupFacts goal
   let mut names : Array Ident :=

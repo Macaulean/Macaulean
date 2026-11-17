@@ -133,6 +133,7 @@ weakening the target, suppressing diagnostics or using `sorry`.
 
 The identity result is generic over admissible inputs, not a one-input execution
 certificate. The branch also contains generic coefficient-row/conservation laws.
-The actual `m2gbReduce` representation and irreducibility targets are explicitly
-still unproved. A passing smoke test establishes the proof-job mechanism, not
+The subsequent [source reduction proofs](m2-reduction-proof.md) discharge the
+actual `m2gbReduce` representation and irreducibility targets. A passing smoke
+test alone establishes the proof-job mechanism, not
 universal correctness of the Gröbner-basis algorithm or completion of all Stage 2.

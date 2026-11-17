@@ -60,9 +60,13 @@ import MacauleanTest.VerificationWidget
 import MacauleanTest.VerificationGraph
 import MacauleanTest.VerificationNatContracts
 import MacauleanTest.VerificationHandles
+import MacauleanTest.VerificationLocalHandles
 import MacauleanTest.ProofJobKernel
 
 -- Standard polynomial semantics and the mathematical Gröbner certificate interface.
 import MacauleanMathlibTest
 import MacauleanTest.PolynomialExprMRDI
 import MacauleanTest.RuntimeEnvironment
+import MacauleanTest.ReductionFoundations
+import MacauleanTest.ReductionRepresentation
+import MacauleanTest.ReductionIrreducibility
