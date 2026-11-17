@@ -90,6 +90,7 @@ inductive Primitive where
   | ring | coefficientRing | generators | entries | numgens | ideal | promote | coefficient
   | monomialDivides | monomialQuotient | monomialLCM | monomialCompare | fromExponents
   | asIdeal | generatorList | makeBasis | normalFormData | changeMatrix | numRows | numColumns
+  | gcdInputs
   deriving Repr, DecidableEq, Inhabited
 
 def Primitive.name : Primitive → String
@@ -105,11 +106,13 @@ def Primitive.name : Primitive → String
   | .asIdeal => "m2AsIdeal" | .generatorList => "m2GeneratorList"
   | .makeBasis => "m2MakeBasis" | .normalFormData => "m2NormalFormData"
   | .changeMatrix => "getChangeMatrix" | .numRows => "numRows" | .numColumns => "numColumns"
+  | .gcdInputs => "m2GCDInputs"
 def primitives : List Primitive := [
   .leadCoefficient,.leadMonomial,.leadTerm,.exponents,.terms,.listForm,.size,
   .ring,.coefficientRing,.generators,.entries,.numgens,.ideal,.promote,.coefficient,
   .monomialDivides,.monomialQuotient,.monomialLCM,.monomialCompare,.fromExponents,
-  .asIdeal,.generatorList,.makeBasis,.normalFormData,.changeMatrix,.numRows,.numColumns]
+  .asIdeal,.generatorList,.makeBasis,.normalFormData,.changeMatrix,.numRows,.numColumns,
+  .gcdInputs]
 
 /-- First-order immutable result containers. `basis` stores one representation row
 per output generator. `matrix` retains its column count even with zero rows.

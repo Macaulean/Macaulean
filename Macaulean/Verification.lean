@@ -7,6 +7,8 @@ import Macaulean.Verification.Intent
 import Macaulean.Verification.Index
 import Macaulean.Verification.Frontend
 import Macaulean.Verification.Server
+import Macaulean.Interpreter.GCD.ProofCommand
+import Macaulean.Interpreter.GCD.AutomaticCorrectness
 
 /-!
 # M2-first intent review

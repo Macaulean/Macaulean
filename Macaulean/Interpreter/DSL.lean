@@ -6,7 +6,7 @@ import Macaulean.Interpreter.Session
 declare_syntax_cat m2
 register_option m2.maxDepth : Nat := {
   defValue := 4096
-  descr := "Maximum M2 evaluation depth; exhaustion is an error and rolls back the input." }
+  descr := "Maximum surrounding M2 evaluation depth; verified gcd calls use their own input-derived budget. Exhaustion rolls back the input." }
 
 namespace Macaulean.M2.DSL
 open Lean
